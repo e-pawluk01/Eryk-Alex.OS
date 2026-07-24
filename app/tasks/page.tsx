@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { Folder, Task } from "@/lib/types";
 import { useGlobalContext } from "@/components/global-context";
 import { TaskItem } from "@/components/task-item";
+import { TaskDetailsPanel } from "@/components/task-details-panel";
 import { Folder as FolderIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +15,7 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -39,7 +41,18 @@ export default function TasksPage() {
     setTasks(prev => 
       prev.map(t => t.id === id ? { ...t, status: newStatus } : t)
     );
+    if (selectedTask?.id === id) {
+      setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
+    }
     await supabase.from("tasks").update({ status: newStatus }).eq("id", id);
+  };
+
+  const handleUpdateTask = async (id: string, updates: Partial<Task>) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    if (selectedTask?.id === id) {
+      setSelectedTask(prev => prev ? { ...prev, ...updates } : null);
+    }
+    await supabase.from("tasks").update(updates).eq("id", id);
   };
 
   const filteredFolders = useMemo(() => {
@@ -70,7 +83,8 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="flex h-[80vh] gap-8 mt-4">
+    <>
+      <div className="flex h-[80vh] gap-8 mt-4">
       
       {/* Left Panel: Folders */}
       <aside className="w-1/3 md:w-1/4 flex flex-col gap-4 border-r border-border pr-4 overflow-y-auto">
@@ -109,7 +123,12 @@ export default function TasksPage() {
           ) : (
             <div className="flex flex-col">
               {folderTaskTree.map(task => (
-                <TaskItem key={task.id} task={task} onToggleStatus={handleToggleStatus} />
+                <TaskItem 
+                  key={task.id} 
+                  task={task} 
+                  onToggleStatus={handleToggleStatus} 
+                  onSelect={setSelectedTask} 
+                />
               ))}
             </div>
           )}
@@ -117,5 +136,13 @@ export default function TasksPage() {
       </section>
 
     </div>
+      
+      {/* Slide-over panel */}
+      <TaskDetailsPanel 
+        task={selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onUpdate={handleUpdateTask}
+      />
+    </>
   );
 }

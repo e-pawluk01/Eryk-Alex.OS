@@ -10,10 +10,11 @@ import { cn } from "@/lib/utils";
 interface TaskItemProps {
   task: Task;
   onToggleStatus: (id: string, newStatus: "todo" | "done") => void;
+  onSelect?: (task: Task) => void;
   level?: number;
 }
 
-export function TaskItem({ task, onToggleStatus, level = 0 }: TaskItemProps) {
+export function TaskItem({ task, onToggleStatus, onSelect, level = 0 }: TaskItemProps) {
   const [expanded, setExpanded] = useState(true);
   const hasSubtasks = task.subTasks && task.subTasks.length > 0;
 
@@ -21,14 +22,18 @@ export function TaskItem({ task, onToggleStatus, level = 0 }: TaskItemProps) {
     <div className="flex flex-col w-full">
       <div 
         className={cn(
-          "flex items-start gap-3 py-3 group hover:bg-white/[0.02] transition-colors rounded-md pr-3",
+          "flex items-start gap-3 py-3 group hover:bg-white/[0.02] transition-colors rounded-md pr-3 cursor-pointer relative",
           level > 0 ? "ml-6" : ""
         )}
+        onClick={(e) => {
+          // Prevent opening panel if clicking chevron or checkbox
+          if (onSelect) onSelect(task);
+        }}
       >
         <div className="flex items-center pt-0.5 min-w-5 justify-center">
           {hasSubtasks ? (
             <button 
-              onClick={() => setExpanded(!expanded)}
+              onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -38,7 +43,7 @@ export function TaskItem({ task, onToggleStatus, level = 0 }: TaskItemProps) {
           )}
         </div>
         
-        <div className="pt-0.5">
+        <div className="pt-0.5" onClick={e => e.stopPropagation()}>
           <CustomCheckbox 
             checked={task.status === "done"} 
             onChange={(checked) => onToggleStatus(task.id, checked ? "done" : "todo")} 
@@ -61,17 +66,25 @@ export function TaskItem({ task, onToggleStatus, level = 0 }: TaskItemProps) {
             </p>
           )}
         </div>
+
+        {/* Deadline Dot */}
+        {task.due_date && (
+          <div className="flex items-center justify-center pt-1 pr-2" title={`Due: ${task.due_date}`}>
+            <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
+          </div>
+        )}
       </div>
       
       {hasSubtasks && expanded && (
         <div className="flex flex-col relative before:absolute before:left-[17px] before:top-0 before:bottom-4 before:w-[1px] before:bg-border/50">
           {task.subTasks!.map(subtask => (
-            <TaskItem 
-              key={subtask.id} 
-              task={subtask} 
-              onToggleStatus={onToggleStatus} 
-              level={level + 1} 
-            />
+              <TaskItem 
+                key={subtask.id} 
+                task={subtask} 
+                onToggleStatus={onToggleStatus} 
+                onSelect={onSelect}
+                level={level + 1} 
+              />
           ))}
         </div>
       )}

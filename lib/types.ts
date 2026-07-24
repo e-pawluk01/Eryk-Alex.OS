@@ -18,6 +18,7 @@ export interface Task {
   parent_id: string | null;
   context: ContextType;
   scheduled_date: string | null; // ISO Date string (YYYY-MM-DD)
+  due_date: string | null;
   status: "todo" | "done";
   folder_id: string | null;
   created_at: string;

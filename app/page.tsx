@@ -6,13 +6,15 @@ import { Goal, Task } from "@/lib/types";
 import { useGlobalContext } from "@/components/global-context";
 import { ContextTag } from "@/components/ui/context-tag";
 import { TaskItem } from "@/components/task-item";
-import { isToday, isTomorrow, isAfter, startOfDay } from "date-fns";
+import { TaskDetailsPanel } from "@/components/task-details-panel";
+import { isToday, isTomorrow, isAfter, startOfDay, addDays, isSameDay, format } from "date-fns";
 
 export default function Home() {
   const { currentContext } = useGlobalContext();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -33,7 +35,19 @@ export default function Home() {
     setTasks(prev => 
       prev.map(t => t.id === id ? { ...t, status: newStatus } : t)
     );
+    // If we're updating the currently selected task, update that state too
+    if (selectedTask?.id === id) {
+      setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
+    }
     await supabase.from("tasks").update({ status: newStatus }).eq("id", id);
+  };
+
+  const handleUpdateTask = async (id: string, updates: Partial<Task>) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    if (selectedTask?.id === id) {
+      setSelectedTask(prev => prev ? { ...prev, ...updates } : null);
+    }
+    await supabase.from("tasks").update(updates).eq("id", id);
   };
 
   const filteredGoals = useMemo(() => {
@@ -61,19 +75,19 @@ export default function Home() {
 
   const todayStr = startOfDay(new Date()).toISOString();
 
-  // Kanban tasks (flat list, only parents or independent tasks, or all?)
-  // Usually Kanban shows top-level tasks.
+  // Tasks mapped for the rail (top level only or all? Let's use topLevelTasks for scheduling)
   const topLevelTasks = filteredTasks.filter(t => !t.parent_id);
 
-  const todayTasks = topLevelTasks.filter(t => t.scheduled_date && isToday(new Date(t.scheduled_date)));
-  const tomorrowTasks = topLevelTasks.filter(t => t.scheduled_date && isTomorrow(new Date(t.scheduled_date)));
-  const laterTasks = topLevelTasks.filter(t => t.scheduled_date && isAfter(startOfDay(new Date(t.scheduled_date)), startOfDay(new Date(todayStr)) ) && !isTomorrow(new Date(t.scheduled_date)));
-
-  // Build tree only for today tasks (including their subtasks even if subtasks have no scheduled_date or different)
-  // For the MVP, we assume subtasks are grouped under their parent's date.
+  // Build tree only for today tasks
   const todayTaskTree = buildTaskTree(filteredTasks).filter(t => 
     t.scheduled_date && isToday(new Date(t.scheduled_date))
   );
+
+  // Generate 7 days for the weekly rail
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(new Date()), i));
+  const getTaskCountForDate = (date: Date) => {
+    return topLevelTasks.filter(t => t.scheduled_date && isSameDay(new Date(t.scheduled_date), date)).length;
+  };
 
   if (loading) {
     return <div className="animate-pulse flex flex-col gap-12 mt-8">
@@ -105,53 +119,41 @@ export default function Home() {
         )}
       </section>
 
-      {/* KANBAN SECTION */}
+      {/* WEEKLY RAIL SECTION */}
       <section className="flex flex-col gap-4">
-        <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground border-b border-border pb-2">Kanban</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          <div className="flex flex-col gap-3 bg-card border border-border rounded-lg p-4 h-min min-h-[200px]">
-            <h3 className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Today</h3>
-            {todayTasks.length === 0 && <p className="text-xs text-muted-foreground/50 italic">Nothing scheduled</p>}
-            {todayTasks.map(task => (
-              <div key={task.id} className="bg-background border border-border p-3 rounded-md text-sm">
-                <div className="flex justify-between items-start gap-2 mb-2">
-                  <span className={task.status === "done" ? "line-through text-muted-foreground" : ""}>{task.title}</span>
-                  <CustomCheckbox checked={task.status === "done"} onChange={(c) => handleToggleStatus(task.id, c ? "done" : "todo")} />
+        <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground border-b border-border pb-2">Weekly Rail</h2>
+        <div className="grid grid-cols-7 gap-2 md:gap-4">
+          {weekDays.map((date, i) => {
+            const isTodayDate = i === 0;
+            const taskCount = getTaskCountForDate(date);
+            return (
+              <div 
+                key={date.toISOString()} 
+                className={`flex flex-col items-center justify-between p-3 rounded-lg border transition-colors ${
+                  isTodayDate ? "bg-white/10 border-white/20" : "bg-card border-border"
+                }`}
+              >
+                <span className={`text-[10px] uppercase tracking-widest font-semibold ${isTodayDate ? "text-white" : "text-muted-foreground"}`}>
+                  {isTodayDate ? "Today" : format(date, "EEE")}
+                </span>
+                <span className={`text-xs mt-1 ${isTodayDate ? "text-white/80" : "text-muted-foreground/50"}`}>
+                  {format(date, "d")}
+                </span>
+                
+                {/* Density Indicator */}
+                <div className="mt-4 flex flex-col gap-1 w-full items-center h-12 justify-end">
+                  {taskCount > 0 ? (
+                    Array.from({ length: Math.min(taskCount, 5) }).map((_, idx) => (
+                      <div key={idx} className={`w-full h-1.5 rounded-full ${isTodayDate ? "bg-white" : "bg-primary/50"}`} />
+                    ))
+                  ) : (
+                    <div className="w-full h-1.5 rounded-full bg-border/30" />
+                  )}
+                  {taskCount > 5 && <span className="text-[9px] text-muted-foreground mt-1">+{taskCount - 5}</span>}
                 </div>
-                <ContextTag context={task.context} />
               </div>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-3 bg-card border border-border rounded-lg p-4 h-min min-h-[200px]">
-            <h3 className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Tomorrow</h3>
-            {tomorrowTasks.length === 0 && <p className="text-xs text-muted-foreground/50 italic">Nothing scheduled</p>}
-            {tomorrowTasks.map(task => (
-              <div key={task.id} className="bg-background border border-border p-3 rounded-md text-sm">
-                <div className="flex justify-between items-start gap-2 mb-2">
-                  <span className={task.status === "done" ? "line-through text-muted-foreground" : ""}>{task.title}</span>
-                  <CustomCheckbox checked={task.status === "done"} onChange={(c) => handleToggleStatus(task.id, c ? "done" : "todo")} />
-                </div>
-                <ContextTag context={task.context} />
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-3 bg-card border border-border rounded-lg p-4 h-min min-h-[200px]">
-            <h3 className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Later</h3>
-            {laterTasks.length === 0 && <p className="text-xs text-muted-foreground/50 italic">Nothing scheduled</p>}
-            {laterTasks.map(task => (
-              <div key={task.id} className="bg-background border border-border p-3 rounded-md text-sm">
-                <div className="flex justify-between items-start gap-2 mb-2">
-                  <span className={task.status === "done" ? "line-through text-muted-foreground" : ""}>{task.title}</span>
-                  <CustomCheckbox checked={task.status === "done"} onChange={(c) => handleToggleStatus(task.id, c ? "done" : "todo")} />
-                </div>
-                <ContextTag context={task.context} />
-              </div>
-            ))}
-          </div>
-
+            );
+          })}
         </div>
       </section>
 
@@ -164,13 +166,24 @@ export default function Home() {
           ) : (
             <div className="flex flex-col">
               {todayTaskTree.map(task => (
-                <TaskItem key={task.id} task={task} onToggleStatus={handleToggleStatus} />
+                <TaskItem 
+                  key={task.id} 
+                  task={task} 
+                  onToggleStatus={handleToggleStatus} 
+                  onSelect={setSelectedTask} 
+                />
               ))}
             </div>
           )}
         </div>
       </section>
 
+      {/* Slide-over panel */}
+      <TaskDetailsPanel 
+        task={selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onUpdate={handleUpdateTask}
+      />
     </div>
   );
 }
