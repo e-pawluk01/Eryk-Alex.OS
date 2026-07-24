@@ -1,30 +1,42 @@
-import { Geist, Geist_Mono } from "next/font/google"
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { GlobalContextProvider } from "@/components/global-context";
+import { ContextSwitcher } from "@/components/context-switcher";
+import { AuthGuard } from "@/components/auth-guard";
 
-import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@/lib/utils";
+const inter = Inter({ subsets: ["latin"] });
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'})
-
-const fontMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-})
+export const metadata: Metadata = {
+  title: "Task OS",
+  description: "Task and productivity app",
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", geist.variable)}
-    >
-      <body>
-        <ThemeProvider>{children}</ThemeProvider>
+    <html lang="en" className="dark">
+      <body className={inter.className}>
+        <AuthGuard>
+          <GlobalContextProvider>
+            <div className="min-h-screen flex flex-col">
+              <header className="flex items-center justify-between p-4 sticky top-0 bg-background/80 backdrop-blur-md z-50 border-b border-border/50">
+                <nav className="flex items-center gap-6 px-4">
+                  <a href="/" className="text-sm font-medium tracking-widest uppercase hover:text-primary transition-colors">Home</a>
+                  <a href="/tasks" className="text-sm font-medium tracking-widest uppercase text-muted-foreground hover:text-primary transition-colors">Tasks</a>
+                </nav>
+                <ContextSwitcher />
+              </header>
+              <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8">
+                {children}
+              </main>
+            </div>
+          </GlobalContextProvider>
+        </AuthGuard>
       </body>
     </html>
-  )
+  );
 }
