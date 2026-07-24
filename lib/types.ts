@@ -1,8 +1,8 @@
 export type ContextType = 
-  | "Study (Person A)"
-  | "Study (Person B)"
-  | "Business 1"
-  | "Business 2";
+  | "Study (Eryk)"
+  | "Study (Alex)"
+  | "Reselling"
+  | "Drink idea";
 
 export interface Goal {
   id: string;
