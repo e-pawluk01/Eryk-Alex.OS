@@ -1,42 +1,64 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Task } from "@/lib/types";
-import { X, Calendar } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import React, { useState, useEffect, useRef } from "react";
+import { Task, ContextType } from "@/lib/types";
+import { X, Tag, AlignLeft, Calendar, Flag, Clock, Trash2 } from "lucide-react";
+import { useGlobalContext } from "./global-context";
+import { cn } from "@/lib/utils";
+import { DatePicker } from "./ui/date-picker";
+import { ConfirmDialog } from "./ui/confirm-dialog";
+import { ContextTag } from "./ui/context-tag";
 
 interface TaskDetailsPanelProps {
   task: Task | null;
+  isOpen?: boolean;
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<Task>) => void;
+  onDelete: (id: string) => void;
 }
 
-export function TaskDetailsPanel({ task, onClose, onUpdate }: TaskDetailsPanelProps) {
-  const [isEditingDesc, setIsEditingDesc] = useState(false);
-  const [descDraft, setDescDraft] = useState("");
+export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: TaskDetailsPanelProps) {
+  const { userEmail } = useGlobalContext();
+  const userContextName = (userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk") as ContextType;
+  const allowedContexts: ContextType[] = [userContextName, "Reselling", "Drink idea"];
+
   const [titleDraft, setTitleDraft] = useState("");
+  const [descDraft, setDescDraft] = useState("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isTitleAtEnd, setIsTitleAtEnd] = useState(true);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (task) {
-      setDescDraft(task.description || "");
       setTitleDraft(task.title);
-      setIsEditingDesc(false);
+      setDescDraft(task.description || "");
     }
   }, [task]);
 
-  if (!task) return null;
-
-  const handleSaveDesc = () => {
-    onUpdate(task.id, { description: descDraft });
-    setIsEditingDesc(false);
-  };
-
   const handleTitleBlur = () => {
-    if (titleDraft.trim() !== task.title) {
-      onUpdate(task.id, { title: titleDraft.trim() });
+    if (titleDraft !== (task?.title || "")) {
+      onUpdate(task!.id, { title: titleDraft });
     }
   };
+
+  const handleDescBlur = () => {
+    if (descDraft !== (task?.description || "")) {
+      onUpdate(task!.id, { description: descDraft });
+    }
+  };
+
+  const checkScroll = () => {
+    if (titleInputRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = titleInputRef.current;
+      setIsTitleAtEnd(Math.abs(scrollWidth - clientWidth - scrollLeft) <= 2);
+    }
+  };
+
+  useEffect(() => {
+    checkScroll();
+  }, [titleDraft, isOpen]);
+
+  if (!task) return null;
 
   return (
     <>
@@ -50,80 +72,108 @@ export function TaskDetailsPanel({ task, onClose, onUpdate }: TaskDetailsPanelPr
       <div className="fixed inset-y-0 right-0 w-full max-w-md bg-black/80 backdrop-blur-2xl border-l border-white/10 z-[70] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
         
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-white/5">
-          <div className="flex-1 flex flex-col gap-2">
-            <input 
-              type="text"
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={handleTitleBlur}
-              className="bg-transparent text-xl font-medium tracking-wide text-white focus:outline-none placeholder:text-muted-foreground w-full"
-            />
+        <div className="flex flex-col gap-4 p-6 border-b border-white/5 relative">
+          
+          <div className="flex items-start justify-between gap-4">
+            {/* Title with conditional gradient fade */}
+            <div className={cn(
+              "flex-1 relative transition-all duration-300",
+              !isTitleAtEnd && "[mask-image:linear-gradient(to_right,black_85%,transparent_100%)]"
+            )}>
+              <input 
+                ref={titleInputRef}
+                type="text"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onScroll={checkScroll}
+                onBlur={handleTitleBlur}
+                className="w-full bg-transparent text-xl font-semibold text-white outline-none placeholder:text-muted-foreground"
+                placeholder="Task title..."
+              />
+            </div>
             
-            {/* Deadline */}
-            {task.due_date ? (
-              <div className="flex items-center gap-2 text-xs text-red-400 group relative">
-                <Calendar className="w-3 h-3" />
-                <span>Due: {task.due_date}</span>
-                <button 
-                  onClick={() => onUpdate(task.id, { due_date: null })}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity ml-2 text-muted-foreground hover:text-white"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ) : (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground hover:text-white transition-colors cursor-pointer w-max">
-                <Calendar className="w-3 h-3" />
-                <span>Add deadline?</span>
-                <input 
-                  type="date" 
-                  className="opacity-0 absolute w-0 h-0"
-                  onChange={(e) => onUpdate(task.id, { due_date: e.target.value })}
-                />
-              </label>
-            )}
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors text-muted-foreground hover:text-white">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Body (Obsidian Note) */}
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Note</span>
-            <button 
-              onClick={() => isEditingDesc ? handleSaveDesc() : setIsEditingDesc(true)}
-              className="text-xs text-muted-foreground hover:text-white transition-colors"
-            >
-              {isEditingDesc ? "Save" : "Edit"}
+            <button onClick={onClose} className="p-1.5 -mr-1.5 hover:bg-white/10 rounded-full transition-colors text-muted-foreground hover:text-white shrink-0">
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {isEditingDesc ? (
-            <textarea
-              value={descDraft}
-              onChange={(e) => setDescDraft(e.target.value)}
-              className="w-full flex-1 bg-transparent text-sm text-foreground focus:outline-none resize-none leading-relaxed font-mono"
-              placeholder="Write a note (Markdown supported)..."
-              autoFocus
+          {/* Dates */}
+          <div className="flex items-center gap-6 text-xs mt-2">
+            <DatePicker 
+              value={task.scheduled_date} 
+              onChange={(date) => onUpdate(task.id, { scheduled_date: date })} 
+              icon={<Clock className="w-3.5 h-3.5 text-muted-foreground" />}
+              placeholder="Schedule"
             />
-          ) : (
-            <div className="prose prose-invert prose-sm max-w-none text-foreground/90">
-              {task.description ? (
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {task.description}
-                </ReactMarkdown>
-              ) : (
-                <p className="text-muted-foreground italic cursor-pointer" onClick={() => setIsEditingDesc(true)}>
-                  No note. Click to add one...
-                </p>
-              )}
-            </div>
-          )}
+            
+            <DatePicker 
+              value={task.due_date} 
+              onChange={(date) => onUpdate(task.id, { due_date: date })} 
+              icon={<Flag className="w-3.5 h-3.5 text-muted-foreground" />}
+              placeholder="Deadline"
+            />
+          </div>
         </div>
+
+        {/* Body (Plain Text Note) */}
+        <div className="flex-1 p-6 flex flex-col relative">
+          <textarea
+            value={descDraft}
+            onChange={(e) => setDescDraft(e.target.value)}
+            onBlur={handleDescBlur}
+            placeholder="Write a note..."
+            className="w-full flex-1 bg-transparent text-sm text-foreground/90 focus:outline-none resize-none leading-relaxed pb-20"
+          />
+          
+          {/* Bottom Actions */}
+          <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between pointer-events-none">
+            
+            {/* Project Tags (Left) */}
+            <div className="flex gap-2 pointer-events-auto">
+              <button
+                onClick={() => onUpdate(task.id, { project: task.project === "Reselling" ? null : "Reselling" })}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest font-bold border transition-all",
+                  task.project === "Reselling" 
+                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]" 
+                    : "bg-white/5 text-muted-foreground border-transparent hover:bg-white/10"
+                )}
+              >
+                Reselling
+              </button>
+              <button
+                onClick={() => onUpdate(task.id, { project: task.project === "Drink idea" ? null : "Drink idea" })}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest font-bold border transition-all",
+                  task.project === "Drink idea" 
+                    ? "bg-purple-500/20 text-purple-400 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]" 
+                    : "bg-white/5 text-muted-foreground border-transparent hover:bg-white/10"
+                )}
+              >
+                Drink idea
+              </button>
+            </div>
+            
+            {/* Delete Button (Right) */}
+            <button 
+              onClick={() => setIsDeleteDialogOpen(true)} 
+              className="p-3 hover:bg-red-500/10 rounded-full transition-colors text-red-500/50 hover:text-red-500 shrink-0 pointer-events-auto"
+              title="Delete Task"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
       </div>
+
+      <ConfirmDialog 
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={() => onDelete(task.id)}
+        title="Delete Task?"
+        description="Are you sure you want to delete this task? This action cannot be undone."
+      />
     </>
   );
 }

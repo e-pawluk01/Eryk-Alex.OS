@@ -1,14 +1,15 @@
 export type ContextType = 
-  | "Study (Eryk)"
-  | "Study (Alex)"
+  | "Eryk"
+  | "Alex"
   | "Reselling"
   | "Drink idea";
 
 export interface Goal {
   id: string;
   title: string;
-  context: ContextType;
   year: number;
+  context: string;
+  status: "active" | "completed";
 }
 
 export interface Task {
@@ -21,8 +22,19 @@ export interface Task {
   due_date: string | null;
   status: "todo" | "done";
   folder_id: string | null;
+  project?: "Reselling" | "Drink idea" | null;
   created_at: string;
   subTasks?: Task[];
+}
+
+export interface Event {
+  id: string;
+  title: string;
+  description?: string | null;
+  event_date: string; // ISO Date string (YYYY-MM-DD)
+  event_time: string | null; // e.g. "14:30"
+  context: ContextType;
+  created_at: string;
 }
 
 export interface Folder {

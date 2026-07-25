@@ -1,26 +1,36 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
-export type ContextType = 
-  | "All"
-  | "Study (Eryk)"
-  | "Study (Alex)"
-  | "Reselling"
-  | "Drink idea";
+export type DomainType = "WORK" | "STUDY" | "CONTENT";
 
 interface GlobalContextProps {
-  currentContext: ContextType;
-  setCurrentContext: (context: ContextType) => void;
+  currentDomain: DomainType;
+  setCurrentDomain: (domain: DomainType) => void;
+  userEmail: string | null;
 }
 
 const GlobalContext = createContext<GlobalContextProps | undefined>(undefined);
 
 export function GlobalContextProvider({ children }: { children: ReactNode }) {
-  const [currentContext, setCurrentContext] = useState<ContextType>("All");
+  const [currentDomain, setCurrentDomain] = useState<DomainType>("WORK");
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserEmail(session?.user?.email || null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserEmail(session?.user?.email || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
-    <GlobalContext.Provider value={{ currentContext, setCurrentContext }}>
+    <GlobalContext.Provider value={{ currentDomain, setCurrentDomain, userEmail }}>
       {children}
     </GlobalContext.Provider>
   );

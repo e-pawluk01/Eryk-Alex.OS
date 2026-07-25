@@ -1,76 +1,40 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useGlobalContext, ContextType } from "./global-context";
+import { useGlobalContext, DomainType } from "./global-context";
 import { cn } from "@/lib/utils";
-
-const contexts: ContextType[] = [
-  "All",
-  "Study (Eryk)",
-  "Study (Alex)",
-  "Reselling",
-  "Drink idea",
-];
+import { Briefcase, BookOpen, MonitorPlay } from "lucide-react";
 
 export function Navbar() {
-  const pathname = usePathname();
-  const { currentContext, setCurrentContext } = useGlobalContext();
+  const { currentDomain, setCurrentDomain } = useGlobalContext();
+
+  const domains: { id: DomainType; icon: React.ReactNode }[] = [
+    { id: "WORK", icon: <Briefcase className="w-4 h-4" /> },
+    { id: "STUDY", icon: <BookOpen className="w-4 h-4" /> },
+    { id: "CONTENT", icon: <MonitorPlay className="w-4 h-4" /> },
+  ];
 
   return (
-    <>
-      {/* Left Navigation Pill */}
-      <div className="fixed top-6 left-6 z-50 transition-opacity duration-500 opacity-60 hover:opacity-100 focus-within:opacity-100">
-        <div className="flex items-center bg-secondary/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
-          <div className="flex items-center bg-black/80 rounded-full p-1 border border-white/5">
-            <Link 
-              href="/"
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 transition-opacity duration-500 opacity-30 hover:opacity-100 focus-within:opacity-100">
+      <div className="flex items-center bg-secondary/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
+        <div className="flex items-center bg-black/80 rounded-full p-1 border border-white/5 gap-1">
+          {domains.map((domain) => (
+            <button
+              key={domain.id}
+              onClick={() => setCurrentDomain(domain.id)}
               className={cn(
-                "px-5 py-2 text-xs font-semibold tracking-widest uppercase rounded-full transition-all duration-300",
-                pathname === "/" 
-                  ? "bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)]" 
+                "p-3 rounded-full transition-all duration-300 cursor-pointer",
+                currentDomain === domain.id
+                  ? "bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)]"
                   : "text-neutral-500 hover:text-white hover:bg-white/10"
               )}
+              title={domain.id}
             >
-              Home
-            </Link>
-            <Link 
-              href="/tasks"
-              className={cn(
-                "px-5 py-2 text-xs font-semibold tracking-widest uppercase rounded-full transition-all duration-300",
-                pathname === "/tasks" 
-                  ? "bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)]" 
-                  : "text-neutral-500 hover:text-white hover:bg-white/10"
-              )}
-            >
-              Tasks
-            </Link>
-          </div>
+              {domain.icon}
+            </button>
+          ))}
         </div>
       </div>
-
-      {/* Right Context Switcher Pill */}
-      <div className="fixed top-6 right-6 z-50 transition-opacity duration-500 opacity-60 hover:opacity-100 focus-within:opacity-100">
-        <div className="flex items-center bg-secondary/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
-          <div className="flex items-center bg-black/80 rounded-full p-1 border border-white/5">
-            {contexts.map((ctx) => (
-              <button
-                key={ctx}
-                onClick={() => setCurrentContext(ctx)}
-                className={cn(
-                  "px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-full transition-all duration-300 cursor-pointer whitespace-nowrap",
-                  currentContext === ctx
-                    ? "bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)]"
-                    : "text-neutral-500 hover:text-white hover:bg-white/10"
-                )}
-              >
-                {ctx}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
