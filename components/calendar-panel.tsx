@@ -134,41 +134,52 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
         </div>
 
         {/* Selected Date Details */}
-        <div className="flex-1 overflow-y-auto px-6 pb-24 flex flex-col gap-6">
+        <div className="flex-1 overflow-y-auto px-6 pb-24 flex flex-col gap-8 mt-4">
           
-          <div className="flex flex-col gap-2">
-            {selectedDayEvents.map(event => (
-              <div 
-                key={event.id} 
-                onClick={() => onSelectEvent(event)}
-                className="flex flex-col bg-[#111] border border-white/5 rounded-xl p-4 cursor-pointer hover:border-white/20 transition-colors"
-              >
-                <span className="text-sm font-medium">{event.title}</span>
-                <span className="text-[10px] text-muted-foreground mt-1">
-                  {event.event_time ? event.event_time.slice(0, 5) : "All day"}
-                </span>
-              </div>
-            ))}
+          {/* Events Section */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Events
+            </h3>
+            {selectedDayEvents.length === 0 ? (
+              <div className="text-xs text-muted-foreground/50 italic py-2">No events scheduled.</div>
+            ) : (
+              selectedDayEvents.map(event => (
+                <div 
+                  key={event.id} 
+                  onClick={() => onSelectEvent(event)}
+                  className="flex flex-col bg-[#111] border border-white/5 rounded-xl p-4 cursor-pointer hover:border-white/20 transition-colors"
+                >
+                  <span className="text-sm font-medium">{event.title}</span>
+                  <span className="text-[10px] text-muted-foreground mt-1">
+                    {event.event_time ? event.event_time.slice(0, 5) : "All day"}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
 
+          {/* Tasks Section */}
           <div className="flex flex-col gap-3">
-            {selectedDayTasks.length > 0 && (
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-4">
-                Tasks
-              </h3>
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Tasks
+            </h3>
+            {selectedDayTasks.length === 0 ? (
+              <div className="text-xs text-muted-foreground/50 italic py-2">No tasks scheduled.</div>
+            ) : (
+              selectedDayTasks.map(task => (
+                <div 
+                  key={task.id} 
+                  onClick={() => onSelectTask(task)}
+                  className="flex items-center gap-3 bg-[#111] border border-white/5 rounded-xl p-4 cursor-pointer hover:border-white/20 transition-colors"
+                >
+                  <div className="w-1.5 h-1.5 rounded-full bg-white/40 flex-shrink-0" />
+                  <span className={cn("text-sm truncate", task.status === "done" && "line-through text-muted-foreground")}>
+                    {task.title}
+                  </span>
+                </div>
+              ))
             )}
-            {selectedDayTasks.map(task => (
-              <div 
-                key={task.id} 
-                onClick={() => onSelectTask(task)}
-                className="flex items-center gap-3 bg-[#111] border border-white/5 rounded-xl p-4 cursor-pointer hover:border-white/20 transition-colors"
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-white/40 flex-shrink-0" />
-                <span className={cn("text-sm truncate", task.status === "done" && "line-through text-muted-foreground")}>
-                  {task.title}
-                </span>
-              </div>
-            ))}
           </div>
         </div>
 
