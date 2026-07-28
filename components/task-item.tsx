@@ -15,11 +15,34 @@ interface TaskItemProps {
 export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
 
   let daysLeftText = "";
+  let colorClass = "text-muted-foreground";
+  let dotClass = "";
+
   if (task.due_date) {
     const days = differenceInDays(startOfDay(new Date(task.due_date)), startOfDay(new Date()));
     if (days < 0) daysLeftText = `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`;
     else if (days === 0) daysLeftText = "Due today";
     else daysLeftText = `${days} day${days === 1 ? '' : 's'} left`;
+
+    if (task.status !== "done") {
+      if (days <= 1) {
+        colorClass = "text-red-500/80";
+        dotClass = "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse";
+      } else if (days <= 3) {
+        colorClass = "text-orange-500/80";
+        dotClass = "bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]";
+      } else if (days <= 7) {
+        colorClass = "text-green-500/80";
+        dotClass = "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]";
+      } else {
+        // > 7 days, neutral appearance
+        colorClass = "text-muted-foreground/60";
+        dotClass = "bg-muted-foreground/20";
+      }
+    } else {
+      colorClass = "text-muted-foreground/30";
+      dotClass = ""; // no dot for done tasks
+    }
   }
 
   return (
@@ -67,8 +90,10 @@ export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
         {/* Deadline Dot & Days Left */}
         {task.due_date && (
           <div className="flex items-center gap-2 pt-0.5" title={`Due: ${task.due_date}`}>
-            <span className="text-[10px] text-red-500/80 font-medium uppercase tracking-wider whitespace-nowrap">{daysLeftText}</span>
-            <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
+            <span className={cn("text-[10px] font-medium uppercase tracking-wider whitespace-nowrap", colorClass)}>
+              {daysLeftText}
+            </span>
+            {dotClass && <div className={cn("w-2 h-2 rounded-full", dotClass)} />}
           </div>
         )}
       </div>
