@@ -88,7 +88,7 @@ export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
         </div>
 
         {/* Deadline Dot & Days Left */}
-        {task.due_date && (
+        {task.due_date && task.status !== "done" && (
           <div className="flex items-center gap-2 pt-0.5" title={`Due: ${task.due_date}`}>
             <span className={cn("text-[10px] font-medium uppercase tracking-wider whitespace-nowrap", colorClass)}>
               {daysLeftText}
