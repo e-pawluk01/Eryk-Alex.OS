@@ -70,24 +70,22 @@ export function VideoItem({ video, onUpdate, onDelete, onGenerateTasks }: VideoI
           </div>
           
           <div className="flex flex-col flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <div 
-                className={cn(
-                  "w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0",
-                  video.context === 'Eryk' 
-                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
-                    : "bg-purple-500/10 text-purple-500 border border-purple-500/20"
-                )}
-                title={`Creator: ${video.context}`}
-              >
-                {video.context === 'Eryk' ? 'E' : 'A'}
-              </div>
-              <span className="text-sm font-medium text-white/90 line-clamp-1">{video.title}</span>
-            </div>
+            <span className="text-sm font-medium text-white/90 line-clamp-1">{video.title}</span>
             <span className="text-[10px] uppercase tracking-widest font-semibold text-white/40">{video.tag}</span>
           </div>
 
           <div className="flex items-center gap-1 shrink-0 ml-4">
+            <div 
+              className={cn(
+                "w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 mr-2",
+                video.context === 'Eryk' 
+                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                  : "bg-purple-500/10 text-purple-500 border border-purple-500/20"
+              )}
+              title={`Creator: ${video.context}`}
+            >
+              {video.context === 'Eryk' ? 'E' : 'A'}
+            </div>
             {STAGES.map((stage, idx) => {
               const Icon = stage.icon;
               const isActive = idx === currentStageIndex;
