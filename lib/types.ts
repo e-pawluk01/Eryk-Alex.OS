@@ -49,7 +49,9 @@ export interface Video {
   context: ContextType;
   tag: string;
   color: string;
-  stage: "idea" | "scripting" | "filming" | "ready";
+  stage: "idea" | "scripting" | "filming" | "editing" | "subtitles" | "uploaded";
+  scheduled_date: string; // "yyyy-MM-dd"
+  shorts_target: number;
   created_at: string;
 }
 

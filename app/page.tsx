@@ -245,6 +245,32 @@ export default function Home() {
     setVideos(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v));
   };
 
+  const handleDeleteVideo = (id: string) => {
+    setVideos(prev => prev.filter(v => v.id !== id));
+  };
+
+  const handleGenerateShortsTasks = async (video: Video) => {
+    if (!video.shorts_target || video.shorts_target <= 0) return;
+    
+    const newTasks = Array.from({ length: video.shorts_target }).map((_, i) => ({
+      title: `Upload Short ${i + 1} for ${video.title}`,
+      context: currentContext, // Default to whoever is logged in and generating
+      domain: "CONTENT" as DomainType,
+      status: "todo" as const,
+      scheduled_date: video.scheduled_date || format(new Date(), "yyyy-MM-dd"),
+    }));
+
+    try {
+      const { data, error } = await supabase.from("tasks").insert(newTasks).select();
+      if (error) throw error;
+      if (data) {
+        setTasks(prev => [...data, ...prev]);
+      }
+    } catch (error) {
+      console.error("Failed to generate shorts tasks:", error);
+    }
+  };
+
   const handleUpdateEvent = async (id: string, updates: Partial<Event>) => {
     setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
     if (selectedEvent?.id === id) {
@@ -489,24 +515,65 @@ export default function Home() {
         
         {currentDomain === "CONTENT" ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
-            <div className="flex flex-col gap-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Uploads</h3>
-              <div className="flex flex-col gap-3">
-                <div className="text-xs text-muted-foreground/50 italic py-8 text-center border border-dashed border-white/5 rounded-lg">
-                  Upload management coming soon.
+            
+            {/* LEFT COLUMN: Post-Production & Daily Uploads */}
+            <div className="flex flex-col gap-8">
+              {/* TOP HALF: Editing Pipeline */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">Editing Pipeline</h2>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {filteredVideos.filter(v => ["editing", "subtitles", "uploaded"].includes(v.stage)).map(video => (
+                    <VideoItem 
+                      key={video.id} 
+                      video={video} 
+                      onUpdate={handleUpdateVideo}
+                      onDelete={handleDeleteVideo}
+                      onGenerateTasks={handleGenerateShortsTasks}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* BOTTOM HALF: Today's Upload Tasks */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">
+                    {format(selectedDate, "EEEE")} Uploads
+                  </h2>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {filteredTasks.map(task => (
+                    <TaskItem 
+                      key={task.id} 
+                      task={task} 
+                      onToggleStatus={(id, status) => handleToggleStatus(id, status)}
+                      onSelect={setSelectedTask}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Videos</h3>
+            {/* RIGHT COLUMN: Production */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">Production</h2>
+              </div>
               <div className="flex flex-col gap-3">
-                {filteredVideos.map(video => (
-                  <VideoItem key={video.id} video={video} onUpdate={handleUpdateVideo} />
+                {filteredVideos.filter(v => ["idea", "scripting", "filming"].includes(v.stage)).map(video => (
+                  <VideoItem 
+                    key={video.id} 
+                    video={video} 
+                    onUpdate={handleUpdateVideo}
+                    onDelete={handleDeleteVideo}
+                  />
                 ))}
                 <NewVideoDialog onVideoAdded={handleAddVideo} contextName={userContextName} />
               </div>
             </div>
+
           </div>
         ) : currentDomain === "WORK" || currentDomain === "STUDY" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

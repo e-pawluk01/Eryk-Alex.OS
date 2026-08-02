@@ -4,30 +4,35 @@ import React, { useState } from "react";
 import { Video } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { Loader2, Lightbulb, PenLine, Video as VideoIcon, CheckCircle2 } from "lucide-react";
-
-interface VideoItemProps {
-  video: Video;
-  onUpdate: (id: string, updates: Partial<Video>) => void;
-}
+import { Loader2, Lightbulb, PenLine, Video as VideoIcon, CheckCircle2, Scissors } from "lucide-react";
+import { EditVideoDialog } from "./edit-video-dialog";
 
 const STAGES = [
   { id: "idea", icon: Lightbulb, label: "Idea", activeColor: "text-yellow-500", hoverColor: "hover:text-yellow-500", activeBg: "bg-yellow-500/10 border-yellow-500/20" },
   { id: "scripting", icon: PenLine, label: "Scripting", activeColor: "text-blue-500", hoverColor: "hover:text-blue-500", activeBg: "bg-blue-500/10 border-blue-500/20" },
   { id: "filming", icon: VideoIcon, label: "Filming", activeColor: "text-red-500", hoverColor: "hover:text-red-500", activeBg: "bg-red-500/10 border-red-500/20" },
-  { id: "ready", icon: CheckCircle2, label: "Ready", activeColor: "text-green-500", hoverColor: "hover:text-green-500", activeBg: "bg-green-500/10 border-green-500/20" },
+  { id: "editing", icon: Scissors, label: "Editing", activeColor: "text-purple-500", hoverColor: "hover:text-purple-500", activeBg: "bg-purple-500/10 border-purple-500/20" },
+  { id: "subtitles", icon: PenLine, label: "Subtitles", activeColor: "text-orange-500", hoverColor: "hover:text-orange-500", activeBg: "bg-orange-500/10 border-orange-500/20" },
+  { id: "uploaded", icon: CheckCircle2, label: "Uploaded", activeColor: "text-green-500", hoverColor: "hover:text-green-500", activeBg: "bg-green-500/10 border-green-500/20" },
 ] as const;
 
-export function VideoItem({ video, onUpdate }: VideoItemProps) {
+interface VideoItemProps {
+  video: Video;
+  onUpdate: (id: string, updates: Partial<Video>) => void;
+  onDelete?: (id: string) => void;
+  onGenerateTasks?: (video: Video) => void;
+}
+
+export function VideoItem({ video, onUpdate, onDelete, onGenerateTasks }: VideoItemProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleStageChange = async (stage: typeof STAGES[number]["id"]) => {
+  const handleStageChange = async (e: React.MouseEvent, stage: typeof STAGES[number]["id"]) => {
+    e.stopPropagation();
     if (isSubmitting || stage === video.stage) return;
     setIsSubmitting(true);
 
     try {
       const updates = { stage };
-      // Optimistic update
       onUpdate(video.id, updates);
       await supabase.from("videos").update(updates).eq("id", video.id);
     } catch (error) {
@@ -37,64 +42,91 @@ export function VideoItem({ video, onUpdate }: VideoItemProps) {
     }
   };
 
+  const handleGenerateClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onGenerateTasks) {
+      onGenerateTasks(video);
+    }
+  };
+
   const isHex = video.color.startsWith('#');
-  
-  // Find index of current stage to determine which ones to show active vs inactive
   const currentStageIndex = STAGES.findIndex(s => s.id === video.stage);
+  const isPostProduction = ["editing", "subtitles"].includes(video.stage);
 
   return (
-    <div className="flex flex-col gap-2 p-3 bg-transparent border border-white/5 rounded-lg group relative overflow-hidden transition-colors hover:border-white/10 hover:bg-white/[0.02]">
-      <div className="flex items-center gap-3 relative z-10">
-        <div className="shrink-0">
-          <div 
-            className={cn("w-3 h-3 rounded-full border flex items-center justify-center opacity-80", !isHex && video.color.replace("bg-", "border-"))}
-            style={isHex ? { borderColor: video.color } : undefined}
-          >
+    <EditVideoDialog video={video} onVideoUpdated={onUpdate} onVideoDeleted={onDelete}>
+      <div className="flex flex-col gap-2 p-3 bg-transparent border border-white/5 rounded-lg group relative overflow-hidden transition-colors hover:border-white/10 hover:bg-white/[0.02] cursor-pointer">
+        <div className="flex items-center gap-3 relative z-10">
+          <div className="shrink-0">
             <div 
-              className={cn("w-1.5 h-1.5 rounded-full", !isHex && video.color)} 
-              style={isHex ? { backgroundColor: video.color } : undefined}
-            />
+              className={cn("w-3 h-3 rounded-full border flex items-center justify-center opacity-80", !isHex && video.color.replace("bg-", "border-"))}
+              style={isHex ? { borderColor: video.color } : undefined}
+            >
+              <div 
+                className={cn("w-1.5 h-1.5 rounded-full", !isHex && video.color)} 
+                style={isHex ? { backgroundColor: video.color } : undefined}
+              />
+            </div>
+          </div>
+          
+          <div className="flex flex-col flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-white/50 bg-white/5 px-1 rounded-sm">
+                [{video.context === 'Eryk' ? 'E' : 'A'}]
+              </span>
+              <span className="text-sm font-medium text-white/90 line-clamp-1">{video.title}</span>
+            </div>
+            <span className="text-[10px] uppercase tracking-widest font-semibold text-white/40">{video.tag}</span>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0 ml-4">
+            {STAGES.map((stage, idx) => {
+              const Icon = stage.icon;
+              const isActive = idx === currentStageIndex;
+              return (
+                <button 
+                  key={stage.id}
+                  onClick={(e) => handleStageChange(e, stage.id)}
+                  disabled={isSubmitting}
+                  title={stage.label}
+                  className={cn(
+                    "flex items-center justify-center p-1.5 rounded-full transition-all",
+                    isActive 
+                      ? "bg-transparent"
+                      : "bg-transparent hover:bg-white/5",
+                    "disabled:opacity-50"
+                  )}
+                >
+                  <Icon className={cn(
+                    "w-4 h-4 transition-colors",
+                    isActive ? stage.activeColor : "text-white/20 hover:text-white/40"
+                  )} />
+                </button>
+              );
+            })}
           </div>
         </div>
-        
-        <div className="flex flex-col flex-1 min-w-0">
-          <span className="text-sm font-medium text-white/90 line-clamp-1">{video.title}</span>
-          <span className="text-[10px] uppercase tracking-widest font-semibold text-white/40">{video.tag}</span>
-        </div>
 
-        <div className="flex items-center gap-1 shrink-0 ml-4">
-          {STAGES.map((stage, idx) => {
-            const Icon = stage.icon;
-            const isActive = idx === currentStageIndex;
-            return (
+        {isPostProduction && (
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+            <span className="text-[10px] font-bold text-white/40">SHORTS TARGET: {video.shorts_target || 0}</span>
+            {(video.shorts_target || 0) > 0 && (
               <button 
-                key={stage.id}
-                onClick={() => handleStageChange(stage.id)}
-                disabled={isSubmitting}
-                title={stage.label}
-                className={cn(
-                  "flex items-center justify-center p-1.5 rounded-full transition-all",
-                  isActive 
-                    ? "bg-transparent"
-                    : "bg-transparent hover:bg-white/5",
-                  "disabled:opacity-50"
-                )}
+                onClick={handleGenerateClick}
+                className="text-[10px] font-bold uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded transition-colors"
               >
-                <Icon className={cn(
-                  "w-4 h-4 transition-colors",
-                  isActive ? stage.activeColor : "text-white/20 hover:text-white/40"
-                )} />
+                Schedule Tasks
               </button>
-            );
-          })}
-        </div>
-      </div>
+            )}
+          </div>
+        )}
 
-      {isSubmitting && (
-        <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] z-20 flex items-center justify-center">
-          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-        </div>
-      )}
-    </div>
+        {isSubmitting && (
+          <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] z-20 flex items-center justify-center rounded-lg">
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
+      </div>
+    </EditVideoDialog>
   );
 }

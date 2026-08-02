@@ -6,13 +6,16 @@ import { Plus, X, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { addDays, format } from "date-fns";
-import { useLocalStorage } from "@/hooks/use-local-storage";
 import { HexColorPicker } from "react-colorful";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseISO } from "date-fns";
 
-interface NewVideoDialogProps {
-  contextName: ContextType;
-  onVideoAdded: (video: Video) => void;
+interface EditVideoDialogProps {
+  video: Video;
+  children: React.ReactNode;
+  onVideoUpdated: (id: string, updates: Partial<Video>) => void;
+  onVideoDeleted?: (id: string) => void;
 }
 
 const COLORS = [
@@ -24,11 +27,13 @@ const COLORS = [
   { name: "Cyan", class: "bg-cyan-500", shadow: "shadow-[0_0_10px_rgba(6,182,212,0.2)]" },
 ];
 
-export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProps) {
+export function EditVideoDialog({ video, children, onVideoUpdated, onVideoDeleted }: EditVideoDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [tag, setTag] = useState("");
-  const [selectedColor, setSelectedColor] = useState(COLORS[0].class);
+  const [title, setTitle] = useState(video.title);
+  const [tag, setTag] = useState(video.tag);
+  const [selectedColor, setSelectedColor] = useState(video.color);
+  const [shortsTarget, setShortsTarget] = useState(video.shorts_target || 0);
+  const [scheduledDate, setScheduledDate] = useState<Date>(parseISO(video.scheduled_date || format(new Date(), "yyyy-MM-dd")));
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [customColors, setCustomColors] = useState<string[]>([]);
@@ -36,8 +41,19 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
   const [customHex, setCustomHex] = useState("#");
   const [editingColor, setEditingColor] = useState<string | null>(null);
 
+  // Sync state when opened
   useEffect(() => {
-    const saved = localStorage.getItem(`custom_colors_${contextName}`);
+    if (isOpen) {
+      setTitle(video.title);
+      setTag(video.tag);
+      setSelectedColor(video.color);
+      setShortsTarget(video.shorts_target || 0);
+      setScheduledDate(parseISO(video.scheduled_date || format(new Date(), "yyyy-MM-dd")));
+    }
+  }, [isOpen, video]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(`custom_colors_${video.context}`);
     if (saved) {
       try {
         setCustomColors(JSON.parse(saved));
@@ -51,63 +67,64 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
     if (!color.startsWith("#") || color.length !== 7) return;
     
     if (editingColor) {
-      if (customColors.includes(editingColor)) {
-        const newColors = customColors.map(c => c === editingColor ? color : c);
-        setCustomColors(newColors);
-        localStorage.setItem(`custom_colors_${contextName}`, JSON.stringify(newColors));
-      }
-      setEditingColor(null);
+      newColors = newColors.map(c => c === editingColor ? color : c);
     } else {
-      if (!customColors.includes(color) && !COLORS.some(c => c.class === color)) {
-        const newColors = [...customColors, color];
-        setCustomColors(newColors);
-        localStorage.setItem(`custom_colors_${contextName}`, JSON.stringify(newColors));
-      }
+      newColors = [...newColors, color];
     }
+    
+    setCustomColors(newColors);
+    localStorage.setItem(`custom_colors_${video.context}`, JSON.stringify(newColors));
+    setSelectedColor(color);
+    setShowCustomInput(false);
+    setEditingColor(null);
   };
 
-  const deleteCustomColor = (color: string) => {
-    const newColors = customColors.filter(c => c !== color);
+  const removeCustomColor = (e: React.MouseEvent, colorToRemove: string) => {
+    e.stopPropagation();
+    const newColors = customColors.filter(c => c !== colorToRemove);
     setCustomColors(newColors);
-    localStorage.setItem(`custom_colors_${contextName}`, JSON.stringify(newColors));
-    if (selectedColor === color) {
+    localStorage.setItem(`custom_colors_${video.context}`, JSON.stringify(newColors));
+    if (selectedColor === colorToRemove) {
       setSelectedColor(COLORS[0].class);
-      setShowCustomInput(false);
-      setEditingColor(null);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !tag.trim() || isSubmitting) return;
+    if (!title.trim() || !tag.trim() || !scheduledDate) return;
 
     setIsSubmitting(true);
     try {
-      const newVideo = {
+      const updates = {
         title: title.trim(),
-        context: contextName,
         tag: tag.trim(),
         color: selectedColor,
-        stage: "idea",
-        shorts_target: 0,
-        scheduled_date: format(new Date(), "yyyy-MM-dd"),
+        shorts_target: shortsTarget,
+        scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
       };
 
-      const { data, error } = await supabase.from("videos").insert([newVideo]).select().single();
+      const { error } = await supabase.from("videos").update(updates).eq("id", video.id);
       if (error) throw error;
       
-      if (selectedColor.startsWith("#")) {
-        saveCustomColor(selectedColor);
-      }
-
-      onVideoAdded(data as Video);
+      onVideoUpdated(video.id, updates);
       setIsOpen(false);
-      setTitle("");
-      setTag("");
-      setShowCustomInput(false);
-      setCustomHex("#");
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error("Failed to update video:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onVideoDeleted) return;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from("videos").delete().eq("id", video.id);
+      if (error) throw error;
+      onVideoDeleted(video.id);
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Failed to delete video:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -115,12 +132,9 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
 
   return (
     <>
-      <button 
-        onClick={() => setIsOpen(true)}
-        className="w-8 h-8 rounded-full border border-dashed border-white/10 hover:border-white/30 hover:bg-white/5 text-white/40 hover:text-white transition-all flex items-center justify-center mt-2 mx-auto cursor-pointer shrink-0"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
+      <div onClick={() => setIsOpen(true)}>
+        {children}
+      </div>
 
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
@@ -134,13 +148,24 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-t-2xl" />
 
             <div className="flex items-center justify-between px-6 py-5">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Add Video for {contextName}</span>
-              <button 
-                onClick={() => setIsOpen(false)} 
-                className="p-1.5 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Edit Video</span>
+              <div className="flex items-center gap-2">
+                {onVideoDeleted && (
+                  <button 
+                    onClick={handleDelete}
+                    disabled={isSubmitting}
+                    className="p-1.5 rounded-full hover:bg-red-500/10 text-red-500/60 hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button 
+                  onClick={() => setIsOpen(false)} 
+                  className="p-1.5 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="px-6 pb-6 flex flex-col gap-6">
@@ -171,6 +196,39 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
                   />
                 </div>
 
+                <div className="flex flex-col gap-2 group">
+                  <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 group-focus-within:text-white/60 transition-colors">
+                    Upload Date
+                  </label>
+                  <DatePicker 
+                    date={scheduledDate}
+                    onDateSelect={(d) => d && setScheduledDate(d)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 group">
+                  <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 group-focus-within:text-white/60 transition-colors">
+                    Shorts Target
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      type="button"
+                      onClick={() => setShortsTarget(Math.max(0, shortsTarget - 1))}
+                      className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                    >
+                      -
+                    </button>
+                    <span className="text-sm font-semibold">{shortsTarget}</span>
+                    <button 
+                      type="button"
+                      onClick={() => setShortsTarget(shortsTarget + 1)}
+                      className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex flex-col gap-2">
                   <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">
                     Tag Color
@@ -195,11 +253,18 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
                         type="button"
                         onClick={() => setSelectedColor(hex)}
                         className={cn(
-                          "w-6 h-6 rounded-full border-2 transition-all cursor-pointer",
+                          "w-6 h-6 rounded-full border-2 transition-all cursor-pointer relative",
                           selectedColor === hex ? "border-white scale-110" : "border-transparent opacity-50 hover:opacity-100 hover:scale-105"
                         )}
                         style={{ backgroundColor: hex }}
-                      />
+                      >
+                         <div 
+                          className="absolute -top-1 -right-1 bg-black/50 rounded-full p-0.5 opacity-0 hover:opacity-100 transition-opacity"
+                          onClick={(e) => removeCustomColor(e, hex)}
+                        >
+                          <X className="w-2 h-2 text-white" />
+                        </div>
+                      </button>
                     ))}
 
                     <button
@@ -208,8 +273,8 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
                         if (showCustomInput && !editingColor) {
                           setShowCustomInput(false);
                         } else {
-                          setCustomHex("#");
-                          setEditingColor(null);
+                          setCustomHex(selectedColor.startsWith("#") ? selectedColor : "#");
+                          setEditingColor(selectedColor.startsWith("#") ? selectedColor : null);
                           setShowCustomInput(true);
                         }
                       }}
@@ -220,31 +285,6 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
                     >
                       <span className="text-[10px] font-bold text-white/50 leading-none mb-0.5">+</span>
                     </button>
-
-                    {customColors.includes(selectedColor) && !showCustomInput && (
-                      <div className="flex items-center gap-1 ml-1 animate-in fade-in slide-in-from-left-2 duration-300">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCustomHex(selectedColor);
-                            setEditingColor(selectedColor);
-                            setShowCustomInput(true);
-                          }}
-                          className="p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-white/50 hover:text-white transition-colors"
-                          title="Edit color"
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteCustomColor(selectedColor)}
-                          className="p-1.5 bg-white/5 hover:bg-red-500/20 rounded-md text-white/50 hover:text-red-400 transition-colors"
-                          title="Delete color"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
 
                     {showCustomInput && (
                       <div className="flex items-center gap-2 ml-2 animate-in fade-in slide-in-from-left-2 duration-300 bg-white/5 p-1 rounded-md border border-white/10">
@@ -286,8 +326,6 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
                           onClick={() => {
                             if (customHex.length === 7 && customHex.startsWith("#")) {
                               saveCustomColor(customHex);
-                              setSelectedColor(customHex);
-                              setShowCustomInput(false);
                             }
                           }}
                           className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-[10px] font-bold uppercase tracking-widest transition-colors ml-1"
@@ -313,13 +351,20 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
 
               </div>
 
-              <div className="mt-2 flex justify-end">
+              <div className="mt-2 flex justify-end gap-2">
+                <button 
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
                 <button 
                   type="submit"
                   disabled={!title.trim() || !tag.trim() || isSubmitting}
                   className="px-6 py-2.5 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-full hover:bg-white/90 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100"
                 >
-                  Create Video
+                  Save Changes
                 </button>
               </div>
 
