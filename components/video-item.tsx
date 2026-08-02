@@ -118,7 +118,7 @@ export function VideoItem({ video, onUpdate, onDelete, onGenerateTasks }: VideoI
             <span className="text-[10px] font-bold text-white/40">SHORTS TARGET: {video.shorts_target || 0}</span>
             {(video.shorts_target || 0) > 0 && (
               <button 
-                onClick={handleGenerate}
+                onClick={handleGenerateClick}
                 disabled={isSubmitting}
                 className="w-full mt-4 flex items-center justify-center gap-2 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
               >
