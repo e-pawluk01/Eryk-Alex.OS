@@ -44,6 +44,8 @@ export default function Home() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  
+  const [videoFilter, setVideoFilter] = useState<"All" | "Eryk" | "Alex">("All");
   const [contentTab, setContentTab] = useState<"videos" | "uploading">("videos");
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
@@ -229,9 +231,15 @@ export default function Home() {
   }, [topics]);
 
   const filteredVideos = useMemo(() => {
-    const valid = ["Eryk", "Alex"];
-    return videos.filter(v => valid.includes(v.context));
-  }, [videos]);
+    let result = videos;
+    if (videoFilter !== "All") {
+      result = result.filter(v => v.context === videoFilter);
+    } else {
+      const valid = ["Eryk", "Alex"];
+      result = result.filter(v => valid.includes(v.context));
+    }
+    return result;
+  }, [videos, videoFilter]);
 
   const handleUpdateTopic = (id: string, updates: Partial<Topic>) => {
     setTopics(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t).sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
@@ -565,6 +573,31 @@ export default function Home() {
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between border-b border-white/5 pb-2">
                 <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">Videos</h2>
+                
+                <div className="flex items-center gap-1.5 opacity-30 hover:opacity-100 transition-opacity duration-300">
+                  <button
+                    onClick={() => setVideoFilter(videoFilter === "Eryk" ? "All" : "Eryk")}
+                    className={cn(
+                      "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full backdrop-blur-md transition-all duration-300",
+                      videoFilter === "Eryk"
+                        ? "bg-white/20 text-white shadow-[0_0_10px_rgba(255,255,255,0.2)] border border-white/30"
+                        : "bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white"
+                    )}
+                  >
+                    Eryk
+                  </button>
+                  <button
+                    onClick={() => setVideoFilter(videoFilter === "Alex" ? "All" : "Alex")}
+                    className={cn(
+                      "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full backdrop-blur-md transition-all duration-300",
+                      videoFilter === "Alex"
+                        ? "bg-white/20 text-white shadow-[0_0_10px_rgba(255,255,255,0.2)] border border-white/30"
+                        : "bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white"
+                    )}
+                  >
+                    Alex
+                  </button>
+                </div>
               </div>
               <div className="flex flex-col gap-3">
                 {filteredVideos.map(video => (
