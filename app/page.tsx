@@ -17,7 +17,7 @@ import { TopicItem } from "@/components/topic-item";
 import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO, differenceInDays } from "date-fns";
-import { Clock, Trophy, Pencil } from "lucide-react";
+import { Clock, Trophy, Pencil, X } from "lucide-react";
 
 export default function Home() {
   const { currentDomain, userEmail } = useGlobalContext();
@@ -353,29 +353,12 @@ export default function Home() {
                       onChange={(checked) => handleToggleGoalStatus(goal.id, checked ? "completed" : "active")} 
                     />
                   </div>
-                  {editingGoalId === goal.id ? (
-                    <textarea
-                      value={editingGoalTitle}
-                      onChange={(e) => setEditingGoalTitle(e.target.value)}
-                      onBlur={() => handleUpdateGoalTitle(goal.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleUpdateGoalTitle(goal.id);
-                        }
-                        if (e.key === 'Escape') setEditingGoalId(null);
-                      }}
-                      autoFocus
-                      className="bg-black/40 border border-white/20 rounded px-2 py-1 text-sm text-foreground outline-none w-full h-full resize-none z-10"
-                    />
-                  ) : (
-                    <div className="relative flex-1 h-full">
-                      <h3 className="font-medium text-foreground pr-6 overflow-y-auto h-full text-sm hide-scrollbar pb-6 break-words whitespace-normal [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                        {goal.title}
-                      </h3>
-                      <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-card to-transparent pointer-events-none" />
-                    </div>
-                  )}
+                  <div className="relative flex-1 h-full">
+                    <h3 className="font-medium text-foreground pr-6 overflow-y-auto h-full text-sm hide-scrollbar pb-6 break-words whitespace-normal [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      {goal.title}
+                    </h3>
+                    <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-card to-transparent pointer-events-none" />
+                  </div>
                 </div>
                 <div className="flex justify-between items-center ml-8 mt-2 shrink-0">
                   <span className="text-xs text-muted-foreground">{goal.year}</span>
@@ -606,12 +589,62 @@ export default function Home() {
         onSelectEvent={setSelectedEvent}
       />
 
-      <HallOfFamePanel
+      <HallOfFamePanel 
         isOpen={isHallOfFameOpen}
         onClose={() => setIsHallOfFameOpen(false)}
         goals={filteredGoals}
         onToggleStatus={handleToggleGoalStatus}
       />
+
+      {editingGoalId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-md transition-opacity animate-in fade-in duration-300" 
+            onClick={() => { setEditingGoalId(null); setEditingGoalTitle(""); }} 
+          />
+          
+          <div className="relative bg-zinc-950/80 backdrop-blur-3xl border border-white/5 rounded-2xl w-[90%] max-w-lg overflow-visible shadow-2xl shadow-black/50 animate-in fade-in zoom-in-[0.98] duration-300 slide-in-from-bottom-4">
+            
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-t-2xl" />
+
+            <div className="flex items-center justify-between px-6 py-5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Edit Goal</span>
+              <button 
+                type="button"
+                onClick={() => { setEditingGoalId(null); setEditingGoalTitle(""); }} 
+                className="p-1.5 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleUpdateGoalTitle(editingGoalId);
+              }} 
+              className="px-6 pb-6 flex flex-col gap-6"
+            >
+              <textarea 
+                placeholder="Goal title..."
+                value={editingGoalTitle}
+                onChange={(e) => setEditingGoalTitle(e.target.value)}
+                autoFocus
+                rows={4}
+                className="w-full bg-transparent text-lg font-medium tracking-wide outline-none text-white placeholder:text-white/20 resize-none hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+              />
+
+              <button 
+                type="submit"
+                disabled={!editingGoalTitle.trim()}
+                className="w-full py-3 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
+              >
+                Save Changes
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
