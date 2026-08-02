@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ContextType, Topic } from "@/lib/types";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { addDays, format } from "date-fns";
@@ -29,10 +29,10 @@ export function NewTopicDialog({ contextName, onTopicAdded }: NewTopicDialogProp
   const [selectedColor, setSelectedColor] = useState(COLORS[0].class);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Custom colors saved in localStorage
   const [customColors, setCustomColors] = useState<string[]>([]);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customHex, setCustomHex] = useState("#");
+  const [editingColor, setEditingColor] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem(`custom_colors_${contextName}`);
@@ -47,10 +47,31 @@ export function NewTopicDialog({ contextName, onTopicAdded }: NewTopicDialogProp
 
   const saveCustomColor = (color: string) => {
     if (!color.startsWith("#") || color.length !== 7) return;
-    if (!customColors.includes(color) && !COLORS.some(c => c.class === color)) {
-      const newColors = [...customColors, color];
-      setCustomColors(newColors);
-      localStorage.setItem(`custom_colors_${contextName}`, JSON.stringify(newColors));
+    
+    if (editingColor) {
+      if (customColors.includes(editingColor)) {
+        const newColors = customColors.map(c => c === editingColor ? color : c);
+        setCustomColors(newColors);
+        localStorage.setItem(`custom_colors_${contextName}`, JSON.stringify(newColors));
+      }
+      setEditingColor(null);
+    } else {
+      if (!customColors.includes(color) && !COLORS.some(c => c.class === color)) {
+        const newColors = [...customColors, color];
+        setCustomColors(newColors);
+        localStorage.setItem(`custom_colors_${contextName}`, JSON.stringify(newColors));
+      }
+    }
+  };
+
+  const deleteCustomColor = (color: string) => {
+    const newColors = customColors.filter(c => c !== color);
+    setCustomColors(newColors);
+    localStorage.setItem(`custom_colors_${contextName}`, JSON.stringify(newColors));
+    if (selectedColor === color) {
+      setSelectedColor(COLORS[0].class);
+      setShowCustomInput(false);
+      setEditingColor(null);
     }
   };
 
@@ -184,14 +205,47 @@ export function NewTopicDialog({ contextName, onTopicAdded }: NewTopicDialogProp
 
                     <button
                       type="button"
-                      onClick={() => setShowCustomInput(!showCustomInput)}
+                      onClick={() => {
+                        if (showCustomInput && !editingColor) {
+                          setShowCustomInput(false);
+                        } else {
+                          setCustomHex("#");
+                          setEditingColor(null);
+                          setShowCustomInput(true);
+                        }
+                      }}
                       className={cn(
                         "relative w-6 h-6 rounded-full overflow-hidden border-2 transition-all flex items-center justify-center bg-white/5",
-                        showCustomInput ? "border-white/50" : "border-white/10 hover:border-white/30"
+                        (showCustomInput && !editingColor) ? "border-white/50" : "border-white/10 hover:border-white/30"
                       )}
                     >
                       <span className="text-[10px] font-bold text-white/50 leading-none mb-0.5">+</span>
                     </button>
+
+                    {customColors.includes(selectedColor) && !showCustomInput && (
+                      <div className="flex items-center gap-1 ml-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomHex(selectedColor);
+                            setEditingColor(selectedColor);
+                            setShowCustomInput(true);
+                          }}
+                          className="p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-white/50 hover:text-white transition-colors"
+                          title="Edit color"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteCustomColor(selectedColor)}
+                          className="p-1.5 bg-white/5 hover:bg-red-500/20 rounded-md text-white/50 hover:text-red-400 transition-colors"
+                          title="Delete color"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
 
                     {showCustomInput && (
                       <div className="flex items-center gap-2 ml-2 animate-in fade-in slide-in-from-left-2 duration-300 bg-white/5 p-1 rounded-md border border-white/10">
@@ -229,8 +283,20 @@ export function NewTopicDialog({ contextName, onTopicAdded }: NewTopicDialogProp
                           }}
                           className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-[10px] font-bold uppercase tracking-widest transition-colors ml-1"
                         >
-                          Add
+                          {editingColor ? "Save" : "Add"}
                         </button>
+                        {editingColor && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCustomInput(false);
+                              setEditingColor(null);
+                            }}
+                            className="px-2 py-1 bg-white/5 hover:bg-white/10 rounded text-[10px] font-bold uppercase tracking-widest transition-colors text-white/50"
+                          >
+                            Cancel
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
