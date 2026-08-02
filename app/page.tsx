@@ -252,13 +252,31 @@ export default function Home() {
   const handleGenerateShortsTasks = async (video: Video) => {
     if (!video.shorts_target || video.shorts_target <= 0) return;
     
-    const newTasks = Array.from({ length: video.shorts_target }).map((_, i) => ({
-      title: `Upload Short ${i + 1} for ${video.title}`,
-      context: currentContext, // Default to whoever is logged in and generating
-      domain: "CONTENT" as DomainType,
-      status: "todo" as const,
-      scheduled_date: video.scheduled_date || format(new Date(), "yyyy-MM-dd"),
-    }));
+    const existingShortTasks = tasks.filter(t => t.domain === "CONTENT" && t.title.toLowerCase().includes("upload short"));
+    const takenDates = new Set(existingShortTasks.map(t => t.scheduled_date));
+    
+    const newTasks = [];
+    let currentDate = parseISO(video.scheduled_date || format(new Date(), "yyyy-MM-dd"));
+    
+    for (let i = 0; i < video.shorts_target; i++) {
+      let dateString = format(currentDate, "yyyy-MM-dd");
+      while (takenDates.has(dateString)) {
+        currentDate = addDays(currentDate, 1);
+        dateString = format(currentDate, "yyyy-MM-dd");
+      }
+      
+      takenDates.add(dateString);
+      
+      newTasks.push({
+        title: `Upload Short ${i + 1} for ${video.title}`,
+        context: currentContext, 
+        domain: "CONTENT" as DomainType,
+        status: "todo" as const,
+        scheduled_date: dateString,
+      });
+      
+      currentDate = addDays(currentDate, 1);
+    }
 
     try {
       const { data, error } = await supabase.from("tasks").insert(newTasks).select();
@@ -516,58 +534,42 @@ export default function Home() {
         {currentDomain === "CONTENT" ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
             
-            {/* LEFT COLUMN: Post-Production & Daily Uploads */}
-            <div className="flex flex-col gap-8">
-              {/* TOP HALF: Editing Pipeline */}
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                  <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">Editing Pipeline</h2>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {filteredVideos.filter(v => ["editing", "subtitles", "uploaded"].includes(v.stage)).map(video => (
-                    <VideoItem 
-                      key={video.id} 
-                      video={video} 
-                      onUpdate={handleUpdateVideo}
-                      onDelete={handleDeleteVideo}
-                      onGenerateTasks={handleGenerateShortsTasks}
-                    />
-                  ))}
-                </div>
+            {/* LEFT COLUMN: Today's Upload Tasks */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">
+                  {isSameDay(selectedDate, startOfDay(new Date())) ? "Today's" : format(selectedDate, "EEEE")} Uploads
+                </h2>
               </div>
-
-              {/* BOTTOM HALF: Today's Upload Tasks */}
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                  <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">
-                    {isSameDay(selectedDate, startOfDay(new Date())) ? "Today's" : format(selectedDate, "EEEE")} Uploads
-                  </h2>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {filteredTasks.map(task => (
+              <div className="flex flex-col gap-2">
+                {filteredTasks.length === 0 ? (
+                  <p className="text-xs text-white/30 italic mt-2">No uploads scheduled for this day.</p>
+                ) : (
+                  filteredTasks.map(task => (
                     <TaskItem 
                       key={task.id} 
                       task={task} 
                       onToggleStatus={(id, status) => handleToggleStatus(id, status)}
                       onSelect={setSelectedTask}
                     />
-                  ))}
-                </div>
+                  ))
+                )}
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Production */}
+            {/* RIGHT COLUMN: All Videos */}
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">Production</h2>
+                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">Videos</h2>
               </div>
               <div className="flex flex-col gap-3">
-                {filteredVideos.filter(v => ["idea", "scripting", "filming"].includes(v.stage)).map(video => (
+                {filteredVideos.map(video => (
                   <VideoItem 
                     key={video.id} 
                     video={video} 
                     onUpdate={handleUpdateVideo}
                     onDelete={handleDeleteVideo}
+                    onGenerateTasks={handleGenerateShortsTasks}
                   />
                 ))}
                 <NewVideoDialog onVideoAdded={handleAddVideo} contextName={userContextName} />
