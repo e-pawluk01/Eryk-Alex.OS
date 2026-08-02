@@ -194,7 +194,17 @@ export function NewTopicDialog({ contextName, onTopicAdded }: NewTopicDialogProp
                     </button>
 
                     {showCustomInput && (
-                      <div className="flex items-center gap-2 ml-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                      <div className="flex items-center gap-2 ml-2 animate-in fade-in slide-in-from-left-2 duration-300 bg-white/5 p-1 rounded-md border border-white/10">
+                        <input
+                          type="color"
+                          value={customHex.length === 7 && customHex.startsWith("#") ? customHex : "#ffffff"}
+                          onChange={(e) => {
+                            setCustomHex(e.target.value);
+                            setSelectedColor(e.target.value);
+                          }}
+                          className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent shrink-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-sm"
+                          title="Pick a color visually"
+                        />
                         <input
                           type="text"
                           value={customHex}
@@ -205,7 +215,7 @@ export function NewTopicDialog({ contextName, onTopicAdded }: NewTopicDialogProp
                             }
                           }}
                           placeholder="#Hex"
-                          className="w-20 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-white/30 uppercase"
+                          className="w-16 bg-transparent border-none px-1 text-xs text-white outline-none uppercase"
                           maxLength={7}
                         />
                         <button
@@ -217,7 +227,7 @@ export function NewTopicDialog({ contextName, onTopicAdded }: NewTopicDialogProp
                               setShowCustomInput(false);
                             }
                           }}
-                          className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-[10px] font-bold uppercase tracking-widest transition-colors"
+                          className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-[10px] font-bold uppercase tracking-widest transition-colors ml-1"
                         >
                           Add
                         </button>
