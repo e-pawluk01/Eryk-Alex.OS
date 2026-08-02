@@ -7,6 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { addDays, format } from "date-fns";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { HexColorPicker } from "react-colorful";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface NewTopicDialogProps {
   contextName: ContextType;
@@ -249,16 +251,26 @@ export function NewTopicDialog({ contextName, onTopicAdded }: NewTopicDialogProp
 
                     {showCustomInput && (
                       <div className="flex items-center gap-2 ml-2 animate-in fade-in slide-in-from-left-2 duration-300 bg-white/5 p-1 rounded-md border border-white/10">
-                        <input
-                          type="color"
-                          value={customHex.length === 7 && customHex.startsWith("#") ? customHex : "#ffffff"}
-                          onChange={(e) => {
-                            setCustomHex(e.target.value);
-                            setSelectedColor(e.target.value);
-                          }}
-                          className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent shrink-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-sm"
-                          title="Pick a color visually"
-                        />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="w-6 h-6 rounded cursor-pointer border border-white/20 shrink-0 shadow-sm transition-transform hover:scale-105"
+                              style={{ backgroundColor: customHex.length === 7 && customHex.startsWith("#") ? customHex : "#ffffff" }}
+                              title="Pick a color visually"
+                            />
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-3 bg-[#1A1A1D] border-white/10 shadow-2xl rounded-xl" sideOffset={10}>
+                            <HexColorPicker
+                              color={customHex.length === 7 && customHex.startsWith("#") ? customHex : "#ffffff"}
+                              onChange={(newColor) => {
+                                setCustomHex(newColor);
+                                setSelectedColor(newColor);
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        
                         <input
                           type="text"
                           value={customHex}
