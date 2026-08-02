@@ -28,6 +28,19 @@ export interface Task {
   is_daily?: boolean;
 }
 
+export interface Topic {
+  id: string;
+  title: string;
+  context: ContextType;
+  tag: string;
+  color: string;
+  repetition: number;
+  interval: number;
+  ease_factor: number;
+  next_review_date: string; // "yyyy-MM-dd"
+  created_at: string;
+}
+
 export interface Event {
   id: string;
   title: string;

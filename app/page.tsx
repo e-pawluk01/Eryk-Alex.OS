@@ -12,6 +12,8 @@ import { EventDetailsPanel } from "@/components/event-details-panel";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { NewTaskDialog } from "@/components/new-task-dialog";
 import { NewGoalDialog } from "@/components/new-goal-dialog";
+import { NewTopicDialog } from "@/components/new-topic-dialog";
+import { TopicItem } from "@/components/topic-item";
 import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO } from "date-fns";
@@ -31,6 +33,7 @@ export default function Home() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -44,19 +47,22 @@ export default function Home() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [goalsRes, tasksRes, eventsRes] = await Promise.all([
+        const [goalsRes, tasksRes, eventsRes, topicsRes] = await Promise.all([
           supabase.from("goals").select("*").order("year", { ascending: false }),
           supabase.from("tasks").select("*").order("created_at", { ascending: false }),
-          supabase.from("events").select("*").order("event_date", { ascending: true })
+          supabase.from("events").select("*").order("event_date", { ascending: true }),
+          supabase.from("study_topics").select("*").order("next_review_date", { ascending: true })
         ]);
 
         if (goalsRes.error) throw goalsRes.error;
         if (tasksRes.error) throw tasksRes.error;
         if (eventsRes.error) throw eventsRes.error;
+        if (topicsRes.error) throw topicsRes.error;
 
         setGoals(goalsRes.data as Goal[]);
         setTasks(tasksRes.data as Task[]);
         setEvents(eventsRes.data as Event[]);
+        setTopics(topicsRes.data as Topic[]);
       } catch (err) {
         console.error("Error fetching data:", err);
       } finally {
@@ -109,6 +115,19 @@ export default function Home() {
             setGoals(prev => prev.map(g => g.id === payload.new.id ? { ...g, ...(payload.new as Partial<Goal>) } : g));
           } else if (payload.eventType === 'DELETE') {
             setGoals(prev => prev.filter(g => g.id !== payload.old.id));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'study_topics' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setTopics(prev => prev.some(t => t.id === payload.new.id) ? prev : [...prev, payload.new as Topic].sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
+          } else if (payload.eventType === 'UPDATE') {
+            setTopics(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...(payload.new as Partial<Topic>) } : t));
+          } else if (payload.eventType === 'DELETE') {
+            setTopics(prev => prev.filter(t => t.id !== payload.old.id));
           }
         }
       )
@@ -167,6 +186,14 @@ export default function Home() {
 
   const handleAddGoal = (newGoal: Goal) => {
     setGoals(prev => [newGoal, ...prev].sort((a, b) => b.year - a.year));
+  };
+
+  const handleUpdateTopic = (id: string, updates: Partial<Topic>) => {
+    setTopics(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t).sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
+  };
+
+  const handleAddTopic = (newTopic: Topic) => {
+    setTopics(prev => [...prev, newTopic].sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
   };
 
   const handleUpdateEvent = async (id: string, updates: Partial<Event>) => {
@@ -232,6 +259,21 @@ export default function Home() {
   const selectedDayTasks = filteredTasks.filter(t => 
     t.scheduled_date && isSameDay(new Date(t.scheduled_date), selectedDate)
   );
+
+  // Filter topics for user
+  const userTopics = useMemo(() => {
+    return topics.filter(t => t.context === userContextName);
+  }, [topics, userContextName]);
+
+  const dueTopics = useMemo(() => {
+    const today = startOfDay(new Date());
+    return userTopics.filter(t => differenceInDays(startOfDay(new Date(t.next_review_date)), today) <= 0);
+  }, [userTopics]);
+
+  const upcomingTopics = useMemo(() => {
+    const today = startOfDay(new Date());
+    return userTopics.filter(t => differenceInDays(startOfDay(new Date(t.next_review_date)), today) > 0);
+  }, [userTopics]);
 
   // Generate 7 days for the weekly rail
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(new Date()), i));
@@ -379,18 +421,47 @@ export default function Home() {
         
         {currentDomain === "WORK" || currentDomain === "STUDY" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {DOMAIN_MAP[currentDomain].map(contextName => {
-              const contextTasks = selectedDayTasks.filter(t => t.context === contextName);
-              
-              return (
-                <div key={contextName} className="flex flex-col gap-4">
+            {currentDomain === "WORK" ? (
+              DOMAIN_MAP[currentDomain].map(contextName => {
+                const contextTasks = selectedDayTasks.filter(t => t.context === contextName);
+                
+                return (
+                  <div key={contextName} className="flex flex-col gap-4">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">{contextName}</h3>
+                      <div className="h-px bg-border flex-1" />
+                    </div>
+                    
+                    <div className="flex flex-col gap-2">
+                      {contextTasks.map(task => (
+                        <TaskItem 
+                          key={task.id} 
+                          task={task} 
+                          onToggleStatus={handleToggleStatus} 
+                          onSelect={() => setSelectedTask(task)}
+                        />
+                      ))}
+                      <NewTaskDialog 
+                        contextName={contextName} 
+                        selectedDateString={format(selectedDate, "yyyy-MM-dd")} 
+                        onTaskAdded={handleAddTask} 
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              // STUDY Layout
+              <>
+                {/* Column 1: Study Tasks */}
+                <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">{contextName}</h3>
+                    <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Study Tasks</h3>
                     <div className="h-px bg-border flex-1" />
                   </div>
                   
                   <div className="flex flex-col gap-2">
-                    {contextTasks.map(task => (
+                    {selectedDayTasks.filter(t => t.context === userContextName).map(task => (
                       <TaskItem 
                         key={task.id} 
                         task={task} 
@@ -399,14 +470,56 @@ export default function Home() {
                       />
                     ))}
                     <NewTaskDialog 
-                      contextName={contextName} 
+                      contextName={userContextName as ContextType} 
                       selectedDateString={format(selectedDate, "yyyy-MM-dd")} 
                       onTaskAdded={handleAddTask} 
                     />
                   </div>
                 </div>
-              );
-            })}
+
+                {/* Column 2: Revisions (Spaced Repetition) */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Revisions</h3>
+                    <div className="h-px bg-border flex-1" />
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    {/* Due Today (Capped at 3) */}
+                    {dueTopics.slice(0, 3).map(topic => (
+                      <TopicItem key={topic.id} topic={topic} onUpdate={handleUpdateTopic} />
+                    ))}
+                    
+                    {dueTopics.length > 3 && (
+                      <div className="text-center py-2 text-[10px] uppercase tracking-widest text-muted-foreground/50 border border-dashed border-border rounded-lg">
+                        + {dueTopics.length - 3} more in queue
+                      </div>
+                    )}
+                    
+                    {dueTopics.length === 0 && upcomingTopics.length > 0 && (
+                      <div className="text-center py-4 text-[10px] uppercase tracking-widest text-muted-foreground border border-dashed border-border rounded-lg">
+                        No revisions due today
+                      </div>
+                    )}
+
+                    {/* Upcoming Overview */}
+                    {upcomingTopics.length > 0 && (
+                      <div className="mt-4 flex flex-col gap-2 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold px-2">Upcoming</span>
+                        {upcomingTopics.slice(0, 5).map(topic => (
+                          <TopicItem key={topic.id} topic={topic} onUpdate={handleUpdateTopic} />
+                        ))}
+                      </div>
+                    )}
+
+                    <NewTopicDialog 
+                      contextName={userContextName as ContextType}
+                      onTopicAdded={handleAddTopic}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-border rounded-lg bg-card/20">
