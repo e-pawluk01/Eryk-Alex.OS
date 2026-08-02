@@ -258,37 +258,51 @@ export default function Home() {
   };
 
   const handleGenerateShortsTasks = async (video: Video) => {
-    if (!video.shorts_target || video.shorts_target <= 0) return;
-    
-    // Prevent duplicate generation if already scheduled
-    const alreadyGenerated = tasks.some(t => t.domain === "CONTENT" && t.title.includes(`for ${video.title}`));
-    if (alreadyGenerated) return;
-    
-    const existingShortTasks = tasks.filter(t => t.domain === "CONTENT" && t.title.toLowerCase().includes("upload short"));
-    const takenDates = new Set(existingShortTasks.map(t => t.scheduled_date));
-    
     const newTasks = [];
-    let currentDate = parseISO(video.scheduled_date || format(new Date(), "yyyy-MM-dd"));
     
-    for (let i = 0; i < video.shorts_target; i++) {
-      let dateString = format(currentDate, "yyyy-MM-dd");
-      while (takenDates.has(dateString)) {
-        currentDate = addDays(currentDate, 1);
-        dateString = format(currentDate, "yyyy-MM-dd");
-      }
-      
-      takenDates.add(dateString);
-      
+    // Check if main upload task already exists
+    const mainTaskExists = tasks.some(t => t.domain === "CONTENT" && t.title === `Upload Video: ${video.title}`);
+    if (!mainTaskExists) {
       newTasks.push({
-        title: `Upload Short ${i + 1} for ${video.title}`,
-        context: currentContext, 
+        title: `Upload Video: ${video.title}`,
+        context: video.context, 
         domain: "CONTENT" as DomainType,
         status: "todo" as const,
-        scheduled_date: dateString,
+        scheduled_date: video.scheduled_date || format(new Date(), "yyyy-MM-dd"),
       });
-      
-      currentDate = addDays(currentDate, 1);
     }
+
+    if (video.shorts_target && video.shorts_target > 0) {
+      const alreadyGenerated = tasks.some(t => t.domain === "CONTENT" && t.title.includes(`for ${video.title}`));
+      if (!alreadyGenerated) {
+        const existingShortTasks = tasks.filter(t => t.domain === "CONTENT" && t.title.toLowerCase().includes("upload short"));
+        const takenDates = new Set(existingShortTasks.map(t => t.scheduled_date));
+        
+        let currentDate = parseISO(video.scheduled_date || format(new Date(), "yyyy-MM-dd"));
+        
+        for (let i = 0; i < video.shorts_target; i++) {
+          let dateString = format(currentDate, "yyyy-MM-dd");
+          while (takenDates.has(dateString)) {
+            currentDate = addDays(currentDate, 1);
+            dateString = format(currentDate, "yyyy-MM-dd");
+          }
+          
+          takenDates.add(dateString);
+          
+          newTasks.push({
+            title: `Upload Short ${i + 1} for ${video.title}`,
+            context: currentContext, 
+            domain: "CONTENT" as DomainType,
+            status: "todo" as const,
+            scheduled_date: dateString,
+          });
+          
+          currentDate = addDays(currentDate, 1);
+        }
+      }
+    }
+
+    if (newTasks.length === 0) return;
 
     try {
       const { data, error } = await supabase.from("tasks").insert(newTasks).select();
@@ -554,10 +568,10 @@ export default function Home() {
                 </h2>
               </div>
               <div className="flex flex-col gap-2">
-                {filteredTasks.length === 0 ? (
+                {selectedDayTasks.length === 0 ? (
                   <p className="text-xs text-white/30 italic mt-2">No uploads scheduled for this day.</p>
                 ) : (
-                  filteredTasks.map(task => (
+                  selectedDayTasks.map(task => (
                     <TaskItem 
                       key={task.id} 
                       task={task} 
