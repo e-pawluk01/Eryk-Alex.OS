@@ -65,7 +65,7 @@ export function VideoItem({ video, onUpdate }: VideoItemProps) {
         <div className="flex items-center gap-1 shrink-0 ml-4">
           {STAGES.map((stage, idx) => {
             const Icon = stage.icon;
-            const isActive = idx <= currentStageIndex;
+            const isActive = idx === currentStageIndex;
             return (
               <button 
                 key={stage.id}
