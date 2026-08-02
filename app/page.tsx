@@ -17,7 +17,7 @@ import { TopicItem } from "@/components/topic-item";
 import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO, differenceInDays } from "date-fns";
-import { Clock, Trophy } from "lucide-react";
+import { Clock, Trophy, Pencil } from "lucide-react";
 
 export default function Home() {
   const { currentDomain, userEmail } = useGlobalContext();
