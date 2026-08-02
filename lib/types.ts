@@ -24,6 +24,7 @@ export interface Task {
   folder_id: string | null;
   project?: "Reselling" | "Drink idea" | null;
   domain?: "WORK" | "STUDY" | "CONTENT" | null;
+  kanban_column?: "idea" | "scripting" | "filming" | "published" | null;
   created_at: string;
   subTasks?: Task[];
   is_daily?: boolean;
@@ -49,6 +50,7 @@ export interface Event {
   event_date: string; // ISO Date string (YYYY-MM-DD)
   event_time: string | null; // e.g. "14:30"
   context: ContextType;
+  domain?: "WORK" | "STUDY" | "CONTENT" | null;
   created_at: string;
 }
 

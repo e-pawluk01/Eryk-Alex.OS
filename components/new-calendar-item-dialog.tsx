@@ -12,12 +12,13 @@ interface NewCalendarItemDialogProps {
   isOpen: boolean;
   onClose: () => void;
   contextName: ContextType;
+  domainName: "WORK" | "STUDY" | "CONTENT";
   selectedDateString: string; // "yyyy-MM-dd"
   onTaskAdded: (task: Task) => void;
   onEventAdded: (event: Event) => void;
 }
 
-export function NewCalendarItemDialog({ isOpen, onClose, contextName, selectedDateString, onTaskAdded, onEventAdded }: NewCalendarItemDialogProps) {
+export function NewCalendarItemDialog({ isOpen, onClose, contextName, domainName, selectedDateString, onTaskAdded, onEventAdded }: NewCalendarItemDialogProps) {
   const [type, setType] = useState<"task" | "event">("task");
   const [title, setTitle] = useState("");
   const [timeOrDeadline, setTimeOrDeadline] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export function NewCalendarItemDialog({ isOpen, onClose, contextName, selectedDa
         const newTask = {
           title: title.trim(),
           context: contextName,
+          domain: domainName,
           status: "todo",
           scheduled_date: selectedDateString,
           due_date: timeOrDeadline || null,
@@ -48,6 +50,7 @@ export function NewCalendarItemDialog({ isOpen, onClose, contextName, selectedDa
         const newEvent = {
           title: title.trim(),
           context: contextName,
+          domain: domainName,
           event_date: selectedDateString,
           event_time: timeOrDeadline || null,
           description: description.trim() || null,

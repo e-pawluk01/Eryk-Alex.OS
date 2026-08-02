@@ -18,6 +18,7 @@ import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO, differenceInDays } from "date-fns";
 import { Clock, Trophy, Pencil, X } from "lucide-react";
+import { KanbanBoard } from "@/components/kanban-board";
 
 export default function Home() {
   const { currentDomain, userEmail } = useGlobalContext();
@@ -36,6 +37,7 @@ export default function Home() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [contentTab, setContentTab] = useState<"videos" | "uploading">("videos");
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [isHallOfFameOpen, setIsHallOfFameOpen] = useState(false);
@@ -231,12 +233,12 @@ export default function Home() {
 
   const filteredTasks = useMemo(() => {
     const valid = DOMAIN_MAP[currentDomain];
-    return tasks.filter(t => valid.includes(t.context) && (t.domain || "WORK") === currentDomain);
+    return tasks.filter(t => (currentDomain === "CONTENT" || valid.includes(t.context)) && (t.domain || "WORK") === currentDomain);
   }, [tasks, currentDomain]);
 
   const filteredEvents = useMemo(() => {
     const valid = DOMAIN_MAP[currentDomain];
-    return events.filter(e => valid.includes(e.context));
+    return events.filter(e => valid.includes(e.context) && (e.domain || "WORK") === currentDomain);
   }, [events, currentDomain]);
 
   const upcomingEvents = useMemo(() => {
@@ -374,45 +376,47 @@ export default function Home() {
       </section>
 
       {/* WEEK SECTION */}
-      <section className="flex flex-col gap-4">
-        <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground border-b border-border pb-2">Week</h2>
-        <div className="grid grid-cols-7 gap-2 md:gap-4">
-          {weekDays.map((date, i) => {
-            const isTodayDate = i === 0;
-            const isSelected = isSameDay(date, selectedDate);
-            const taskCount = getTaskCountForDate(date);
-            return (
-              <button 
-                key={date.toISOString()} 
-                onClick={() => setSelectedDate(date)}
-                className={`flex flex-col items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer ${
-                  isSelected 
-                    ? "bg-white/10 border-white/20" 
-                    : isTodayDate 
-                      ? "bg-white/5 border-white/10"
-                      : "bg-card border-border hover:bg-white/5"
-                }`}
-              >
-                <span className={`text-[10px] uppercase tracking-widest font-semibold ${isSelected || isTodayDate ? "text-white" : "text-muted-foreground"}`}>
-                  {isTodayDate ? "Today" : format(date, "EEE")}
-                </span>
-                <span className={`text-xs mt-1 ${isSelected || isTodayDate ? "text-white/80" : "text-muted-foreground/50"}`}>
-                  {format(date, "d")}
-                </span>
-                
-                {/* Text Indicator */}
-                <div className="mt-3 flex flex-col gap-1 w-full items-center justify-end h-8">
-                  {taskCount > 0 ? (
-                    <span className={`text-[10px] font-medium ${isSelected ? "text-white" : "text-primary/70"}`}>{taskCount} task{taskCount > 1 ? 's' : ''}</span>
-                  ) : (
-                    <span className="text-[10px] text-muted-foreground/50">-</span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      {currentDomain !== "CONTENT" && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground border-b border-border pb-2">Week</h2>
+          <div className="grid grid-cols-7 gap-2 md:gap-4">
+            {weekDays.map((date, i) => {
+              const isTodayDate = i === 0;
+              const isSelected = isSameDay(date, selectedDate);
+              const taskCount = getTaskCountForDate(date);
+              return (
+                <button 
+                  key={date.toISOString()} 
+                  onClick={() => setSelectedDate(date)}
+                  className={`flex flex-col items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer ${
+                    isSelected 
+                      ? "bg-white/10 border-white/20" 
+                      : isTodayDate 
+                        ? "bg-white/5 border-white/10"
+                        : "bg-card border-border hover:bg-white/5"
+                  }`}
+                >
+                  <span className={`text-[10px] uppercase tracking-widest font-semibold ${isSelected || isTodayDate ? "text-white" : "text-muted-foreground"}`}>
+                    {isTodayDate ? "Today" : format(date, "EEE")}
+                  </span>
+                  <span className={`text-xs mt-1 ${isSelected || isTodayDate ? "text-white/80" : "text-muted-foreground/50"}`}>
+                    {format(date, "d")}
+                  </span>
+                  
+                  {/* Text Indicator */}
+                  <div className="mt-3 flex flex-col gap-1 w-full items-center justify-end h-8">
+                    {taskCount > 0 ? (
+                      <span className={`text-[10px] font-medium ${isSelected ? "text-white" : "text-primary/70"}`}>{taskCount} task{taskCount > 1 ? 's' : ''}</span>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground/50">-</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* UPCOMING EVENTS WIDGET */}
       {currentDomain === "WORK" && upcomingEvents.length > 0 && (
@@ -443,13 +447,48 @@ export default function Home() {
 
       {/* TODAY'S TASKS LIST SECTION */}
       <section className="flex flex-col gap-4">
-        <div className="flex items-center justify-between border-b border-border pb-2">
-          <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
-            {isSameDay(selectedDate, startOfDay(new Date())) ? "Today" : format(selectedDate, "MMM d, yyyy")}
+        <div className="flex items-center border-b border-border pb-2 relative min-h-[32px]">
+          <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground absolute left-0">
+            {currentDomain === "CONTENT" ? "Content" : isSameDay(selectedDate, startOfDay(new Date())) ? "Today" : format(selectedDate, "MMM d, yyyy")}
           </h2>
+
+          {currentDomain === "CONTENT" && (
+            <div className="flex items-center gap-4 mx-auto">
+              <button 
+                onClick={() => setContentTab("videos")}
+                className={cn(
+                  "px-6 py-1.5 rounded-full border transition-all text-sm font-medium",
+                  contentTab === "videos" 
+                    ? "bg-white/10 border-white/20 text-white" 
+                    : "border-transparent text-muted-foreground hover:text-white/80 hover:bg-white/5"
+                )}
+              >
+                Videos
+              </button>
+              <button 
+                onClick={() => setContentTab("uploading")}
+                className={cn(
+                  "px-6 py-1.5 rounded-full border transition-all text-sm font-medium",
+                  contentTab === "uploading" 
+                    ? "bg-white/10 border-white/20 text-white" 
+                    : "border-transparent text-muted-foreground hover:text-white/80 hover:bg-white/5"
+                )}
+              >
+                Uploading
+              </button>
+            </div>
+          )}
         </div>
         
-        {currentDomain === "WORK" || currentDomain === "STUDY" ? (
+        {currentDomain === "CONTENT" ? (
+          contentTab === "videos" ? (
+            <KanbanBoard tasks={filteredTasks} onUpdateTask={handleUpdateTask} />
+          ) : (
+            <div className="text-center text-muted-foreground/50 py-12 border-2 border-dashed border-white/5 rounded-xl">
+              Uploading features coming soon.
+            </div>
+          )
+        ) : currentDomain === "WORK" || currentDomain === "STUDY" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {currentDomain === "WORK" ? (
               DOMAIN_MAP[currentDomain].map(contextName => {

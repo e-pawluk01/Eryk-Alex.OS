@@ -197,6 +197,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         contextName={userContextName}
+        domainName={currentDomain}
         selectedDateString={format(selectedDate, "yyyy-MM-dd")}
         onTaskAdded={onAddTask}
         onEventAdded={onAddEvent}
