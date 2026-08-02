@@ -540,7 +540,7 @@ export default function Home() {
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">
-                    {format(selectedDate, "EEEE")} Uploads
+                    {isSameDay(selectedDate, startOfDay(new Date())) ? "Today's" : format(selectedDate, "EEEE")} Uploads
                   </h2>
                 </div>
                 <div className="flex flex-col gap-2">

@@ -28,6 +28,7 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [tag, setTag] = useState("");
+  const [selectedContext, setSelectedContext] = useState<ContextType>(contextName);
   const [selectedColor, setSelectedColor] = useState(COLORS[0].class);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -85,7 +86,7 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
     try {
       const newVideo = {
         title: title.trim(),
-        context: contextName,
+        context: selectedContext,
         tag: tag.trim(),
         color: selectedColor,
         stage: "idea",
@@ -163,12 +164,35 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
                   </label>
                   <input 
                     type="text"
-                    placeholder="Video title..."
+                    placeholder="E.g. Tutorial, Vlog..."
                     value={tag}
                     onChange={(e) => setTag(e.target.value)}
                     className="bg-transparent border-b border-white/5 pb-2 text-xs text-white/80 outline-none focus:border-white/30 focus:text-white transition-all w-full"
                     disabled={isSubmitting}
                   />
+                </div>
+
+                <div className="flex flex-col gap-2 group">
+                  <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 group-focus-within:text-white/60 transition-colors">
+                    Creator
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {(['Eryk', 'Alex'] as ContextType[]).map(ctx => (
+                      <button
+                        key={ctx}
+                        type="button"
+                        onClick={() => setSelectedContext(ctx)}
+                        className={cn(
+                          "px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest border transition-all",
+                          selectedContext === ctx 
+                            ? "bg-white/10 text-white border-white/20" 
+                            : "bg-transparent text-white/40 border-white/5 hover:border-white/10"
+                        )}
+                      >
+                        {ctx}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
