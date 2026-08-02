@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ContextType, Topic } from "@/lib/types";
 import { Plus, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
