@@ -123,7 +123,7 @@ export function NewTopicDialog({ contextName, onTopicAdded }: NewTopicDialogProp
                   <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">
                     Tag Color
                   </label>
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 items-center">
                     {COLORS.map((c) => (
                       <button
                         key={c.name}
@@ -136,6 +136,24 @@ export function NewTopicDialog({ contextName, onTopicAdded }: NewTopicDialogProp
                         )}
                       />
                     ))}
+                    <div 
+                      className={cn(
+                        "relative w-6 h-6 rounded-full overflow-hidden border-2 transition-all cursor-pointer flex items-center justify-center bg-white/10",
+                        selectedColor.startsWith("#") ? "border-white scale-110" : "border-transparent opacity-50 hover:opacity-100 hover:scale-105"
+                      )}
+                      style={selectedColor.startsWith("#") ? { backgroundColor: selectedColor } : undefined}
+                    >
+                      <input 
+                        type="color" 
+                        value={selectedColor.startsWith("#") ? selectedColor : "#a855f7"}
+                        onChange={(e) => setSelectedColor(e.target.value)}
+                        className="absolute inset-[-10px] w-12 h-12 cursor-pointer opacity-0"
+                        title="Custom Color"
+                      />
+                      {!selectedColor.startsWith("#") && (
+                        <span className="text-[10px] font-bold text-white/50 leading-none">+</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

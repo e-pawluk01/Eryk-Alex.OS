@@ -62,12 +62,20 @@ export function TopicItem({ topic, onUpdate }: TopicItemProps) {
   else if (daysDiff === 0) statusText = "Due today";
   else statusText = `In ${daysDiff} ${daysDiff === 1 ? 'day' : 'days'}`;
 
+  const isHex = topic.color.startsWith('#');
+
   return (
     <div className="flex flex-col gap-2 p-3 bg-card border border-border rounded-lg group relative overflow-hidden transition-colors hover:border-primary/20">
       <div className="flex gap-3 relative z-10">
         <div className="pt-0.5">
-          <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center opacity-80", topic.color.replace("bg-", "border-"))}>
-            <div className={cn("w-2 h-2 rounded-full", topic.color)} />
+          <div 
+            className={cn("w-4 h-4 rounded-full border flex items-center justify-center opacity-80", !isHex && topic.color.replace("bg-", "border-"))}
+            style={isHex ? { borderColor: topic.color } : undefined}
+          >
+            <div 
+              className={cn("w-2 h-2 rounded-full", !isHex && topic.color)} 
+              style={isHex ? { backgroundColor: topic.color } : undefined}
+            />
           </div>
         </div>
         
@@ -75,7 +83,10 @@ export function TopicItem({ topic, onUpdate }: TopicItemProps) {
           <span className="text-sm font-medium text-foreground line-clamp-1">{topic.title}</span>
           
           <div className="flex items-center gap-2">
-            <span className={cn("px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 bg-white/5 shadow-[0_0_8px_rgba(0,0,0,0.2)]", topic.color.replace("bg-", "text-"), topic.color.replace("bg-", "border-"))}>
+            <span 
+              className={cn("px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 bg-white/5 shadow-[0_0_8px_rgba(0,0,0,0.2)]", !isHex && topic.color.replace("bg-", "text-"), !isHex && topic.color.replace("bg-", "border-"))}
+              style={isHex ? { color: topic.color, borderColor: `${topic.color}80` } : undefined}
+            >
               {topic.tag}
             </span>
             <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1">
