@@ -58,9 +58,9 @@ export function TopicItem({ topic, onUpdate }: TopicItemProps) {
   };
 
   let statusText = "";
-  if (daysDiff < 0) statusText = `${Math.abs(daysDiff)}d overdue`;
+  if (daysDiff < 0) statusText = `${Math.abs(daysDiff)} ${Math.abs(daysDiff) === 1 ? 'day' : 'days'} overdue`;
   else if (daysDiff === 0) statusText = "Due today";
-  else statusText = `In ${daysDiff}d`;
+  else statusText = `In ${daysDiff} ${daysDiff === 1 ? 'day' : 'days'}`;
 
   return (
     <div className="flex flex-col gap-2 p-3 bg-card border border-border rounded-lg group relative overflow-hidden transition-colors hover:border-primary/20">
@@ -92,7 +92,7 @@ export function TopicItem({ topic, onUpdate }: TopicItemProps) {
                 className="flex flex-col items-center justify-center p-1.5 rounded bg-white/5 border border-white/10 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-colors text-[9px] uppercase tracking-widest font-bold disabled:opacity-50 text-white/60"
               >
                 Hard
-                <span className="text-[8px] opacity-50 mt-0.5 font-medium">1d</span>
+                <span className="text-[8px] mt-0.5 font-medium text-white/20 lowercase tracking-normal">1 day</span>
               </button>
               <button 
                 onClick={() => handleReview("good")}
@@ -100,7 +100,7 @@ export function TopicItem({ topic, onUpdate }: TopicItemProps) {
                 className="flex flex-col items-center justify-center p-1.5 rounded bg-white/5 border border-white/10 hover:bg-orange-500/10 hover:text-orange-400 hover:border-orange-500/20 transition-colors text-[9px] uppercase tracking-widest font-bold disabled:opacity-50 text-white/60"
               >
                 Good
-                <span className="text-[8px] opacity-50 mt-0.5 font-medium">{Math.max(2, Math.round(topic.interval * topic.ease_factor))}d</span>
+                <span className="text-[8px] mt-0.5 font-medium text-white/20 lowercase tracking-normal">{Math.max(2, Math.round(topic.interval * topic.ease_factor))} days</span>
               </button>
               <button 
                 onClick={() => handleReview("easy")}
@@ -108,7 +108,7 @@ export function TopicItem({ topic, onUpdate }: TopicItemProps) {
                 className="flex flex-col items-center justify-center p-1.5 rounded bg-white/5 border border-white/10 hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/20 transition-colors text-[9px] uppercase tracking-widest font-bold disabled:opacity-50 text-white/60"
               >
                 Easy
-                <span className="text-[8px] opacity-50 mt-0.5 font-medium">{topic.interval <= 1 ? 4 : topic.interval + 4}d</span>
+                <span className="text-[8px] mt-0.5 font-medium text-white/20 lowercase tracking-normal">{topic.interval <= 1 ? 4 : topic.interval + 4} days</span>
               </button>
             </div>
           )}
