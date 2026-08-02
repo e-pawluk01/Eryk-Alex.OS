@@ -16,7 +16,7 @@ import { NewTopicDialog } from "@/components/new-topic-dialog";
 import { TopicItem } from "@/components/topic-item";
 import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
-import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO } from "date-fns";
+import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO, differenceInDays } from "date-fns";
 import { Clock, Trophy } from "lucide-react";
 
 export default function Home() {
