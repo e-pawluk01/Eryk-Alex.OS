@@ -35,6 +35,10 @@ export function VideoItem({ video, onUpdate, onDelete, onGenerateTasks }: VideoI
       const updates = { stage };
       onUpdate(video.id, updates);
       await supabase.from("videos").update(updates).eq("id", video.id);
+      
+      if (stage === "uploaded" && onGenerateTasks) {
+        onGenerateTasks(video);
+      }
     } catch (error) {
       console.error("Failed to update video stage:", error);
     } finally {
@@ -42,12 +46,7 @@ export function VideoItem({ video, onUpdate, onDelete, onGenerateTasks }: VideoI
     }
   };
 
-  const handleGenerateClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onGenerateTasks) {
-      onGenerateTasks(video);
-    }
-  };
+
 
   const isHex = video.color.startsWith('#');
   const currentStageIndex = STAGES.findIndex(s => s.id === video.stage);
@@ -113,19 +112,9 @@ export function VideoItem({ video, onUpdate, onDelete, onGenerateTasks }: VideoI
           </div>
         </div>
 
-        {isPostProduction && (
+        {isPostProduction && (video.shorts_target || 0) > 0 && (
           <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
-            <span className="text-[10px] font-bold text-white/40">SHORTS TARGET: {video.shorts_target || 0}</span>
-            {(video.shorts_target || 0) > 0 && (
-              <button 
-                onClick={handleGenerateClick}
-                disabled={isSubmitting}
-                className="w-full mt-4 flex items-center justify-center gap-2 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
-              >
-                {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                Schedule Shorts
-              </button>
-            )}
+            <span className="text-[10px] font-bold text-white/40">SHORTS TARGET: {video.shorts_target}</span>
           </div>
         )}
 

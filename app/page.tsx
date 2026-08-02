@@ -252,6 +252,10 @@ export default function Home() {
   const handleGenerateShortsTasks = async (video: Video) => {
     if (!video.shorts_target || video.shorts_target <= 0) return;
     
+    // Prevent duplicate generation if already scheduled
+    const alreadyGenerated = tasks.some(t => t.domain === "CONTENT" && t.title.includes(`for ${video.title}`));
+    if (alreadyGenerated) return;
+    
     const existingShortTasks = tasks.filter(t => t.domain === "CONTENT" && t.title.toLowerCase().includes("upload short"));
     const takenDates = new Set(existingShortTasks.map(t => t.scheduled_date));
     
