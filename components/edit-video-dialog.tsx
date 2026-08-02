@@ -61,11 +61,12 @@ export function EditVideoDialog({ video, children, onVideoUpdated, onVideoDelete
         // ignore
       }
     }
-  }, [contextName]);
+  }, [video.context]);
 
   const saveCustomColor = (color: string) => {
     if (!color.startsWith("#") || color.length !== 7) return;
     
+    let newColors = [...customColors];
     if (editingColor) {
       newColors = newColors.map(c => c === editingColor ? color : c);
     } else {
