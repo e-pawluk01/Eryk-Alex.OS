@@ -107,38 +107,40 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
               {/* Deadline & Notes Grid */}
               <div className="flex flex-col gap-5">
                 
-                {/* Project Tag */}
-                <div className="flex flex-col gap-2 group relative">
-                  <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 flex items-center gap-2 group-focus-within:text-white/60 transition-colors">
-                    Project Tag
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setProject(project === "Reselling" ? null : "Reselling")}
-                      className={cn(
-                        "px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest font-bold border transition-all",
-                        project === "Reselling" 
-                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]" 
-                          : "bg-white/5 text-muted-foreground border-transparent hover:bg-white/10"
-                      )}
-                    >
-                      Reselling
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setProject(project === "Drink idea" ? null : "Drink idea")}
-                      className={cn(
-                        "px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest font-bold border transition-all",
-                        project === "Drink idea" 
-                          ? "bg-purple-500/20 text-purple-400 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]" 
-                          : "bg-white/5 text-muted-foreground border-transparent hover:bg-white/10"
-                      )}
-                    >
-                      Drink idea
-                    </button>
+                {/* Project Tag (Only in WORK domain) */}
+                {domain === "WORK" && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">
+                      Project Tag
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setProject(project === "Reselling" ? null : "Reselling")}
+                        className={cn(
+                          "px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest font-bold transition-all border",
+                          project === "Reselling"
+                            ? "bg-purple-500/20 text-purple-400 border-purple-500/50"
+                            : "bg-white/5 text-white/40 border-transparent hover:bg-white/10 hover:text-white/80"
+                        )}
+                      >
+                        Reselling
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProject(project === "Drink idea" ? null : "Drink idea")}
+                        className={cn(
+                          "px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest font-bold transition-all border",
+                          project === "Drink idea"
+                            ? "bg-blue-500/20 text-blue-400 border-blue-500/50"
+                            : "bg-white/5 text-white/40 border-transparent hover:bg-white/10 hover:text-white/80"
+                        )}
+                      >
+                        Drink Idea
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Deadline */}
                 <div className="flex flex-col gap-2 group relative">
