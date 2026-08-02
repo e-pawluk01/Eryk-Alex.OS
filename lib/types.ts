@@ -25,6 +25,7 @@ export interface Task {
   project?: "Reselling" | "Drink idea" | null;
   created_at: string;
   subTasks?: Task[];
+  is_daily?: boolean;
 }
 
 export interface Event {

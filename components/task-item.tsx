@@ -5,6 +5,7 @@ import { Task } from "@/lib/types";
 import { CustomCheckbox } from "./ui/custom-checkbox";
 import { cn } from "@/lib/utils";
 import { differenceInDays, startOfDay } from "date-fns";
+import { Repeat } from "lucide-react";
 
 interface TaskItemProps {
   task: Task;
@@ -69,6 +70,9 @@ export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
             )}>
               {task.title}
             </span>
+            {task.is_daily && (
+              <Repeat className="w-3 h-3 text-muted-foreground ml-1" />
+            )}
             {task.project && (
               <span className={cn(
                 "px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.2)]",

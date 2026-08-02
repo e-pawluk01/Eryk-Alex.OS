@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ContextType, Task } from "@/lib/types";
-import { Plus, X, Flag } from "lucide-react";
+import { Plus, X, Flag, Repeat } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
@@ -19,6 +19,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded }: 
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [project, setProject] = useState<"Reselling" | "Drink idea" | null>(null);
+  const [isDaily, setIsDaily] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,6 +36,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded }: 
         due_date: dueDate,
         project: project,
         description: description.trim() || null,
+        is_daily: isDaily,
       };
 
       const { data, error } = await supabase.from("tasks").insert([newTask]).select().single();
@@ -46,6 +48,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded }: 
       setDescription("");
       setDueDate(null);
       setProject(null);
+      setIsDaily(false);
     } catch (err) {
       console.error(err);
     } finally {
@@ -161,6 +164,29 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded }: 
                     className="bg-transparent border-b border-white/5 pb-2 text-xs text-white/80 outline-none focus:border-white/30 focus:text-white transition-all resize-none w-full"
                     disabled={isSubmitting}
                   />
+                </div>
+
+                {/* Daily Toggle */}
+                <div className="flex items-center justify-between group py-2">
+                  <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
+                    <Repeat className="w-3 h-3" />
+                    <span className="text-[9px] uppercase tracking-widest font-semibold">
+                      Daily Routine
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsDaily(!isDaily)}
+                    className={cn(
+                      "w-8 h-4 rounded-full transition-colors relative",
+                      isDaily ? "bg-white" : "bg-white/10"
+                    )}
+                  >
+                    <div className={cn(
+                      "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
+                      isDaily ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
+                    )} />
+                  </button>
                 </div>
 
               </div>
