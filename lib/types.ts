@@ -49,7 +49,7 @@ export interface Video {
   context: ContextType;
   tag: string;
   color: string;
-  stage: "idea" | "scripting" | "filming" | "editing";
+  stage: "idea" | "scripting" | "filming" | "ready";
   created_at: string;
 }
 

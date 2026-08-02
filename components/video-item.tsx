@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Video } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { Loader2, Lightbulb, PenLine, Video as VideoIcon, Scissors } from "lucide-react";
+import { Loader2, Lightbulb, PenLine, Video as VideoIcon, CheckCircle2 } from "lucide-react";
 
 interface VideoItemProps {
   video: Video;
@@ -15,7 +15,7 @@ const STAGES = [
   { id: "idea", icon: Lightbulb, label: "Idea", activeColor: "text-yellow-500", hoverColor: "hover:text-yellow-500", activeBg: "bg-yellow-500/10 border-yellow-500/20" },
   { id: "scripting", icon: PenLine, label: "Scripting", activeColor: "text-blue-500", hoverColor: "hover:text-blue-500", activeBg: "bg-blue-500/10 border-blue-500/20" },
   { id: "filming", icon: VideoIcon, label: "Filming", activeColor: "text-red-500", hoverColor: "hover:text-red-500", activeBg: "bg-red-500/10 border-red-500/20" },
-  { id: "editing", icon: Scissors, label: "Editing", activeColor: "text-purple-500", hoverColor: "hover:text-purple-500", activeBg: "bg-purple-500/10 border-purple-500/20" },
+  { id: "ready", icon: CheckCircle2, label: "Ready", activeColor: "text-green-500", hoverColor: "hover:text-green-500", activeBg: "bg-green-500/10 border-green-500/20" },
 ] as const;
 
 export function VideoItem({ video, onUpdate }: VideoItemProps) {
@@ -43,58 +43,50 @@ export function VideoItem({ video, onUpdate }: VideoItemProps) {
   const currentStageIndex = STAGES.findIndex(s => s.id === video.stage);
 
   return (
-    <div className="flex flex-col gap-2 p-3 bg-card border border-border rounded-lg group relative overflow-hidden transition-colors hover:border-primary/20">
-      <div className="flex gap-3 relative z-10">
-        <div className="pt-0.5">
+    <div className="flex flex-col gap-2 p-3 bg-transparent border border-white/5 rounded-lg group relative overflow-hidden transition-colors hover:border-white/10 hover:bg-white/[0.02]">
+      <div className="flex items-center gap-3 relative z-10">
+        <div className="shrink-0">
           <div 
-            className={cn("w-4 h-4 rounded-full border flex items-center justify-center opacity-80", !isHex && video.color.replace("bg-", "border-"))}
+            className={cn("w-3 h-3 rounded-full border flex items-center justify-center opacity-80", !isHex && video.color.replace("bg-", "border-"))}
             style={isHex ? { borderColor: video.color } : undefined}
           >
             <div 
-              className={cn("w-2 h-2 rounded-full", !isHex && video.color)} 
+              className={cn("w-1.5 h-1.5 rounded-full", !isHex && video.color)} 
               style={isHex ? { backgroundColor: video.color } : undefined}
             />
           </div>
         </div>
         
-        <div className="flex flex-col flex-1 gap-1.5 min-w-0">
-          <span className="text-sm font-medium text-foreground line-clamp-1">{video.title}</span>
-          
-          <div className="flex items-center gap-2">
-            <span 
-              className={cn("px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 bg-white/5 shadow-[0_0_8px_rgba(0,0,0,0.2)]", !isHex && video.color.replace("bg-", "text-"), !isHex && video.color.replace("bg-", "border-"))}
-              style={isHex ? { color: video.color, borderColor: `${video.color}80` } : undefined}
-            >
-              {video.tag}
-            </span>
-          </div>
+        <div className="flex flex-col flex-1 min-w-0">
+          <span className="text-sm font-medium text-white/90 line-clamp-1">{video.title}</span>
+          <span className="text-[10px] uppercase tracking-widest font-semibold text-white/40">{video.tag}</span>
+        </div>
 
-          <div className="grid grid-cols-4 gap-2 mt-2">
-            {STAGES.map((stage, idx) => {
-              const Icon = stage.icon;
-              const isActive = idx === currentStageIndex;
-              return (
-                <button 
-                  key={stage.id}
-                  onClick={() => handleStageChange(stage.id)}
-                  disabled={isSubmitting}
-                  title={stage.label}
-                  className={cn(
-                    "flex flex-col items-center justify-center p-2 rounded transition-all",
-                    isActive 
-                      ? cn("border", stage.activeBg)
-                      : "bg-white/5 border border-transparent hover:bg-white/10 hover:border-white/10",
-                    "disabled:opacity-50 group/btn"
-                  )}
-                >
-                  <Icon className={cn(
-                    "w-4 h-4 transition-colors",
-                    isActive ? stage.activeColor : cn("text-white/30", stage.hoverColor)
-                  )} />
-                </button>
-              );
-            })}
-          </div>
+        <div className="flex items-center gap-1 shrink-0 ml-4">
+          {STAGES.map((stage, idx) => {
+            const Icon = stage.icon;
+            const isActive = idx <= currentStageIndex;
+            return (
+              <button 
+                key={stage.id}
+                onClick={() => handleStageChange(stage.id)}
+                disabled={isSubmitting}
+                title={stage.label}
+                className={cn(
+                  "flex items-center justify-center p-1.5 rounded-full transition-all",
+                  isActive 
+                    ? "bg-transparent"
+                    : "bg-transparent hover:bg-white/5",
+                  "disabled:opacity-50"
+                )}
+              >
+                <Icon className={cn(
+                  "w-4 h-4 transition-colors",
+                  isActive ? stage.activeColor : "text-white/20 hover:text-white/40"
+                )} />
+              </button>
+            );
+          })}
         </div>
       </div>
 
