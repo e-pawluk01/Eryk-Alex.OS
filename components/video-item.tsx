@@ -28,7 +28,15 @@ export function VideoItem({ video, onUpdate, onDelete, onGenerateTasks }: VideoI
 
   const handleStageChange = async (e: React.MouseEvent, stage: typeof STAGES[number]["id"]) => {
     e.stopPropagation();
-    if (isSubmitting || stage === video.stage) return;
+    if (isSubmitting) return;
+
+    if (stage === video.stage) {
+      if (stage === "uploaded" && onGenerateTasks) {
+        onGenerateTasks(video);
+      }
+      return;
+    }
+    
     setIsSubmitting(true);
 
     try {

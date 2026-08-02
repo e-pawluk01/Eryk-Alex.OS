@@ -228,8 +228,10 @@ export function EditVideoDialog({ video, children, onVideoUpdated, onVideoDelete
                     Upload Date
                   </label>
                   <DatePicker 
-                    date={scheduledDate}
-                    onDateSelect={(d) => d && setScheduledDate(d)}
+                    value={format(scheduledDate, "yyyy-MM-dd")}
+                    onChange={(dateStr) => {
+                      if (dateStr) setScheduledDate(parseISO(dateStr));
+                    }}
                   />
                 </div>
 
