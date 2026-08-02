@@ -332,40 +332,41 @@ export default function Home() {
             className="flex gap-4 overflow-x-auto pb-4 px-2 snap-x snap-mandatory hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           >
             {filteredGoals.filter(g => g.status !== "completed").map(goal => (
-              <div key={goal.id} className="w-[280px] h-[120px] snap-start shrink-0 bg-card border border-border p-4 rounded-lg flex flex-col justify-between group hover:border-primary/20 transition-colors relative overflow-hidden">
+              <div key={goal.id} className="w-[280px] snap-start shrink-0 bg-card border border-border p-4 rounded-lg flex flex-col gap-3 justify-between group hover:border-primary/20 transition-colors relative">
                 
                 {editingGoalId !== goal.id && (
                   <button 
+                    type="button"
                     onClick={() => {
                       setEditingGoalTitle(goal.title);
                       setEditingGoalId(goal.id);
                     }}
-                    className="absolute top-2 right-2 p-1.5 bg-background/80 hover:bg-white/10 rounded-md text-white/40 hover:text-white opacity-0 group-hover:opacity-100 transition-all z-20 backdrop-blur-sm"
+                    className="absolute top-3 right-3 p-1.5 bg-background/80 hover:bg-white/10 rounded-md text-white/40 hover:text-white opacity-0 group-hover:opacity-100 transition-all z-20 backdrop-blur-sm"
                   >
                     <Pencil className="w-3 h-3" />
                   </button>
                 )}
 
-                <div className="flex gap-3 h-[60px]">
+                <div className="flex gap-3">
                   <div className="pt-0.5 shrink-0">
                     <CustomCheckbox 
                       checked={goal.status === "completed"} 
                       onChange={(checked) => handleToggleGoalStatus(goal.id, checked ? "completed" : "active")} 
                     />
                   </div>
-                  <div className="relative flex-1 h-full">
-                    <h3 className="font-medium text-foreground pr-6 overflow-y-auto h-full text-sm hide-scrollbar pb-6 break-words whitespace-normal [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  <div className="relative flex-1 overflow-hidden">
+                    <h3 className="font-medium text-foreground pr-8 whitespace-nowrap overflow-x-auto hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                       {goal.title}
                     </h3>
-                    <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-card to-transparent pointer-events-none" />
+                    <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-card to-transparent pointer-events-none" />
                   </div>
                 </div>
-                <div className="flex justify-between items-center ml-8 mt-2 shrink-0">
+                <div className="flex justify-between items-center ml-8 shrink-0">
                   <span className="text-xs text-muted-foreground">{goal.year}</span>
                 </div>
               </div>
             ))}
-            <div className="snap-start shrink-0 h-[120px] flex items-center">
+            <div className="snap-start shrink-0">
               <NewGoalDialog onGoalAdded={handleAddGoal} currentDomain={currentDomain} />
             </div>
           </div>
