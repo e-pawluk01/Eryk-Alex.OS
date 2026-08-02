@@ -23,6 +23,7 @@ export interface Task {
   status: "todo" | "done";
   folder_id: string | null;
   project?: "Reselling" | "Drink idea" | null;
+  domain?: "WORK" | "STUDY" | "CONTENT" | null;
   created_at: string;
   subTasks?: Task[];
   is_daily?: boolean;

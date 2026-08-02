@@ -5,7 +5,7 @@ import { Topic } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { differenceInDays, startOfDay, addDays, format } from "date-fns";
 import { supabase } from "@/lib/supabase";
-import { Loader2 } from "lucide-react";
+import { Loader2, Clock } from "lucide-react";
 
 interface TopicItemProps {
   topic: Topic;
@@ -63,57 +63,63 @@ export function TopicItem({ topic, onUpdate }: TopicItemProps) {
   else statusText = `In ${daysDiff}d`;
 
   return (
-    <div className="flex flex-col gap-3 p-4 bg-card border border-border rounded-lg relative overflow-hidden group">
-      
-      {/* Background tint based on tag color */}
-      <div className={cn("absolute inset-0 opacity-5 pointer-events-none", topic.color)} />
-
-      <div className="flex flex-col gap-1.5 z-10">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-foreground">{topic.title}</span>
+    <div className="flex flex-col gap-2 p-3 bg-card border border-border rounded-lg group relative overflow-hidden transition-colors hover:border-primary/20">
+      <div className="flex gap-3 relative z-10">
+        <div className="pt-0.5">
+          <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center opacity-80", topic.color.replace("bg-", "border-"))}>
+            <div className={cn("w-2 h-2 rounded-full", topic.color)} />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className={cn("px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 bg-white/5 border-white/10", topic.color.replace("bg-", "text-"))}>
-            {topic.tag}
-          </span>
-          <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
-            {statusText}
-          </span>
+        
+        <div className="flex flex-col flex-1 gap-1.5 min-w-0">
+          <span className="text-sm font-medium text-foreground line-clamp-1">{topic.title}</span>
+          
+          <div className="flex items-center gap-2">
+            <span className={cn("px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 bg-white/5 shadow-[0_0_8px_rgba(0,0,0,0.2)]", topic.color.replace("bg-", "text-"), topic.color.replace("bg-", "border-"))}>
+              {topic.tag}
+            </span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {statusText}
+            </span>
+          </div>
+
+          {isDue && (
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              <button 
+                onClick={() => handleReview("hard")}
+                disabled={isSubmitting}
+                className="flex flex-col items-center justify-center p-1.5 rounded bg-white/5 border border-white/10 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-colors text-[9px] uppercase tracking-widest font-bold disabled:opacity-50 text-white/60"
+              >
+                Hard
+                <span className="text-[8px] opacity-50 mt-0.5 font-medium">1d</span>
+              </button>
+              <button 
+                onClick={() => handleReview("good")}
+                disabled={isSubmitting}
+                className="flex flex-col items-center justify-center p-1.5 rounded bg-white/5 border border-white/10 hover:bg-orange-500/10 hover:text-orange-400 hover:border-orange-500/20 transition-colors text-[9px] uppercase tracking-widest font-bold disabled:opacity-50 text-white/60"
+              >
+                Good
+                <span className="text-[8px] opacity-50 mt-0.5 font-medium">{Math.max(2, Math.round(topic.interval * topic.ease_factor))}d</span>
+              </button>
+              <button 
+                onClick={() => handleReview("easy")}
+                disabled={isSubmitting}
+                className="flex flex-col items-center justify-center p-1.5 rounded bg-white/5 border border-white/10 hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/20 transition-colors text-[9px] uppercase tracking-widest font-bold disabled:opacity-50 text-white/60"
+              >
+                Easy
+                <span className="text-[8px] opacity-50 mt-0.5 font-medium">{topic.interval <= 1 ? 4 : topic.interval + 4}d</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {isDue && (
-        <div className="grid grid-cols-3 gap-2 mt-2 z-10">
-          <button 
-            onClick={() => handleReview("hard")}
-            disabled={isSubmitting}
-            className="flex items-center justify-center p-2 rounded-md bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-colors text-[10px] uppercase tracking-widest font-bold disabled:opacity-50"
-          >
-            Hard <span className="text-red-500/50 ml-1">(1d)</span>
-          </button>
-          <button 
-            onClick={() => handleReview("good")}
-            disabled={isSubmitting}
-            className="flex items-center justify-center p-2 rounded-md bg-orange-500/10 text-orange-500 border border-orange-500/20 hover:bg-orange-500/20 transition-colors text-[10px] uppercase tracking-widest font-bold disabled:opacity-50"
-          >
-            Good <span className="text-orange-500/50 ml-1">({Math.max(2, Math.round(topic.interval * topic.ease_factor))}d)</span>
-          </button>
-          <button 
-            onClick={() => handleReview("easy")}
-            disabled={isSubmitting}
-            className="flex items-center justify-center p-2 rounded-md bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20 transition-colors text-[10px] uppercase tracking-widest font-bold disabled:opacity-50"
-          >
-            Easy <span className="text-green-500/50 ml-1">({topic.interval <= 1 ? 4 : topic.interval + 4}d)</span>
-          </button>
-        </div>
-      )}
-
       {isSubmitting && (
-        <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-20 flex items-center justify-center">
+        <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] z-20 flex items-center justify-center">
           <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
         </div>
       )}
-
     </div>
   );
 }

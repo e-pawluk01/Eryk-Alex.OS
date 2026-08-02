@@ -11,9 +11,10 @@ interface NewTaskDialogProps {
   contextName: ContextType;
   selectedDateString: string; // "yyyy-MM-dd"
   onTaskAdded: (task: Task) => void;
+  domain?: "WORK" | "STUDY" | "CONTENT" | null;
 }
 
-export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded }: NewTaskDialogProps) {
+export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, domain }: NewTaskDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded }: 
         project: project,
         description: description.trim() || null,
         is_daily: isDaily,
+        domain: domain || "WORK",
       };
 
       const { data, error } = await supabase.from("tasks").insert([newTask]).select().single();

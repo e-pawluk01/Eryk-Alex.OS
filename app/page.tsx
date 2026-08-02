@@ -220,7 +220,7 @@ export default function Home() {
 
   const filteredTasks = useMemo(() => {
     const valid = DOMAIN_MAP[currentDomain];
-    return tasks.filter(t => valid.includes(t.context));
+    return tasks.filter(t => valid.includes(t.context) && (t.domain || "WORK") === currentDomain);
   }, [tasks, currentDomain]);
 
   const filteredEvents = useMemo(() => {
@@ -445,6 +445,7 @@ export default function Home() {
                         contextName={contextName} 
                         selectedDateString={format(selectedDate, "yyyy-MM-dd")} 
                         onTaskAdded={handleAddTask} 
+                        domain={currentDomain}
                       />
                     </div>
                   </div>
@@ -473,6 +474,7 @@ export default function Home() {
                       contextName={userContextName as ContextType} 
                       selectedDateString={format(selectedDate, "yyyy-MM-dd")} 
                       onTaskAdded={handleAddTask} 
+                      domain={currentDomain}
                     />
                   </div>
                 </div>
