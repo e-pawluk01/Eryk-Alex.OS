@@ -66,6 +66,65 @@ export default function Home() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setTasks(prev => prev.some(t => t.id === payload.new.id) ? prev : [payload.new as Task, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setTasks(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...(payload.new as Partial<Task>) } : t));
+            setSelectedTask(prev => prev?.id === payload.new.id ? { ...prev, ...(payload.new as Partial<Task>) } : prev);
+          } else if (payload.eventType === 'DELETE') {
+            setTasks(prev => prev.filter(t => t.id !== payload.old.id));
+            setSelectedTask(prev => prev?.id === payload.old.id ? null : prev);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'events' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setEvents(prev => prev.some(e => e.id === payload.new.id) ? prev : [...prev, payload.new as Event].sort((a, b) => parseISO(a.event_date).getTime() - parseISO(b.event_date).getTime()));
+          } else if (payload.eventType === 'UPDATE') {
+            setEvents(prev => prev.map(e => e.id === payload.new.id ? { ...e, ...(payload.new as Partial<Event>) } : e));
+            setSelectedEvent(prev => prev?.id === payload.new.id ? { ...prev, ...(payload.new as Partial<Event>) } : prev);
+          } else if (payload.eventType === 'DELETE') {
+            setEvents(prev => prev.filter(e => e.id !== payload.old.id));
+            setSelectedEvent(prev => prev?.id === payload.old.id ? null : prev);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'goals' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setGoals(prev => prev.some(g => g.id === payload.new.id) ? prev : [payload.new as Goal, ...prev].sort((a, b) => b.year - a.year));
+          } else if (payload.eventType === 'UPDATE') {
+            setGoals(prev => prev.map(g => g.id === payload.new.id ? { ...g, ...(payload.new as Partial<Goal>) } : g));
+          } else if (payload.eventType === 'DELETE') {
+            setGoals(prev => prev.filter(g => g.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully connected to realtime channel');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Failed to subscribe to realtime channel:', status, err);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const handleToggleStatus = async (id: string, newStatus: "todo" | "done") => {
     setTasks(prev => 
       prev.map(t => t.id === id ? { ...t, status: newStatus } : t)
