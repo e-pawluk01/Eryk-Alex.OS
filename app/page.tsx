@@ -241,6 +241,10 @@ export default function Home() {
     setTopics(prev => [...prev, newTopic].sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
   };
 
+  const handleUpdateVideo = (id: string, updates: Partial<Video>) => {
+    setVideos(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v));
+  };
+
   const handleUpdateEvent = async (id: string, updates: Partial<Event>) => {
     setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
     if (selectedEvent?.id === id) {
