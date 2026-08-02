@@ -19,12 +19,18 @@ import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO, differenceInDays } from "date-fns";
 import { Clock, Trophy, Pencil, X } from "lucide-react";
 import { KanbanBoard } from "@/components/kanban-board";
+import { VideoItem } from "@/components/video-item";
+import { NewVideoDialog } from "@/components/new-video-dialog";
+import { Video } from "@/lib/types";
 
 export default function Home() {
   const { currentDomain, userEmail } = useGlobalContext();
 
-  const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
+  const handleAddVideo = (video: Video) => {
+    setVideos(prev => [video, ...prev]);
+  };
 
+  const userContextName = (userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk") as ContextType;
   const DOMAIN_MAP: Record<DomainType, ContextType[]> = useMemo(() => ({
     WORK: ["Eryk", "Alex"],
     STUDY: [userContextName as ContextType],
@@ -35,6 +41,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [contentTab, setContentTab] = useState<"videos" | "uploading">("videos");
@@ -50,22 +57,25 @@ export default function Home() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [goalsRes, tasksRes, eventsRes, topicsRes] = await Promise.all([
+        const [goalsRes, tasksRes, eventsRes, topicsRes, videosRes] = await Promise.all([
           supabase.from("goals").select("*").order("year", { ascending: false }),
           supabase.from("tasks").select("*").order("created_at", { ascending: false }),
           supabase.from("events").select("*").order("event_date", { ascending: true }),
-          supabase.from("study_topics").select("*").order("next_review_date", { ascending: true })
+          supabase.from("study_topics").select("*").order("next_review_date", { ascending: true }),
+          supabase.from("videos").select("*").order("created_at", { ascending: false }),
         ]);
 
         if (goalsRes.error) throw goalsRes.error;
         if (tasksRes.error) throw tasksRes.error;
         if (eventsRes.error) throw eventsRes.error;
         if (topicsRes.error) throw topicsRes.error;
+        if (videosRes.error) throw videosRes.error;
 
         setGoals(goalsRes.data as Goal[]);
         setTasks(tasksRes.data as Task[]);
         setEvents(eventsRes.data as Event[]);
         setTopics(topicsRes.data as Topic[]);
+        setVideos(videosRes.data as Video[]);
       } catch (err) {
         console.error("Error fetching data:", err);
       } finally {
@@ -134,6 +144,19 @@ export default function Home() {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'videos' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setVideos(prev => prev.some(v => v.id === payload.new.id) ? prev : [payload.new as Video, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setVideos(prev => prev.map(v => v.id === payload.new.id ? { ...v, ...(payload.new as Partial<Video>) } : v));
+          } else if (payload.eventType === 'DELETE') {
+            setVideos(prev => prev.filter(v => v.id !== payload.old.id));
+          }
+        }
+      )
       .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
           console.log('Successfully connected to realtime channel');
@@ -151,7 +174,6 @@ export default function Home() {
     setTasks(prev => 
       prev.map(t => t.id === id ? { ...t, status: newStatus } : t)
     );
-    // If we're updating the currently selected task, update that state too
     if (selectedTask?.id === id) {
       setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
     }
@@ -200,6 +222,16 @@ export default function Home() {
   const handleAddGoal = (newGoal: Goal) => {
     setGoals(prev => [newGoal, ...prev].sort((a, b) => b.year - a.year));
   };
+
+  const filteredTopics = useMemo(() => {
+    const valid = ["Eryk", "Alex"];
+    return topics.filter(t => valid.includes(t.context));
+  }, [topics]);
+
+  const filteredVideos = useMemo(() => {
+    const valid = ["Eryk", "Alex"];
+    return videos.filter(v => valid.includes(v.context));
+  }, [videos]);
 
   const handleUpdateTopic = (id: string, updates: Partial<Topic>) => {
     setTopics(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t).sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
@@ -376,47 +408,45 @@ export default function Home() {
       </section>
 
       {/* WEEK SECTION */}
-      {currentDomain !== "CONTENT" && (
-        <section className="flex flex-col gap-4">
-          <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground border-b border-border pb-2">Week</h2>
-          <div className="grid grid-cols-7 gap-2 md:gap-4">
-            {weekDays.map((date, i) => {
-              const isTodayDate = i === 0;
-              const isSelected = isSameDay(date, selectedDate);
-              const taskCount = getTaskCountForDate(date);
-              return (
-                <button 
-                  key={date.toISOString()} 
-                  onClick={() => setSelectedDate(date)}
-                  className={`flex flex-col items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer ${
-                    isSelected 
-                      ? "bg-white/10 border-white/20" 
-                      : isTodayDate 
-                        ? "bg-white/5 border-white/10"
-                        : "bg-card border-border hover:bg-white/5"
-                  }`}
-                >
-                  <span className={`text-[10px] uppercase tracking-widest font-semibold ${isSelected || isTodayDate ? "text-white" : "text-muted-foreground"}`}>
-                    {isTodayDate ? "Today" : format(date, "EEE")}
-                  </span>
-                  <span className={`text-xs mt-1 ${isSelected || isTodayDate ? "text-white/80" : "text-muted-foreground/50"}`}>
-                    {format(date, "d")}
-                  </span>
-                  
-                  {/* Text Indicator */}
-                  <div className="mt-3 flex flex-col gap-1 w-full items-center justify-end h-8">
-                    {taskCount > 0 ? (
-                      <span className={`text-[10px] font-medium ${isSelected ? "text-white" : "text-primary/70"}`}>{taskCount} task{taskCount > 1 ? 's' : ''}</span>
-                    ) : (
-                      <span className="text-[10px] text-muted-foreground/50">-</span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground border-b border-border pb-2">Week</h2>
+        <div className="grid grid-cols-7 gap-2 md:gap-4">
+          {weekDays.map((date, i) => {
+            const isTodayDate = i === 0;
+            const isSelected = isSameDay(date, selectedDate);
+            const taskCount = getTaskCountForDate(date);
+            return (
+              <button 
+                key={date.toISOString()} 
+                onClick={() => setSelectedDate(date)}
+                className={`flex flex-col items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer ${
+                  isSelected 
+                    ? "bg-white/10 border-white/20" 
+                    : isTodayDate 
+                      ? "bg-white/5 border-white/10"
+                      : "bg-card border-border hover:bg-white/5"
+                }`}
+              >
+                <span className={`text-[10px] uppercase tracking-widest font-semibold ${isSelected || isTodayDate ? "text-white" : "text-muted-foreground"}`}>
+                  {isTodayDate ? "Today" : format(date, "EEE")}
+                </span>
+                <span className={`text-xs mt-1 ${isSelected || isTodayDate ? "text-white/80" : "text-muted-foreground/50"}`}>
+                  {format(date, "d")}
+                </span>
+                
+                {/* Text Indicator */}
+                <div className="mt-3 flex flex-col gap-1 w-full items-center justify-end h-8">
+                  {taskCount > 0 ? (
+                    <span className={`text-[10px] font-medium ${isSelected ? "text-white" : "text-primary/70"}`}>{taskCount} task{taskCount > 1 ? 's' : ''}</span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground/50">-</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* UPCOMING EVENTS WIDGET */}
       {currentDomain === "WORK" && upcomingEvents.length > 0 && (
@@ -447,47 +477,33 @@ export default function Home() {
 
       {/* TODAY'S TASKS LIST SECTION */}
       <section className="flex flex-col gap-4">
-        <div className="flex items-center border-b border-border pb-2 relative min-h-[32px]">
-          <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground absolute left-0">
-            {currentDomain === "CONTENT" ? "Content" : isSameDay(selectedDate, startOfDay(new Date())) ? "Today" : format(selectedDate, "MMM d, yyyy")}
+        <div className="flex items-center justify-between border-b border-border pb-2">
+          <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
+            {isSameDay(selectedDate, startOfDay(new Date())) ? "Today" : format(selectedDate, "MMM d, yyyy")}
           </h2>
-
-          {currentDomain === "CONTENT" && (
-            <div className="flex items-center gap-4 mx-auto">
-              <button 
-                onClick={() => setContentTab("videos")}
-                className={cn(
-                  "px-6 py-1.5 rounded-full border transition-all text-sm font-medium",
-                  contentTab === "videos" 
-                    ? "bg-white/10 border-white/20 text-white" 
-                    : "border-transparent text-muted-foreground hover:text-white/80 hover:bg-white/5"
-                )}
-              >
-                Videos
-              </button>
-              <button 
-                onClick={() => setContentTab("uploading")}
-                className={cn(
-                  "px-6 py-1.5 rounded-full border transition-all text-sm font-medium",
-                  contentTab === "uploading" 
-                    ? "bg-white/10 border-white/20 text-white" 
-                    : "border-transparent text-muted-foreground hover:text-white/80 hover:bg-white/5"
-                )}
-              >
-                Uploading
-              </button>
-            </div>
-          )}
         </div>
         
         {currentDomain === "CONTENT" ? (
-          contentTab === "videos" ? (
-            <KanbanBoard tasks={filteredTasks} onUpdateTask={handleUpdateTask} />
-          ) : (
-            <div className="text-center text-muted-foreground/50 py-12 border-2 border-dashed border-white/5 rounded-xl">
-              Uploading features coming soon.
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
+            <div className="flex flex-col gap-6">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Uploads</h3>
+              <div className="flex flex-col gap-3">
+                <div className="text-xs text-muted-foreground/50 italic py-8 text-center border border-dashed border-white/5 rounded-lg">
+                  Upload management coming soon.
+                </div>
+              </div>
             </div>
-          )
+
+            <div className="flex flex-col gap-6">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Videos</h3>
+              <div className="flex flex-col gap-3">
+                {filteredVideos.map(video => (
+                  <VideoItem key={video.id} video={video} onUpdate={handleUpdateVideo} />
+                ))}
+                <NewVideoDialog onVideoAdded={handleAddVideo} contextName={userContextName} />
+              </div>
+            </div>
+          </div>
         ) : currentDomain === "WORK" || currentDomain === "STUDY" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {currentDomain === "WORK" ? (

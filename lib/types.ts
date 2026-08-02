@@ -43,6 +43,16 @@ export interface Topic {
   created_at: string;
 }
 
+export interface Video {
+  id: string;
+  title: string;
+  context: ContextType;
+  tag: string;
+  color: string;
+  stage: "idea" | "scripting" | "filming" | "editing";
+  created_at: string;
+}
+
 export interface Event {
   id: string;
   title: string;
