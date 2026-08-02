@@ -24,7 +24,7 @@ export interface Task {
   folder_id: string | null;
   project?: "Reselling" | "Drink idea" | null;
   domain?: "WORK" | "STUDY" | "CONTENT" | null;
-  kanban_column?: "idea" | "scripting" | "filming" | "published" | null;
+  kanban_column?: "idea" | "scripting" | "filming" | "editing" | null;
   created_at: string;
   subTasks?: Task[];
   is_daily?: boolean;

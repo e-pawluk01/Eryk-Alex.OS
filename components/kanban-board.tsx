@@ -21,10 +21,10 @@ import {
   useSortable
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Lightbulb, PenLine, Video, CheckCircle2 } from "lucide-react";
+import { Lightbulb, PenLine, Video, Scissors } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type ColumnType = "idea" | "scripting" | "filming" | "published";
+type ColumnType = "idea" | "scripting" | "filming" | "editing";
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -32,14 +32,31 @@ interface KanbanBoardProps {
 }
 
 const COLUMNS: { id: ColumnType; label: string; icon: React.ReactNode }[] = [
-  { id: "idea", label: "Ideas", icon: <Lightbulb className="w-4 h-4 text-yellow-500" /> },
-  { id: "scripting", label: "Scripting", icon: <PenLine className="w-4 h-4 text-blue-500" /> },
-  { id: "filming", label: "Filming", icon: <Video className="w-4 h-4 text-red-500" /> },
-  { id: "published", label: "Published", icon: <CheckCircle2 className="w-4 h-4 text-green-500" /> }
+  { id: "idea", label: "Ideas", icon: <Lightbulb className="w-4 h-4 text-white/40 group-hover:text-yellow-500 transition-colors" /> },
+  { id: "scripting", label: "Scripting", icon: <PenLine className="w-4 h-4 text-white/40 group-hover:text-blue-500 transition-colors" /> },
+  { id: "filming", label: "Filming", icon: <Video className="w-4 h-4 text-white/40 group-hover:text-red-500 transition-colors" /> },
+  { id: "editing", label: "Editing", icon: <Scissors className="w-4 h-4 text-white/40 group-hover:text-purple-500 transition-colors" /> }
 ];
 
 export function KanbanBoard({ tasks, onUpdateTask }: KanbanBoardProps) {
   const [activeId, setActiveId] = React.useState<string | null>(null);
+  const [scrollLeft, setScrollLeft] = React.useState(0);
+  const [maxScroll, setMaxScroll] = React.useState(1); // Default > 0 so right gradient shows initially
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const updateScrollState = () => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      setScrollLeft(scrollLeft);
+      setMaxScroll(scrollWidth - clientWidth);
+    }
+  };
+
+  React.useEffect(() => {
+    updateScrollState();
+    window.addEventListener('resize', updateScrollState);
+    return () => window.removeEventListener('resize', updateScrollState);
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -57,7 +74,7 @@ export function KanbanBoard({ tasks, onUpdateTask }: KanbanBoardProps) {
       idea: [],
       scripting: [],
       filming: [],
-      published: []
+      editing: []
     };
     tasks.forEach(t => {
       // Safety check just in case, though they should all be CONTENT
@@ -100,12 +117,22 @@ export function KanbanBoard({ tasks, onUpdateTask }: KanbanBoardProps) {
   };
 
   return (
-    <div className="relative w-full h-[600px] overflow-hidden -mx-4 px-4 sm:mx-0 sm:px-0">
-      {/* Scroll gradients */}
-      <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+    <div className="relative w-full h-[550px] overflow-hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+      {/* Scroll gradients - dynamic visibility */}
+      <div className={cn(
+        "absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none transition-opacity duration-300",
+        scrollLeft > 0 ? "opacity-100" : "opacity-0"
+      )} />
+      <div className={cn(
+        "absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none transition-opacity duration-300",
+        scrollLeft < maxScroll - 1 ? "opacity-100" : "opacity-0"
+      )} />
 
-      <div className="flex gap-4 overflow-x-auto h-full pb-4 px-4 sm:px-0 snap-x snap-mandatory hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div 
+        ref={scrollContainerRef}
+        onScroll={updateScrollState}
+        className="flex gap-6 overflow-x-auto h-full pb-4 px-4 sm:px-0 snap-x snap-mandatory hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+      >
         <DndContext 
           sensors={sensors} 
           collisionDetection={closestCorners} 
@@ -135,20 +162,21 @@ function KanbanColumn({ column, tasks }: { column: typeof COLUMNS[0], tasks: Tas
   });
 
   return (
-    <div className="w-[300px] min-w-[300px] snap-start shrink-0 bg-[#0c0c0e] border border-white/5 rounded-xl flex flex-col h-full overflow-hidden">
-      <div className="p-4 border-b border-white/5 bg-white/[0.02] flex items-center gap-3">
-        <div className="p-1.5 bg-black/40 rounded-md">
+    <div className="w-[320px] min-w-[320px] snap-start shrink-0 flex flex-col h-full group">
+      <div className="pb-4 mb-4 flex items-center gap-3 relative">
+        <div className="p-2 bg-transparent border border-white/5 rounded-lg">
           {column.icon}
         </div>
-        <h3 className="font-semibold text-sm uppercase tracking-widest text-white/80">{column.label}</h3>
-        <span className="ml-auto text-xs font-medium text-muted-foreground bg-black/40 px-2 py-0.5 rounded-full">
+        <h3 className="font-medium text-xs uppercase tracking-[0.2em] text-white/50">{column.label}</h3>
+        <span className="ml-auto text-[10px] font-bold text-muted-foreground/30 bg-transparent px-2 py-0.5 rounded-full border border-white/5">
           {tasks.length}
         </span>
+        <div className="absolute -bottom-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       </div>
 
       <div 
         ref={setNodeRef}
-        className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar min-h-[150px]"
+        className="flex-1 overflow-y-auto pb-8 flex flex-col gap-3 custom-scrollbar min-h-[150px]"
       >
         <SortableContext 
           items={tasks.map(t => t.id)} 
@@ -203,12 +231,12 @@ function SortableTask({ task }: { task: Task }) {
 function TaskCard({ task, isOverlay }: { task: Task, isOverlay?: boolean }) {
   return (
     <div className={cn(
-      "bg-[#151518] border border-white/10 p-4 rounded-lg flex flex-col gap-2 hover:border-white/20 transition-colors shadow-sm group relative",
-      isOverlay && "scale-105 shadow-2xl rotate-2 opacity-90 cursor-grabbing border-white/30"
+      "bg-transparent border border-white/5 p-4 rounded-xl flex flex-col gap-2 hover:border-white/20 transition-all shadow-sm group relative hover:bg-white/[0.02]",
+      isOverlay && "scale-105 shadow-2xl rotate-2 opacity-90 cursor-grabbing border-white/30 bg-[#0c0c0e]"
     )}>
-      <h4 className="text-sm font-medium text-white leading-tight break-words whitespace-normal">{task.title}</h4>
+      <h4 className="text-sm font-medium text-white/90 leading-tight break-words whitespace-normal">{task.title}</h4>
       {task.description && (
-        <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground/60 line-clamp-2 mt-1">{task.description}</p>
+        <p className="text-[10px] font-semibold text-muted-foreground/40 line-clamp-2 mt-1">{task.description}</p>
       )}
     </div>
   );
