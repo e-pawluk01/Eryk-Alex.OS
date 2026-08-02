@@ -39,10 +39,11 @@ export default function Home() {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [isHallOfFameOpen, setIsHallOfFameOpen] = useState(false);
-
   const goalsScrollRef = useRef<HTMLDivElement>(null);
   const [canScrollGoalsLeft, setCanScrollGoalsLeft] = useState(false);
   const [canScrollGoalsRight, setCanScrollGoalsRight] = useState(false);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [editingGoalTitle, setEditingGoalTitle] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -184,6 +185,16 @@ export default function Home() {
     await supabase.from("goals").update({ status: newStatus }).eq("id", id);
   };
 
+  const handleUpdateGoalTitle = async (id: string) => {
+    if (!editingGoalTitle.trim()) {
+      setEditingGoalId(null);
+      return;
+    }
+    setGoals(prev => prev.map(g => g.id === id ? { ...g, title: editingGoalTitle } : g));
+    await supabase.from("goals").update({ title: editingGoalTitle.trim() }).eq("id", id);
+    setEditingGoalId(null);
+  };
+
   const handleAddGoal = (newGoal: Goal) => {
     setGoals(prev => [newGoal, ...prev].sort((a, b) => b.year - a.year));
   };
@@ -321,15 +332,43 @@ export default function Home() {
             className="flex gap-4 overflow-x-auto pb-4 px-2 snap-x snap-mandatory hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           >
             {filteredGoals.filter(g => g.status !== "completed").map(goal => (
-              <div key={goal.id} className="min-w-[280px] snap-start shrink-0 bg-card border border-border p-4 rounded-lg flex flex-col gap-3 justify-between group hover:border-primary/20 transition-colors">
+              <div key={goal.id} className="w-[280px] min-w-[280px] max-w-[280px] snap-start shrink-0 bg-card border border-border p-4 rounded-lg flex flex-col gap-3 justify-between group hover:border-primary/20 transition-colors relative">
+                
+                {editingGoalId !== goal.id && (
+                  <button 
+                    onClick={() => {
+                      setEditingGoalTitle(goal.title);
+                      setEditingGoalId(goal.id);
+                    }}
+                    className="absolute top-3 right-3 p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-white/40 hover:text-white opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                )}
+
                 <div className="flex gap-3">
-                  <div className="pt-0.5">
+                  <div className="pt-0.5 shrink-0">
                     <CustomCheckbox 
                       checked={goal.status === "completed"} 
                       onChange={(checked) => handleToggleGoalStatus(goal.id, checked ? "completed" : "active")} 
                     />
                   </div>
-                  <h3 className="font-medium text-foreground">{goal.title}</h3>
+                  {editingGoalId === goal.id ? (
+                    <input
+                      type="text"
+                      value={editingGoalTitle}
+                      onChange={(e) => setEditingGoalTitle(e.target.value)}
+                      onBlur={() => handleUpdateGoalTitle(goal.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleUpdateGoalTitle(goal.id);
+                        if (e.key === 'Escape') setEditingGoalId(null);
+                      }}
+                      autoFocus
+                      className="bg-black/40 border border-white/20 rounded px-2 py-1 text-sm text-foreground outline-none w-full"
+                    />
+                  ) : (
+                    <h3 className="font-medium text-foreground pr-6 break-words whitespace-normal">{goal.title}</h3>
+                  )}
                 </div>
                 <div className="flex justify-between items-center ml-8">
                   <span className="text-xs text-muted-foreground">{goal.year}</span>
