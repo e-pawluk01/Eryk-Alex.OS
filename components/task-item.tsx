@@ -80,16 +80,6 @@ export function TaskItem({ task, onToggleStatus, onSelect, onUpdate }: TaskItemP
             {task.is_daily && (
               <Repeat className="w-3 h-3 text-muted-foreground ml-1" />
             )}
-            {task.project && (
-              <span className={cn(
-                "px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.2)]",
-                task.color && task.status !== "done"
-                  ? `${task.color.replace("bg-", "text-")} ${task.color.replace("bg-", "border-")}/30 ${task.color.replace("bg-", "bg-")}/10`
-                  : "bg-zinc-500/10 text-zinc-400 border-zinc-500/30"
-              )}>
-                {task.project}
-              </span>
-            )}
             {task.domain === "CONTENT" && task.context && (
               <span className={cn(
                 "px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.2)]",

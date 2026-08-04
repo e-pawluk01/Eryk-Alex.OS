@@ -6,7 +6,6 @@ import { Plus, X, Flag, Repeat } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
-import { ColorPicker } from "./ui/color-picker";
 
 const COLORS = [
   { name: "Purple", class: "bg-purple-500" },
@@ -31,8 +30,6 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [description, setDescription] = useState("");
-  const [project, setProject] = useState("");
-  const [color, setColor] = useState<string | null>(null);
   const [isDaily, setIsDaily] = useState(false);
   const [trackProgress, setTrackProgress] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,8 +46,8 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
         status: "todo",
         scheduled_date: selectedDateString,
         due_date: dueDate,
-        project: project.trim() || null,
-        color: color,
+        project: null,
+        color: null,
         description: description.trim() || null,
         is_daily: isDaily,
         track_progress: trackProgress,
@@ -66,8 +63,6 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
       setTitle("");
       setDescription("");
       setDueDate(null);
-      setProject("");
-      setColor(null);
       setIsDaily(false);
       setTrackProgress(false);
     } catch (err) {
@@ -127,36 +122,6 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
               {/* Deadline & Notes Grid */}
               <div className="flex flex-col gap-5">
                 
-                {/* Project Tag (Only in WORK domain) */}
-                {domain === "WORK" && (
-                  <>
-                  <div className="flex flex-col gap-2 group">
-                    <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 group-focus-within:text-white/60 transition-colors">
-                      Project Tag
-                    </label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Reselling, Drink Idea..."
-                      value={project}
-                      onChange={(e) => setProject(e.target.value)}
-                      className="bg-transparent border-b border-white/5 pb-2 text-xs text-white/80 outline-none focus:border-white/30 focus:text-white transition-all w-full"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">
-                      Color
-                    </label>
-                    <ColorPicker 
-                      selectedColor={color}
-                      onChange={setColor}
-                      contextName={contextName}
-                    />
-                  </div>
-                </>
-                )}
-
                 {/* Deadline */}
                 <div className="flex flex-col gap-2 group relative">
                   <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 flex items-center gap-2 group-focus-within:text-white/60 transition-colors">

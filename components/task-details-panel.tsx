@@ -7,7 +7,6 @@ import { useGlobalContext } from "./global-context";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
 import { ConfirmDialog } from "./ui/confirm-dialog";
-import { ColorPicker } from "./ui/color-picker";
 import { ContextTag } from "./ui/context-tag";
 
 interface TaskDetailsPanelProps {
@@ -25,7 +24,6 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
 
   const [titleDraft, setTitleDraft] = useState("");
   const [descDraft, setDescDraft] = useState("");
-  const [projectDraft, setProjectDraft] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isTitleAtEnd, setIsTitleAtEnd] = useState(true);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +32,6 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
     if (task) {
       setTitleDraft(task.title);
       setDescDraft(task.description || "");
-      setProjectDraft(task.project || "");
     }
   }, [task]);
 
@@ -47,12 +44,6 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
   const handleDescBlur = () => {
     if (descDraft !== (task?.description || "")) {
       onUpdate(task!.id, { description: descDraft });
-    }
-  };
-
-  const handleProjectBlur = () => {
-    if (projectDraft !== (task?.project || "")) {
-      onUpdate(task!.id, { project: projectDraft.trim() || null });
     }
   };
 
@@ -161,27 +152,8 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
           </div>
           
           {/* Bottom Actions */}
-          <div className="flex items-end justify-between gap-4">
-            
-            {/* Project & Color (Left) */}
-            <div className="flex flex-col gap-3 flex-1 min-w-0">
-              <input 
-                type="text"
-                value={projectDraft}
-                onChange={(e) => setProjectDraft(e.target.value)}
-                onBlur={handleProjectBlur}
-                placeholder="Project Tag..."
-                className="bg-transparent border-b border-white/10 pb-1 text-xs text-white/80 outline-none focus:border-white/30 focus:text-white transition-all w-full"
-              />
-              
-              <ColorPicker 
-                selectedColor={task.color || null}
-                onChange={(c) => onUpdate(task.id, { color: c })}
-                contextName={task.context}
-              />
-            </div>
-            
-            {/* Delete Button (Right) */}
+          <div className="flex items-end justify-end">
+
             <button 
               onClick={() => setIsDeleteDialogOpen(true)} 
               className="p-3 hover:bg-red-500/10 rounded-full transition-colors text-red-500/50 hover:text-red-500 shrink-0"
