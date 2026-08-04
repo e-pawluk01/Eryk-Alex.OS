@@ -7,6 +7,7 @@ import { useGlobalContext } from "./global-context";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
 import { ConfirmDialog } from "./ui/confirm-dialog";
+import { ColorPicker } from "./ui/color-picker";
 import { ContextTag } from "./ui/context-tag";
 
 interface TaskDetailsPanelProps {
@@ -124,47 +125,46 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
         </div>
 
         {/* Body (Plain Text Note) */}
-        <div className="flex-1 p-6 flex flex-col relative">
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col">
           <textarea
             value={descDraft}
             onChange={(e) => setDescDraft(e.target.value)}
             onBlur={handleDescBlur}
             placeholder="Write a note..."
-            className="w-full flex-1 bg-transparent text-sm text-foreground/90 focus:outline-none resize-none leading-relaxed pb-20"
+            className="w-full flex-1 bg-transparent text-sm text-foreground/90 focus:outline-none resize-none leading-relaxed min-h-[150px]"
           />
+        </div>
+        
+        {/* Footer Actions */}
+        <div className="p-6 bg-zinc-950/50 border-t border-white/5 flex flex-col gap-4 shrink-0">
           
           {/* Extra Options */}
-          <div className="absolute bottom-28 left-6 right-6 flex flex-col gap-2">
-            <div className="flex items-center justify-between group py-2">
-              <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
-                <div className="w-3 h-3 rounded-sm border border-current flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 bg-current" />
-                </div>
-                <span className="text-[9px] uppercase tracking-widest font-semibold">
-                  Track Progress (%)
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => onUpdate(task.id, { track_progress: !task.track_progress, progress: !task.track_progress ? 0 : task.progress })}
-                className={cn(
-                  "w-8 h-4 rounded-full transition-colors relative",
-                  task.track_progress ? "bg-white" : "bg-white/10"
-                )}
-              >
-                <div className={cn(
-                  "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
-                  task.track_progress ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
-                )} />
-              </button>
+          <div className="flex items-center justify-between group py-2">
+            <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
+              <span className="text-[9px] uppercase tracking-widest font-semibold">
+                Track Progress
+              </span>
             </div>
+            <button
+              type="button"
+              onClick={() => onUpdate(task.id, { track_progress: !task.track_progress, progress: !task.track_progress ? 0 : task.progress })}
+              className={cn(
+                "w-8 h-4 rounded-full transition-colors relative",
+                task.track_progress ? "bg-white" : "bg-white/10"
+              )}
+            >
+              <div className={cn(
+                "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
+                task.track_progress ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
+              )} />
+            </button>
           </div>
           
           {/* Bottom Actions */}
-          <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between pointer-events-none">
+          <div className="flex items-end justify-between">
             
             {/* Project & Color (Left) */}
-            <div className="flex flex-col gap-3 pointer-events-auto w-[60%]">
+            <div className="flex flex-col gap-3 w-[60%]">
               <input 
                 type="text"
                 value={projectDraft}
@@ -174,44 +174,17 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
                 className="bg-transparent border-b border-white/10 pb-1 text-xs text-white/80 outline-none focus:border-white/30 focus:text-white transition-all w-full"
               />
               
-              <div className="flex gap-2 mt-1">
-                <button
-                  type="button"
-                  onClick={() => onUpdate(task.id, { color: null })}
-                  className={cn(
-                    "w-5 h-5 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center bg-transparent",
-                    task.color === null ? "border-white scale-110" : "border-white/10 opacity-50 hover:opacity-100"
-                  )}
-                >
-                  <X className="w-2.5 h-2.5 text-white/50" />
-                </button>
-                {[
-                  { name: "Purple", class: "bg-purple-500" },
-                  { name: "Blue", class: "bg-blue-500" },
-                  { name: "Emerald", class: "bg-emerald-500" },
-                  { name: "Amber", class: "bg-amber-500" },
-                  { name: "Rose", class: "bg-rose-500" },
-                  { name: "Cyan", class: "bg-cyan-500" },
-                  { name: "Zinc", class: "bg-zinc-500" },
-                ].map((c) => (
-                  <button
-                    key={c.name}
-                    type="button"
-                    onClick={() => onUpdate(task.id, { color: c.class })}
-                    className={cn(
-                      "w-5 h-5 rounded-full border-2 transition-all cursor-pointer",
-                      c.class,
-                      task.color === c.class ? "border-white scale-110 shadow-lg" : "border-transparent opacity-50 hover:opacity-100"
-                    )}
-                  />
-                ))}
-              </div>
+              <ColorPicker 
+                selectedColor={task.color || null}
+                onChange={(c) => onUpdate(task.id, { color: c })}
+                contextName={task.context}
+              />
             </div>
             
             {/* Delete Button (Right) */}
             <button 
               onClick={() => setIsDeleteDialogOpen(true)} 
-              className="p-3 hover:bg-red-500/10 rounded-full transition-colors text-red-500/50 hover:text-red-500 shrink-0 pointer-events-auto"
+              className="p-3 hover:bg-red-500/10 rounded-full transition-colors text-red-500/50 hover:text-red-500 shrink-0"
               title="Delete Task"
             >
               <Trash2 className="w-5 h-5" />

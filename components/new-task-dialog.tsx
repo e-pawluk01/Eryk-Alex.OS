@@ -6,6 +6,7 @@ import { Plus, X, Flag, Repeat } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
+import { ColorPicker } from "./ui/color-picker";
 
 const COLORS = [
   { name: "Purple", class: "bg-purple-500" },
@@ -147,30 +148,11 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
                     <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">
                       Color
                     </label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setColor(null)}
-                        className={cn(
-                          "w-6 h-6 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center bg-transparent",
-                          color === null ? "border-white scale-110" : "border-white/10 opacity-50 hover:opacity-100 hover:scale-105"
-                        )}
-                      >
-                        <X className="w-3 h-3 text-white/50" />
-                      </button>
-                      {COLORS.map((c) => (
-                        <button
-                          key={c.name}
-                          type="button"
-                          onClick={() => setColor(c.class)}
-                          className={cn(
-                            "w-6 h-6 rounded-full border-2 transition-all cursor-pointer",
-                            c.class,
-                            color === c.class ? "border-white scale-110 shadow-lg" : "border-transparent opacity-50 hover:opacity-100 hover:scale-105"
-                          )}
-                        />
-                      ))}
-                    </div>
+                    <ColorPicker 
+                      selectedColor={color}
+                      onChange={setColor}
+                      contextName={contextName}
+                    />
                   </div>
                 </>
                 )}
@@ -229,11 +211,8 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
                 {/* Progress Toggle */}
                 <div className="flex items-center justify-between group py-2">
                   <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
-                    <div className="w-3 h-3 rounded-sm border border-current flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 bg-current" />
-                    </div>
                     <span className="text-[9px] uppercase tracking-widest font-semibold">
-                      Track Progress (%)
+                      Track Progress
                     </span>
                   </div>
                   <button
