@@ -22,7 +22,7 @@ export interface Task {
   due_date: string | null;
   status: "todo" | "done";
   folder_id: string | null;
-  project?: "Reselling" | "Drink idea" | null;
+  project?: string | null;
   domain?: "WORK" | "STUDY" | "CONTENT" | null;
   kanban_column?: "idea" | "scripting" | "filming" | "editing" | null;
   created_at: string;

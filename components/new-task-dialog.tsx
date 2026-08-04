@@ -20,7 +20,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [description, setDescription] = useState("");
-  const [project, setProject] = useState<"Reselling" | "Drink idea" | null>(null);
+  const [project, setProject] = useState("");
   const [isDaily, setIsDaily] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,7 +36,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
         status: "todo",
         scheduled_date: selectedDateString,
         due_date: dueDate,
-        project: project,
+        project: project.trim() || null,
         description: description.trim() || null,
         is_daily: isDaily,
         domain: domain || "WORK",
@@ -50,7 +50,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
       setTitle("");
       setDescription("");
       setDueDate(null);
-      setProject(null);
+      setProject("");
       setIsDaily(false);
     } catch (err) {
       console.error(err);
@@ -111,36 +111,18 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
                 
                 {/* Project Tag (Only in WORK domain) */}
                 {domain === "WORK" && (
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">
+                  <div className="flex flex-col gap-2 group">
+                    <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 group-focus-within:text-white/60 transition-colors">
                       Project Tag
                     </label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setProject(project === "Reselling" ? null : "Reselling")}
-                        className={cn(
-                          "px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest font-bold transition-all border",
-                          project === "Reselling"
-                            ? "bg-purple-500/20 text-purple-400 border-purple-500/50"
-                            : "bg-white/5 text-white/40 border-transparent hover:bg-white/10 hover:text-white/80"
-                        )}
-                      >
-                        Reselling
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setProject(project === "Drink idea" ? null : "Drink idea")}
-                        className={cn(
-                          "px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest font-bold transition-all border",
-                          project === "Drink idea"
-                            ? "bg-blue-500/20 text-blue-400 border-blue-500/50"
-                            : "bg-white/5 text-white/40 border-transparent hover:bg-white/10 hover:text-white/80"
-                        )}
-                      >
-                        Drink Idea
-                      </button>
-                    </div>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Reselling, Drink Idea..."
+                      value={project}
+                      onChange={(e) => setProject(e.target.value)}
+                      className="bg-transparent border-b border-white/5 pb-2 text-xs text-white/80 outline-none focus:border-white/30 focus:text-white transition-all w-full"
+                      disabled={isSubmitting}
+                    />
                   </div>
                 )}
 
