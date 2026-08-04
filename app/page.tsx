@@ -560,18 +560,29 @@ export default function Home() {
         {currentDomain === "CONTENT" ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
             
-            {/* LEFT COLUMN: Today's Upload Tasks */}
+            {/* LEFT COLUMN: Content Tasks */}
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between border-b border-white/5 pb-2">
                 <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">
-                  {isSameDay(selectedDate, startOfDay(new Date())) ? "Today's" : format(selectedDate, "EEEE")} Uploads
+                  Content Tasks
                 </h2>
+                <NewTaskDialog 
+                  onTaskAdded={handleAddTask} 
+                  currentDomain={currentDomain}
+                  initialStatus="todo"
+                  trigger={
+                    <button className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/30 hover:text-white transition-colors">
+                      <Plus className="w-3 h-3" />
+                      Add Task
+                    </button>
+                  }
+                />
               </div>
               <div className="flex flex-col gap-2">
-                {selectedDayTasks.length === 0 ? (
-                  <p className="text-xs text-white/30 italic mt-2">No uploads scheduled for this day.</p>
+                {filteredTasks.filter(t => t.status !== "done").length === 0 ? (
+                  <p className="text-xs text-white/30 italic mt-2">No pending content tasks.</p>
                 ) : (
-                  selectedDayTasks.map(task => (
+                  filteredTasks.filter(t => t.status !== "done").map(task => (
                     <TaskItem 
                       key={task.id} 
                       task={task} 
