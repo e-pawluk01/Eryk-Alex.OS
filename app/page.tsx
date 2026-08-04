@@ -568,10 +568,10 @@ export default function Home() {
                 </h2>
               </div>
               <div className="flex flex-col gap-2">
-                {selectedDayTasks.filter(t => t.status !== "done").length === 0 ? (
-                  <p className="text-xs text-white/30 italic mt-2">No pending content tasks.</p>
+                {selectedDayTasks.length === 0 ? (
+                  <p className="text-xs text-white/30 italic mt-2">No content tasks for this date.</p>
                 ) : (
-                  selectedDayTasks.filter(t => t.status !== "done").map(task => (
+                  selectedDayTasks.map(task => (
                     <TaskItem 
                       key={task.id} 
                       task={task} 
