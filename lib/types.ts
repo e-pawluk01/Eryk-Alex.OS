@@ -23,6 +23,7 @@ export interface Task {
   status: "todo" | "done";
   folder_id: string | null;
   project?: string | null;
+  color?: string | null;
   domain?: "WORK" | "STUDY" | "CONTENT" | null;
   kanban_column?: "idea" | "scripting" | "filming" | "editing" | null;
   created_at: string;

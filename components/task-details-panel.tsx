@@ -24,6 +24,7 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
 
   const [titleDraft, setTitleDraft] = useState("");
   const [descDraft, setDescDraft] = useState("");
+  const [projectDraft, setProjectDraft] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isTitleAtEnd, setIsTitleAtEnd] = useState(true);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -32,6 +33,7 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
     if (task) {
       setTitleDraft(task.title);
       setDescDraft(task.description || "");
+      setProjectDraft(task.project || "");
     }
   }, [task]);
 
@@ -44,6 +46,12 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
   const handleDescBlur = () => {
     if (descDraft !== (task?.description || "")) {
       onUpdate(task!.id, { description: descDraft });
+    }
+  };
+
+  const handleProjectBlur = () => {
+    if (projectDraft !== (task?.project || "")) {
+      onUpdate(task!.id, { project: projectDraft.trim() || null });
     }
   };
 
@@ -128,30 +136,49 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
           {/* Bottom Actions */}
           <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between pointer-events-none">
             
-            {/* Project Tags (Left) */}
-            <div className="flex gap-2 pointer-events-auto">
-              <button
-                onClick={() => onUpdate(task.id, { project: task.project === "Reselling" ? null : "Reselling" })}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest font-bold border transition-all",
-                  task.project === "Reselling" 
-                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]" 
-                    : "bg-white/5 text-muted-foreground border-transparent hover:bg-white/10"
-                )}
-              >
-                Reselling
-              </button>
-              <button
-                onClick={() => onUpdate(task.id, { project: task.project === "Drink idea" ? null : "Drink idea" })}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest font-bold border transition-all",
-                  task.project === "Drink idea" 
-                    ? "bg-purple-500/20 text-purple-400 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]" 
-                    : "bg-white/5 text-muted-foreground border-transparent hover:bg-white/10"
-                )}
-              >
-                Drink idea
-              </button>
+            {/* Project & Color (Left) */}
+            <div className="flex flex-col gap-3 pointer-events-auto w-[60%]">
+              <input 
+                type="text"
+                value={projectDraft}
+                onChange={(e) => setProjectDraft(e.target.value)}
+                onBlur={handleProjectBlur}
+                placeholder="Project Tag..."
+                className="bg-transparent border-b border-white/10 pb-1 text-xs text-white/80 outline-none focus:border-white/30 focus:text-white transition-all w-full"
+              />
+              
+              <div className="flex gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => onUpdate(task.id, { color: null })}
+                  className={cn(
+                    "w-5 h-5 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center bg-transparent",
+                    task.color === null ? "border-white scale-110" : "border-white/10 opacity-50 hover:opacity-100"
+                  )}
+                >
+                  <X className="w-2.5 h-2.5 text-white/50" />
+                </button>
+                {[
+                  { name: "Purple", class: "bg-purple-500" },
+                  { name: "Blue", class: "bg-blue-500" },
+                  { name: "Emerald", class: "bg-emerald-500" },
+                  { name: "Amber", class: "bg-amber-500" },
+                  { name: "Rose", class: "bg-rose-500" },
+                  { name: "Cyan", class: "bg-cyan-500" },
+                  { name: "Zinc", class: "bg-zinc-500" },
+                ].map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => onUpdate(task.id, { color: c.class })}
+                    className={cn(
+                      "w-5 h-5 rounded-full border-2 transition-all cursor-pointer",
+                      c.class,
+                      task.color === c.class ? "border-white scale-110 shadow-lg" : "border-transparent opacity-50 hover:opacity-100"
+                    )}
+                  />
+                ))}
+              </div>
             </div>
             
             {/* Delete Button (Right) */}

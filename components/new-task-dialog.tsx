@@ -7,6 +7,16 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
 
+const COLORS = [
+  { name: "Purple", class: "bg-purple-500" },
+  { name: "Blue", class: "bg-blue-500" },
+  { name: "Emerald", class: "bg-emerald-500" },
+  { name: "Amber", class: "bg-amber-500" },
+  { name: "Rose", class: "bg-rose-500" },
+  { name: "Cyan", class: "bg-cyan-500" },
+  { name: "Zinc", class: "bg-zinc-500" },
+];
+
 interface NewTaskDialogProps {
   contextName: ContextType;
   selectedDateString: string; // "yyyy-MM-dd"
@@ -21,6 +31,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [project, setProject] = useState("");
+  const [color, setColor] = useState<string | null>(null);
   const [isDaily, setIsDaily] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -37,6 +48,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
         scheduled_date: selectedDateString,
         due_date: dueDate,
         project: project.trim() || null,
+        color: color,
         description: description.trim() || null,
         is_daily: isDaily,
         domain: domain || "WORK",
@@ -51,6 +63,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
       setDescription("");
       setDueDate(null);
       setProject("");
+      setColor(null);
       setIsDaily(false);
     } catch (err) {
       console.error(err);
@@ -111,6 +124,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
                 
                 {/* Project Tag (Only in WORK domain) */}
                 {domain === "WORK" && (
+                  <>
                   <div className="flex flex-col gap-2 group">
                     <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 group-focus-within:text-white/60 transition-colors">
                       Project Tag
@@ -124,6 +138,37 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
                       disabled={isSubmitting}
                     />
                   </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">
+                      Color
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setColor(null)}
+                        className={cn(
+                          "w-6 h-6 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center bg-transparent",
+                          color === null ? "border-white scale-110" : "border-white/10 opacity-50 hover:opacity-100 hover:scale-105"
+                        )}
+                      >
+                        <X className="w-3 h-3 text-white/50" />
+                      </button>
+                      {COLORS.map((c) => (
+                        <button
+                          key={c.name}
+                          type="button"
+                          onClick={() => setColor(c.class)}
+                          className={cn(
+                            "w-6 h-6 rounded-full border-2 transition-all cursor-pointer",
+                            c.class,
+                            color === c.class ? "border-white scale-110 shadow-lg" : "border-transparent opacity-50 hover:opacity-100 hover:scale-105"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </>
                 )}
 
                 {/* Deadline */}

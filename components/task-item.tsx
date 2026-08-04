@@ -49,13 +49,21 @@ export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
   return (
     <div className="flex flex-col w-full">
       <div 
-        className="flex items-start gap-4 p-4 group hover:bg-white/[0.02] transition-colors rounded-lg cursor-pointer relative"
+        className={cn(
+          "flex items-start gap-4 p-4 group transition-colors rounded-lg cursor-pointer relative overflow-hidden border",
+          task.color && task.status !== "done" 
+            ? task.color.replace("bg-", "border-") + "/30 bg-white/[0.01] hover:" + task.color.replace("bg-", "border-") + "/50" 
+            : "border-transparent hover:bg-white/[0.02]"
+        )}
         onClick={(e) => {
           // Prevent opening panel if clicking checkbox
           if (onSelect) onSelect(task);
         }}
       >
-        <div className="pt-0.5" onClick={e => e.stopPropagation()}>
+        {task.color && task.status !== "done" && (
+          <div className={cn("absolute left-0 top-0 bottom-0 w-[3px] opacity-80", task.color)} />
+        )}
+        <div className="pt-0.5 relative z-10" onClick={e => e.stopPropagation()}>
           <CustomCheckbox 
             checked={task.status === "done"} 
             onChange={(checked) => onToggleStatus(task.id, checked ? "done" : "todo")} 
