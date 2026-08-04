@@ -83,6 +83,16 @@ export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
                 {task.project}
               </span>
             )}
+            {task.domain === "CONTENT" && task.context && (
+              <span className={cn(
+                "px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.2)]",
+                task.context === "Eryk" 
+                  ? "bg-blue-500/10 text-blue-400 border-blue-500/20" 
+                  : "bg-purple-500/10 text-purple-400 border-purple-500/20"
+              )}>
+                {task.context.charAt(0)}
+              </span>
+            )}
           </div>
           {task.description && (
             <p className="text-xs text-muted-foreground line-clamp-2">
