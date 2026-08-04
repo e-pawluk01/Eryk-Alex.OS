@@ -245,6 +245,10 @@ export default function Home() {
     setTopics(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t).sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
   };
 
+  const handleDeleteTopic = (id: string) => {
+    setTopics(prev => prev.filter(t => t.id !== id));
+  };
+
   const handleAddTopic = (newTopic: Topic) => {
     setTopics(prev => [...prev, newTopic].sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
   };
@@ -704,7 +708,7 @@ export default function Home() {
                   <div className="flex flex-col gap-2">
                     {/* Due Today (Capped at 3) */}
                     {dueTopics.slice(0, 3).map(topic => (
-                      <TopicItem key={topic.id} topic={topic} onUpdate={handleUpdateTopic} />
+                      <TopicItem key={topic.id} topic={topic} onUpdate={handleUpdateTopic} onDelete={handleDeleteTopic} />
                     ))}
                     
                     {dueTopics.length > 3 && (
@@ -724,7 +728,7 @@ export default function Home() {
                       <div className="mt-4 flex flex-col gap-2 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
                         <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold px-2">Upcoming</span>
                         {upcomingTopics.slice(0, 5).map(topic => (
-                          <TopicItem key={topic.id} topic={topic} onUpdate={handleUpdateTopic} />
+                          <TopicItem key={topic.id} topic={topic} onUpdate={handleUpdateTopic} onDelete={handleDeleteTopic} />
                         ))}
                       </div>
                     )}

@@ -6,13 +6,15 @@ import { cn } from "@/lib/utils";
 import { differenceInDays, startOfDay, addDays, format } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { Loader2, Clock } from "lucide-react";
+import { EditTopicDialog } from "./edit-topic-dialog";
 
 interface TopicItemProps {
   topic: Topic;
   onUpdate: (id: string, updates: Partial<Topic>) => void;
+  onDelete: (id: string) => void;
 }
 
-export function TopicItem({ topic, onUpdate }: TopicItemProps) {
+export function TopicItem({ topic, onUpdate, onDelete }: TopicItemProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const today = startOfDay(new Date());
@@ -66,6 +68,7 @@ export function TopicItem({ topic, onUpdate }: TopicItemProps) {
 
   return (
     <div className="flex flex-col gap-2 p-3 bg-card border border-border rounded-lg group relative overflow-hidden transition-colors hover:border-primary/20">
+      <EditTopicDialog topic={topic} onUpdate={onUpdate} onDelete={onDelete} />
       <div className="flex gap-3 relative z-10">
         <div className="pt-0.5">
           <div 
