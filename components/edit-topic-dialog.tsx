@@ -9,6 +9,7 @@ import { addDays, format } from "date-fns";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { HexColorPicker } from "react-colorful";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { createPortal } from "react-dom";
 
 interface EditTopicDialogProps {
   topic: Topic;
@@ -36,8 +37,10 @@ export function EditTopicDialog({ topic, onUpdate, onDelete }: EditTopicDialogPr
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customHex, setCustomHex] = useState("#");
   const [editingColor, setEditingColor] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const saved = localStorage.getItem(`custom_colors_${topic.context}`);
     if (saved) {
       try {
@@ -130,7 +133,7 @@ export function EditTopicDialog({ topic, onUpdate, onDelete }: EditTopicDialogPr
         <Pencil className="w-3 h-3" />
       </button>
 
-      {isOpen && (
+      {isOpen && mounted && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           <div 
             className="absolute inset-0 bg-black/40 backdrop-blur-md transition-opacity animate-in fade-in duration-300" 
@@ -339,10 +342,10 @@ export function EditTopicDialog({ topic, onUpdate, onDelete }: EditTopicDialogPr
                   Save Changes
                 </button>
               </div>
-
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
