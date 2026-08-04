@@ -194,7 +194,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
                     <div className="flex items-start justify-between">
                       <span className="text-sm font-medium">{event.title}</span>
                       <span className={cn("text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border", domainPillColors[dom])}>
-                        {dom}
+                        {dom.charAt(0)}
                       </span>
                     </div>
                     <span className="text-[10px] text-muted-foreground mt-1">
@@ -229,7 +229,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
                         </span>
                       </div>
                       <span className={cn("text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border shrink-0 ml-2", domainPillColors[dom])}>
-                        {dom}
+                        {dom.charAt(0)}
                       </span>
                     </div>
                   </div>
