@@ -17,7 +17,7 @@ import { TopicItem } from "@/components/topic-item";
 import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO, differenceInDays } from "date-fns";
-import { Clock, Trophy, Pencil, X } from "lucide-react";
+import { Clock, Trophy, Pencil, X, Plus } from "lucide-react";
 import { KanbanBoard } from "@/components/kanban-board";
 import { VideoItem } from "@/components/video-item";
 import { NewVideoDialog } from "@/components/new-video-dialog";
