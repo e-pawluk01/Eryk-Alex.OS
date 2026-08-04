@@ -4,8 +4,8 @@ import React, { useState } from "react";
 import { Task } from "@/lib/types";
 import { CustomCheckbox } from "./ui/custom-checkbox";
 import { cn } from "@/lib/utils";
-import { differenceInDays, startOfDay } from "date-fns";
-import { Repeat } from "lucide-react";
+import { differenceInDays, startOfDay, parseISO, format } from "date-fns";
+import { Repeat, Calendar } from "lucide-react";
 
 interface TaskItemProps {
   task: Task;
@@ -88,6 +88,12 @@ export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
             <p className="text-xs text-muted-foreground line-clamp-2">
               {task.description}
             </p>
+          )}
+          {task.scheduled_date && (
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50 mt-0.5">
+              <Calendar className="w-3 h-3" />
+              <span>{format(parseISO(task.scheduled_date), "MMM d, yyyy")}</span>
+            </div>
           )}
         </div>
 
