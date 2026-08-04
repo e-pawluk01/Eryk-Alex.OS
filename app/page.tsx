@@ -566,18 +566,6 @@ export default function Home() {
                 <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">
                   Content Tasks
                 </h2>
-                <NewTaskDialog 
-                  onTaskAdded={handleAddTask} 
-                  domain={currentDomain}
-                  contextName={userContextName}
-                  selectedDateString={format(selectedDate, "yyyy-MM-dd")}
-                  trigger={
-                    <button className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/30 hover:text-white transition-colors">
-                      <Plus className="w-3 h-3" />
-                      Add Task
-                    </button>
-                  }
-                />
               </div>
               <div className="flex flex-col gap-2">
                 {selectedDayTasks.filter(t => t.status !== "done").length === 0 ? (
@@ -592,6 +580,12 @@ export default function Home() {
                     />
                   ))
                 )}
+                <NewTaskDialog 
+                  onTaskAdded={handleAddTask} 
+                  domain={currentDomain}
+                  contextName={userContextName}
+                  selectedDateString={format(selectedDate, "yyyy-MM-dd")}
+                />
               </div>
             </div>
 
