@@ -224,7 +224,6 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={cn("w-2 h-2 rounded-full flex-shrink-0 shadow-[0_0_8px_rgba(255,255,255,0.2)]", domainDotColors[dom])} />
                         <span className={cn("text-sm break-words line-clamp-2", task.status === "done" && "line-through text-muted-foreground")}>
                           {task.title}
                         </span>
