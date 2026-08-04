@@ -12,9 +12,10 @@ interface NewTaskDialogProps {
   selectedDateString: string; // "yyyy-MM-dd"
   onTaskAdded: (task: Task) => void;
   domain?: "WORK" | "STUDY" | "CONTENT" | null;
+  trigger?: React.ReactNode;
 }
 
-export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, domain }: NewTaskDialogProps) {
+export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, domain, trigger }: NewTaskDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState<string | null>(null);
@@ -60,12 +61,13 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
 
   return (
     <>
-      <button 
-        onClick={() => setIsOpen(true)}
-        className="w-8 h-8 rounded-full border border-dashed border-white/10 hover:border-white/30 hover:bg-white/5 text-white/40 hover:text-white transition-all flex items-center justify-center mt-2 mx-auto cursor-pointer"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
+      <div onClick={() => setIsOpen(true)} className="cursor-pointer">
+        {trigger ? trigger : (
+          <div className="w-8 h-8 rounded-full border border-dashed border-white/10 hover:border-white/30 hover:bg-white/5 text-white/40 hover:text-white transition-all flex items-center justify-center mt-2 mx-auto">
+            <Plus className="w-4 h-4" />
+          </div>
+        )}
+      </div>
 
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">

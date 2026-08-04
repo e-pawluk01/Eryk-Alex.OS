@@ -291,7 +291,7 @@ export default function Home() {
           
           newTasks.push({
             title: `Upload Short ${i + 1} for ${video.title}`,
-            context: currentContext, 
+            context: video.context, 
             domain: "CONTENT" as DomainType,
             status: "todo" as const,
             scheduled_date: dateString,
@@ -397,7 +397,7 @@ export default function Home() {
   // Generate 7 days for the weekly rail
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(new Date()), i));
   const getTaskCountForDate = (date: Date) => {
-    return topLevelTasks.filter(t => t.scheduled_date && isSameDay(new Date(t.scheduled_date), date)).length;
+    return topLevelTasks.filter(t => t.status !== "done" && t.scheduled_date && isSameDay(new Date(t.scheduled_date), date)).length;
   };
 
   if (loading) {
@@ -568,8 +568,9 @@ export default function Home() {
                 </h2>
                 <NewTaskDialog 
                   onTaskAdded={handleAddTask} 
-                  currentDomain={currentDomain}
-                  initialStatus="todo"
+                  domain={currentDomain}
+                  contextName={userContextName}
+                  selectedDateString={format(selectedDate, "yyyy-MM-dd")}
                   trigger={
                     <button className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/30 hover:text-white transition-colors">
                       <Plus className="w-3 h-3" />
