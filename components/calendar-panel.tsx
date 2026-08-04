@@ -132,16 +132,21 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
             {paddingDays.map(i => <div key={`pad-${i}`} />)}
             {daysInMonth.map(day => {
               const isSelected = isSameDay(day, selectedDate);
+              const hasItems = tasks.some(t => t.scheduled_date && isSameDay(parseISO(t.scheduled_date), day) && (filterDomain === "ALL" || (t.domain || "WORK") === filterDomain)) || 
+                               events.some(e => isSameDay(parseISO(e.event_date), day) && (filterDomain === "ALL" || (e.domain || "WORK") === filterDomain));
               return (
                 <button
                   key={day.toString()}
                   onClick={() => setSelectedDate(day)}
                   className={cn(
-                    "relative h-9 flex items-center justify-center rounded-xl text-xs transition-all",
+                    "relative h-9 flex flex-col items-center justify-center rounded-xl text-xs transition-all",
                     isSelected ? "bg-white text-black font-semibold" : "text-white hover:bg-white/10"
                   )}
                 >
-                  {format(day, "d")}
+                  <span className={hasItems ? "-mt-1" : ""}>{format(day, "d")}</span>
+                  {hasItems && (
+                    <div className={cn("absolute bottom-1.5 w-1 h-1 rounded-full", isSelected ? "bg-black/50" : "bg-white/30")} />
+                  )}
                 </button>
               );
             })}
