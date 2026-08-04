@@ -25,6 +25,8 @@ export interface Task {
   project?: string | null;
   color?: string | null;
   domain?: "WORK" | "STUDY" | "CONTENT" | null;
+  track_progress?: boolean;
+  progress?: number;
   kanban_column?: "idea" | "scripting" | "filming" | "editing" | null;
   created_at: string;
   subTasks?: Task[];

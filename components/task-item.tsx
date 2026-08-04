@@ -6,14 +6,16 @@ import { CustomCheckbox } from "./ui/custom-checkbox";
 import { cn } from "@/lib/utils";
 import { differenceInDays, startOfDay } from "date-fns";
 import { Repeat } from "lucide-react";
+import { ProgressSlider } from "./ui/progress-slider";
 
 interface TaskItemProps {
   task: Task;
   onToggleStatus: (id: string, newStatus: "todo" | "done") => void;
   onSelect?: (task: Task) => void;
+  onUpdate?: (id: string, updates: Partial<Task>) => void;
 }
 
-export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
+export function TaskItem({ task, onToggleStatus, onSelect, onUpdate }: TaskItemProps) {
 
   let daysLeftText = "";
   let colorClass = "text-muted-foreground";
@@ -50,25 +52,22 @@ export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
     <div className="flex flex-col w-full">
       <div 
         className={cn(
-          "flex items-start gap-4 p-4 group transition-colors rounded-lg cursor-pointer relative overflow-hidden border",
-          task.color && task.status !== "done" 
-            ? task.color.replace("bg-", "border-") + "/30 bg-white/[0.01] hover:" + task.color.replace("bg-", "border-") + "/50" 
-            : "border-transparent hover:bg-white/[0.02]"
+          "flex items-start gap-4 p-4 group hover:bg-white/[0.02] transition-colors rounded-lg cursor-pointer relative overflow-hidden border border-transparent",
+          task.status === "done" && "opacity-50"
         )}
         onClick={(e) => {
           // Prevent opening panel if clicking checkbox
           if (onSelect) onSelect(task);
         }}
       >
-        {task.color && task.status !== "done" && (
-          <div className={cn("absolute left-0 top-0 bottom-0 w-[3px] opacity-80", task.color)} />
+        {!task.track_progress && (
+          <div className="pt-0.5 relative z-10" onClick={e => e.stopPropagation()}>
+            <CustomCheckbox 
+              checked={task.status === "done"} 
+              onChange={(checked) => onToggleStatus(task.id, checked ? "done" : "todo")} 
+            />
+          </div>
         )}
-        <div className="pt-0.5 relative z-10" onClick={e => e.stopPropagation()}>
-          <CustomCheckbox 
-            checked={task.status === "done"} 
-            onChange={(checked) => onToggleStatus(task.id, checked ? "done" : "todo")} 
-          />
-        </div>
         
         <div className="flex flex-col flex-1 gap-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -82,7 +81,12 @@ export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
               <Repeat className="w-3 h-3 text-muted-foreground ml-1" />
             )}
             {task.project && (
-              <span className="px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.2)] bg-zinc-500/10 text-zinc-400 border-zinc-500/30">
+              <span className={cn(
+                "px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-bold border shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.2)]",
+                task.color && task.status !== "done"
+                  ? `${task.color.replace("bg-", "text-")} ${task.color.replace("bg-", "border-")}/30 ${task.color.replace("bg-", "bg-")}/10`
+                  : "bg-zinc-500/10 text-zinc-400 border-zinc-500/30"
+              )}>
                 {task.project}
               </span>
             )}
@@ -98,9 +102,28 @@ export function TaskItem({ task, onToggleStatus, onSelect }: TaskItemProps) {
             )}
           </div>
           {task.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2">
+            <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
               {task.description}
             </p>
+          )}
+          {task.track_progress && (
+            <ProgressSlider 
+              progress={task.progress || 0}
+              colorClass={task.color}
+              onChange={(p) => {
+                // Optimistic visual update handled internally by slider
+                if (p === 100 && task.status !== "done") {
+                  onToggleStatus(task.id, "done");
+                } else if (p < 100 && task.status === "done") {
+                  onToggleStatus(task.id, "todo");
+                }
+              }}
+              onDragEnd={(p) => {
+                if (onUpdate) {
+                  onUpdate(task.id, { progress: p, status: p === 100 ? "done" : "todo" });
+                }
+              }}
+            />
           )}
         </div>
 

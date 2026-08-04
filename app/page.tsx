@@ -581,6 +581,7 @@ export default function Home() {
                       task={task} 
                       onToggleStatus={(id, status) => handleToggleStatus(id, status)}
                       onSelect={setSelectedTask}
+                      onUpdate={handleUpdateTask}
                     />
                   ))
                 )}
@@ -658,6 +659,7 @@ export default function Home() {
                           task={task} 
                           onToggleStatus={handleToggleStatus} 
                           onSelect={() => setSelectedTask(task)}
+                          onUpdate={handleUpdateTask}
                         />
                       ))}
                       <NewTaskDialog 
@@ -687,6 +689,7 @@ export default function Home() {
                         task={task} 
                         onToggleStatus={handleToggleStatus} 
                         onSelect={() => setSelectedTask(task)}
+                        onUpdate={handleUpdateTask}
                       />
                     ))}
                     <NewTaskDialog 

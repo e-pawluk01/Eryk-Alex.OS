@@ -133,8 +133,35 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
             className="w-full flex-1 bg-transparent text-sm text-foreground/90 focus:outline-none resize-none leading-relaxed pb-20"
           />
           
+          {/* Extra Options */}
+          <div className="absolute bottom-28 left-6 right-6 flex flex-col gap-2">
+            <div className="flex items-center justify-between group py-2">
+              <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
+                <div className="w-3 h-3 rounded-sm border border-current flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 bg-current" />
+                </div>
+                <span className="text-[9px] uppercase tracking-widest font-semibold">
+                  Track Progress (%)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onUpdate(task.id, { track_progress: !task.track_progress, progress: !task.track_progress ? 0 : task.progress })}
+                className={cn(
+                  "w-8 h-4 rounded-full transition-colors relative",
+                  task.track_progress ? "bg-white" : "bg-white/10"
+                )}
+              >
+                <div className={cn(
+                  "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
+                  task.track_progress ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
+                )} />
+              </button>
+            </div>
+          </div>
+          
           {/* Bottom Actions */}
-          <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between pointer-events-none">
+          <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between pointer-events-none">
             
             {/* Project & Color (Left) */}
             <div className="flex flex-col gap-3 pointer-events-auto w-[60%]">
