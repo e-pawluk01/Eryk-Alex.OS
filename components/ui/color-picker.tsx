@@ -76,7 +76,7 @@ export function ColorPicker({ selectedColor, onChange, contextName }: ColorPicke
   if (!mounted) return null;
 
   return (
-    <div className="flex gap-2 items-center flex-wrap mt-1">
+    <div className="flex gap-1.5 items-center flex-wrap mt-1">
       <button
         type="button"
         onClick={() => onChange(null)}

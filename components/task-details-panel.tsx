@@ -161,10 +161,10 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
           </div>
           
           {/* Bottom Actions */}
-          <div className="flex items-end justify-between">
+          <div className="flex items-end justify-between gap-4">
             
             {/* Project & Color (Left) */}
-            <div className="flex flex-col gap-3 w-[60%]">
+            <div className="flex flex-col gap-3 flex-1 min-w-0">
               <input 
                 type="text"
                 value={projectDraft}
