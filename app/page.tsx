@@ -275,10 +275,10 @@ export default function Home() {
     if (video.shorts_target && video.shorts_target > 0) {
       const alreadyGenerated = tasks.some(t => t.domain === "CONTENT" && t.title.includes(`for ${video.title}`));
       if (!alreadyGenerated) {
-        const existingShortTasks = tasks.filter(t => t.domain === "CONTENT" && t.title.toLowerCase().includes("upload short"));
-        const takenDates = new Set(existingShortTasks.map(t => t.scheduled_date));
+        const existingUploadTasks = tasks.filter(t => t.domain === "CONTENT" && t.title.toLowerCase().includes("upload"));
+        const takenDates = new Set(existingUploadTasks.map(t => t.scheduled_date));
         
-        let currentDate = parseISO(video.scheduled_date || format(new Date(), "yyyy-MM-dd"));
+        let currentDate = addDays(parseISO(video.scheduled_date || format(new Date(), "yyyy-MM-dd")), 1);
         
         for (let i = 0; i < video.shorts_target; i++) {
           let dateString = format(currentDate, "yyyy-MM-dd");
