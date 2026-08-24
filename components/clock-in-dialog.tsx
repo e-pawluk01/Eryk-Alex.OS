@@ -57,7 +57,7 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
     <>
       <div onClick={() => setIsOpen(true)}>
         {trigger || (
-          <button className="flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-widest transition-colors">
+          <button className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-widest transition-colors">
             <Play className="w-3 h-3" />
             Clock In
           </button>

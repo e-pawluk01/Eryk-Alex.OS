@@ -11,6 +11,7 @@ import { TaskDetailsPanel } from "@/components/task-details-panel";
 import { EventDetailsPanel } from "@/components/event-details-panel";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { AnalyticsView } from "@/components/analytics-view";
+import { ActiveSessionWidget } from "@/components/active-session-widget";
 import { NewTaskDialog } from "@/components/new-task-dialog";
 import { NewGoalDialog } from "@/components/new-goal-dialog";
 import { NewTopicDialog } from "@/components/new-topic-dialog";
@@ -415,6 +416,11 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-12 mt-4 pb-20">
+      {currentDomain === "WORK" && (
+        <div className="flex justify-end -mb-8 relative z-10">
+          <ActiveSessionWidget />
+        </div>
+      )}
       {currentDomain === "WORK" && showAnalytics ? (
         <AnalyticsView />
       ) : (

@@ -94,7 +94,6 @@ export function AnalyticsView() {
           {safeData.monthLabel} Data
           {loading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50" />}
         </h2>
-        <ActiveSessionWidget onHoursUpdated={fetchData} />
       </div>
 
       {error && (
@@ -144,7 +143,6 @@ export function AnalyticsView() {
           title="Profit / Hour" 
           value={formatCurrency(profitPerHour)} 
           prefix="£" 
-          className="bg-emerald-500/5 border-emerald-500/20"
         />
       </div>
 
