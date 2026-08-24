@@ -10,6 +10,7 @@ import { TaskItem } from "@/components/task-item";
 import { TaskDetailsPanel } from "@/components/task-details-panel";
 import { EventDetailsPanel } from "@/components/event-details-panel";
 import { CalendarPanel } from "@/components/calendar-panel";
+import { AnalyticsTrigger } from "@/components/analytics-trigger";
 import { NewTaskDialog } from "@/components/new-task-dialog";
 import { NewGoalDialog } from "@/components/new-goal-dialog";
 import { NewTopicDialog } from "@/components/new-topic-dialog";
@@ -781,6 +782,8 @@ export default function Home() {
         onSelectTask={setSelectedTask}
         onSelectEvent={setSelectedEvent}
       />
+
+      {currentDomain === "WORK" && <AnalyticsTrigger />}
 
       <HallOfFamePanel 
         isOpen={isHallOfFameOpen}
