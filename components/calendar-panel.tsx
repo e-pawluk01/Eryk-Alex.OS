@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Task, Event } from "@/lib/types";
 import { DomainType } from "./global-context";
-import { X, ChevronLeft, ChevronRight, Plus, Calendar } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp } from "lucide-react";
 import { 
   startOfMonth, endOfMonth, eachDayOfInterval, format, 
   isSameDay, isToday, addMonths, subMonths, parseISO, startOfDay
@@ -40,9 +40,11 @@ interface CalendarPanelProps {
   onAddEvent: (event: Event) => void;
   onSelectTask: (task: Task) => void;
   onSelectEvent: (event: Event) => void;
+  onAnalyticsToggle?: () => void;
+  showAnalytics?: boolean;
 }
 
-export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent }: CalendarPanelProps) {
+export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics }: CalendarPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
@@ -75,16 +77,27 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
   return (
     <>
       {/* The Icon Trigger */}
-      <button 
-        onClick={() => setIsOpen(true)}
+      <div 
         className={cn(
-          "fixed right-0 top-1/2 -translate-y-1/2 bg-white/5 hover:bg-white/10 border border-white/10 border-r-0 backdrop-blur-md",
-          "rounded-l-lg py-4 px-3 cursor-pointer z-40 transition-all duration-300",
+          "fixed right-0 top-1/2 -translate-y-1/2 flex flex-col bg-white/5 border border-white/10 border-r-0 backdrop-blur-md rounded-l-lg z-40 transition-all duration-300 overflow-hidden divide-y divide-white/10",
           isOpen ? "translate-x-full" : "translate-x-0"
         )}
       >
-        <Calendar className="w-5 h-5 text-white/80" />
-      </button>
+        <button 
+          onClick={() => setIsOpen(true)}
+          className="p-3 py-4 hover:bg-white/10 transition-colors"
+        >
+          <Calendar className="w-5 h-5 text-white/80" />
+        </button>
+        {currentDomain === "WORK" && onAnalyticsToggle && (
+          <button 
+            onClick={onAnalyticsToggle}
+            className="p-3 py-4 hover:bg-white/10 transition-colors"
+          >
+            {showAnalytics ? <X className="w-5 h-5 text-white/80" /> : <TrendingUp className="w-5 h-5 text-white/80" />}
+          </button>
+        )}
+      </div>
 
       {/* Overlay */}
       {isOpen && (

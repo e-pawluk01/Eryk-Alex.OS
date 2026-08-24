@@ -10,7 +10,7 @@ import { TaskItem } from "@/components/task-item";
 import { TaskDetailsPanel } from "@/components/task-details-panel";
 import { EventDetailsPanel } from "@/components/event-details-panel";
 import { CalendarPanel } from "@/components/calendar-panel";
-import { AnalyticsTrigger } from "@/components/analytics-trigger";
+import { AnalyticsView } from "@/components/analytics-view";
 import { NewTaskDialog } from "@/components/new-task-dialog";
 import { NewGoalDialog } from "@/components/new-goal-dialog";
 import { NewTopicDialog } from "@/components/new-topic-dialog";
@@ -48,6 +48,7 @@ export default function Home() {
   
   const [videoFilter, setVideoFilter] = useState<"All" | "Eryk" | "Alex">("All");
   const [contentTab, setContentTab] = useState<"videos" | "uploading">("videos");
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [isHallOfFameOpen, setIsHallOfFameOpen] = useState(false);
@@ -414,7 +415,10 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-12 mt-4 pb-20">
-      
+      {currentDomain === "WORK" && showAnalytics ? (
+        <AnalyticsView />
+      ) : (
+        <>
       {/* GOALS SECTION */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between border-b border-border pb-2">
@@ -754,7 +758,8 @@ export default function Home() {
           </div>
         )}
       </section>
-
+      </>
+      )}
       {/* Slide-over panel */}
       <TaskDetailsPanel 
         task={selectedTask} 
@@ -781,9 +786,9 @@ export default function Home() {
         onAddEvent={handleAddEvent}
         onSelectTask={setSelectedTask}
         onSelectEvent={setSelectedEvent}
+        onAnalyticsToggle={() => setShowAnalytics(!showAnalytics)}
+        showAnalytics={showAnalytics}
       />
-
-      {currentDomain === "WORK" && <AnalyticsTrigger />}
 
       <HallOfFamePanel 
         isOpen={isHallOfFameOpen}
