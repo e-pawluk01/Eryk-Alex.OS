@@ -37,68 +37,67 @@ export function AnalyticsView() {
     return val.toFixed(1);
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[50vh] gap-3 text-muted-foreground animate-pulse">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <span className="text-xs tracking-widest uppercase font-semibold">Loading Analytics...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[50vh] gap-3 text-red-400/80 bg-red-500/10 rounded-xl p-6 text-center border border-red-500/20 max-w-lg mx-auto">
-        <AlertCircle className="w-8 h-8" />
-        <span className="text-sm font-medium">{error}</span>
-      </div>
-    );
-  }
-
-  if (!data) return null;
+  const safeData = data || {
+    revenue: 0,
+    cogs: 0,
+    grossProfit: 0,
+    grossMargin: 0,
+    itemsSold: 0,
+    avgSalePrice: 0,
+    avgProfitPerItem: 0,
+    monthLabel: "Current Month"
+  };
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-500">
+    <div className="flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-500 relative">
       <div className="flex items-center justify-between border-b border-border pb-2">
-        <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
-          {data.monthLabel} Data
+        <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+          {safeData.monthLabel} Data
+          {loading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50" />}
         </h2>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {error && (
+        <div className="flex items-center gap-2 text-red-400/80 bg-red-500/10 rounded-lg px-4 py-3 border border-red-500/20 text-xs">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 transition-opacity duration-300 ${loading ? "opacity-50" : "opacity-100"}`}>
         <MetricCard 
           title="Revenue" 
-          value={formatCurrency(data.revenue)} 
+          value={formatCurrency(safeData.revenue)} 
           prefix="£" 
         />
         <MetricCard 
           title="Gross Profit" 
-          value={formatCurrency(data.grossProfit)} 
+          value={formatCurrency(safeData.grossProfit)} 
           prefix="£" 
         />
         <MetricCard 
           title="COGS" 
-          value={formatCurrency(data.cogs)} 
+          value={formatCurrency(safeData.cogs)} 
           prefix="£" 
         />
         <MetricCard 
           title="Gross Margin" 
-          value={formatPercent(data.grossMargin)} 
+          value={formatPercent(safeData.grossMargin)} 
           suffix="%" 
         />
         
         <MetricCard 
           title="Items Sold" 
-          value={data.itemsSold} 
+          value={safeData.itemsSold} 
         />
         <MetricCard 
           title="Avg Sale Price" 
-          value={formatCurrency(data.avgSalePrice)} 
+          value={formatCurrency(safeData.avgSalePrice)} 
           prefix="£" 
         />
         <MetricCard 
           title="Avg Profit/Item" 
-          value={formatCurrency(data.avgProfitPerItem)} 
+          value={formatCurrency(safeData.avgProfitPerItem)} 
           prefix="£" 
         />
       </div>
