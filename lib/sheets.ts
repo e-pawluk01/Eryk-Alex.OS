@@ -51,7 +51,7 @@ const getTabData = unstable_cache(
   { revalidate: 300 } // 5 minutes
 );
 
-export async function getMonthlyAnalytics() {
+export async function getMonthlyAnalytics(dateIso?: string) {
   if (!process.env.GOOGLE_OAUTH_REFRESH_TOKEN || !process.env.GOOGLE_SHEET_ID) {
     return { error: "Google Sheets integration is missing environment variables." };
   }
@@ -59,7 +59,7 @@ export async function getMonthlyAnalytics() {
   try {
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
     
-    const date = new Date();
+    const date = dateIso ? new Date(dateIso) : new Date();
     // E.g., "Aug 26"
     const month = date.toLocaleString("en-US", { month: "short" });
     const year = date.getFullYear().toString().slice(2);
