@@ -1,5 +1,12 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+
+export interface MetricComparison {
+  percentage: number;
+  isPositive: boolean;
+  label: string;
+}
 
 interface MetricCardProps {
   title: string;
@@ -7,9 +14,10 @@ interface MetricCardProps {
   prefix?: string;
   suffix?: string;
   className?: string;
+  comparison?: MetricComparison | null;
 }
 
-export function MetricCard({ title, value, prefix, suffix, className }: MetricCardProps) {
+export function MetricCard({ title, value, prefix, suffix, className, comparison }: MetricCardProps) {
   return (
     <div className={cn("flex flex-col gap-1 bg-[#111] border border-white/5 rounded-xl p-4 relative overflow-hidden", className)}>
       <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -20,6 +28,16 @@ export function MetricCard({ title, value, prefix, suffix, className }: MetricCa
         <span className="text-2xl font-semibold tracking-tight text-white">{value}</span>
         {suffix && <span className="text-sm text-muted-foreground/50 font-medium">{suffix}</span>}
       </div>
+      
+      {comparison && (
+        <div className={cn(
+          "flex items-center gap-1 mt-2 text-[10px] uppercase font-bold tracking-widest",
+          comparison.isPositive ? "text-emerald-400/80" : "text-red-400/80"
+        )}>
+          {comparison.isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+          <span>{comparison.percentage.toFixed(1)}% {comparison.label}</span>
+        </div>
+      )}
     </div>
   );
 }

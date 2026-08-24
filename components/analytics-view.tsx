@@ -1,25 +1,35 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Save } from "lucide-react";
 import { getMonthlyAnalytics } from "@/lib/sheets";
-import { MetricCard } from "./metric-card";
-import { ActiveSessionWidget } from "./active-session-widget";
+import { MetricCard, MetricComparison } from "./metric-card";
 import { supabase } from "@/lib/supabase";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { PastMonthsDialog } from "./past-months-dialog";
+import { HistoricalSnapshotView } from "./historical-snapshot-view";
 
 export function AnalyticsView() {
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
   const [totalHours, setTotalHours] = useState<number>(0);
+  const [prevSnapshot, setPrevSnapshot] = useState<any>(null);
+  
+  const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchLiveAndPreviousData = useCallback(async () => {
     setLoading(true);
     try {
-      const [sheetsResult, sessionsResult] = await Promise.all([
+      const now = new Date();
+      const prevDate = subMonths(now, 1);
+      const prevMonthKey = `${prevDate.getFullYear()}-${(prevDate.getMonth() + 1).toString().padStart(2, '0')}`;
+
+      const [sheetsResult, sessionsResult, prevSnapshotResult] = await Promise.all([
         getMonthlyAnalytics(),
-        fetchCurrentMonthHours()
+        fetchCurrentMonthHours(now),
+        supabase.from("analytics_monthly_snapshots").select("*").eq("month", prevMonthKey).single()
       ]);
 
       if (sheetsResult.error) {
@@ -29,6 +39,10 @@ export function AnalyticsView() {
       }
 
       setTotalHours(sessionsResult);
+      
+      if (!prevSnapshotResult.error) {
+        setPrevSnapshot(prevSnapshotResult.data);
+      }
     } catch (err: any) {
       setError(err.message || "Failed to load analytics.");
     } finally {
@@ -37,12 +51,12 @@ export function AnalyticsView() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchLiveAndPreviousData();
+  }, [fetchLiveAndPreviousData]);
 
-  const fetchCurrentMonthHours = async (): Promise<number> => {
-    const start = startOfMonth(new Date()).toISOString();
-    const end = endOfMonth(new Date()).toISOString();
+  const fetchCurrentMonthHours = async (date: Date): Promise<number> => {
+    const start = startOfMonth(date).toISOString();
+    const end = endOfMonth(date).toISOString();
 
     const { data: sessions, error } = await supabase
       .from("work_sessions")
@@ -51,16 +65,56 @@ export function AnalyticsView() {
       .lte("started_at", end)
       .not("ended_at", "is", null);
 
-    if (error) {
-      console.error("Error fetching work sessions", error);
-      return 0;
-    }
-
+    if (error) return 0;
     if (!sessions) return 0;
-
     const totalSeconds = sessions.reduce((acc, curr) => acc + (curr.duration || 0), 0);
-    return totalSeconds / 3600; // Return in hours
+    return totalSeconds / 3600;
   };
+
+  const handleSaveSnapshot = async () => {
+    if (!data) return;
+    setSaving(true);
+    
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    const profitPerHour = totalHours > 0 ? data.grossProfit / totalHours : 0;
+
+    const payload = {
+      month: currentMonthKey,
+      month_label: data.monthLabel,
+      revenue: data.revenue,
+      cogs: data.cogs,
+      gross_profit: data.grossProfit,
+      gross_margin: data.grossMargin,
+      items_sold: data.itemsSold,
+      average_sale_price: data.avgSalePrice,
+      average_profit_per_item: data.avgProfitPerItem,
+      total_hours: totalHours,
+      profit_per_hour: profitPerHour
+    };
+
+    try {
+      const { error } = await supabase.from("analytics_monthly_snapshots").insert([payload]);
+      if (error) {
+        if (error.code === '23505') { // unique violation
+          alert("A snapshot for this month already exists.");
+        } else {
+          throw error;
+        }
+      } else {
+        alert("Snapshot saved successfully!");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to save snapshot.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (selectedHistorical) {
+    return <HistoricalSnapshotView snapshot={selectedHistorical} onBack={() => setSelectedHistorical(null)} />;
+  }
 
   const formatCurrency = (val: number) => {
     return val.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -68,10 +122,6 @@ export function AnalyticsView() {
 
   const formatPercent = (val: number) => {
     return val.toFixed(1);
-  };
-
-  const formatHours = (val: number) => {
-    return val.toLocaleString("en-GB", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   };
 
   const safeData = data || {
@@ -87,13 +137,37 @@ export function AnalyticsView() {
 
   const profitPerHour = totalHours > 0 ? safeData.grossProfit / totalHours : 0;
 
+  const getComparison = (current: number, previous: number | undefined): MetricComparison | null => {
+    if (previous === undefined || previous === null || previous === 0) return null;
+    const diff = current - previous;
+    const percentage = (diff / previous) * 100;
+    return {
+      percentage: Math.abs(percentage),
+      isPositive: diff >= 0,
+      label: `vs ${prevSnapshot.month_label}`
+    };
+  };
+
   return (
     <div className="flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-500 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-border pb-4 gap-4">
-        <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-          {safeData.monthLabel} Data
-          {loading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50" />}
-        </h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+            {safeData.monthLabel} Live
+            {loading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50" />}
+          </h2>
+          <button 
+            onClick={handleSaveSnapshot} 
+            disabled={saving || !data}
+            className="flex items-center gap-1.5 text-[9px] uppercase font-bold tracking-widest text-emerald-400/50 hover:text-emerald-400 transition-colors disabled:opacity-50"
+            title="Lock in this month's data to history"
+          >
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+            Save Snapshot
+          </button>
+        </div>
+        
+        <PastMonthsDialog onOpenSnapshot={setSelectedHistorical} />
       </div>
 
       {error && (
@@ -107,42 +181,50 @@ export function AnalyticsView() {
         <MetricCard 
           title="Revenue" 
           value={formatCurrency(safeData.revenue)} 
-          prefix="£" 
+          prefix="£"
+          comparison={prevSnapshot ? getComparison(safeData.revenue, prevSnapshot.revenue) : null}
         />
         <MetricCard 
           title="Gross Profit" 
           value={formatCurrency(safeData.grossProfit)} 
           prefix="£" 
+          comparison={prevSnapshot ? getComparison(safeData.grossProfit, prevSnapshot.gross_profit) : null}
         />
         <MetricCard 
           title="COGS" 
           value={formatCurrency(safeData.cogs)} 
           prefix="£" 
+          comparison={prevSnapshot ? getComparison(safeData.cogs, prevSnapshot.cogs) : null}
         />
         <MetricCard 
           title="Gross Margin" 
           value={formatPercent(safeData.grossMargin)} 
           suffix="%" 
+          comparison={prevSnapshot ? getComparison(safeData.grossMargin, prevSnapshot.gross_margin) : null}
         />
         
         <MetricCard 
           title="Items Sold" 
           value={safeData.itemsSold} 
+          comparison={prevSnapshot ? getComparison(safeData.itemsSold, prevSnapshot.items_sold) : null}
         />
         <MetricCard 
           title="Avg Sale Price" 
           value={formatCurrency(safeData.avgSalePrice)} 
           prefix="£" 
+          comparison={prevSnapshot ? getComparison(safeData.avgSalePrice, prevSnapshot.average_sale_price) : null}
         />
         <MetricCard 
           title="Avg Profit/Item" 
           value={formatCurrency(safeData.avgProfitPerItem)} 
           prefix="£" 
+          comparison={prevSnapshot ? getComparison(safeData.avgProfitPerItem, prevSnapshot.average_profit_per_item) : null}
         />
         <MetricCard 
           title="Profit / Hour" 
           value={formatCurrency(profitPerHour)} 
           prefix="£" 
+          comparison={prevSnapshot ? getComparison(profitPerHour, prevSnapshot.profit_per_hour) : null}
         />
       </div>
 
