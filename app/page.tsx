@@ -417,9 +417,7 @@ export default function Home() {
   return (
     <div className="flex flex-col gap-12 mt-4 pb-20">
       {currentDomain === "WORK" && (
-        <div className="flex justify-end -mb-8 relative z-10">
-          <ActiveSessionWidget />
-        </div>
+        <ActiveSessionWidget />
       )}
       {currentDomain === "WORK" && showAnalytics ? (
         <AnalyticsView />
