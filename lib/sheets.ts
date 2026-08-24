@@ -19,7 +19,7 @@ function getGoogleSheetsClient() {
 // 1. Heavy Cache: Resolve the actual tab name (e.g. "Aug 26") for the current month
 // Caches for 24 hours, but automatically invalidates on month rollover due to the dynamic key.
 const getResolvedTabName = unstable_cache(
-  async (spreadsheetId: string, currentMonthString: string) => {
+  async (spreadsheetId: string, currentMonthString: string, currentMonthKey: string) => {
     const sheets = getGoogleSheetsClient();
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
     
@@ -73,7 +73,7 @@ export async function getMonthlyAnalytics() {
     // We didn't add currentMonthKey to getResolvedTabName args, but targetTabString ("Aug 26") acts as the boundary key. 
     // Just to be explicitly compliant with the senior advisor's note, we pass currentMonthKey to ensure the cache strictly misses.
     
-    const tabName = await getResolvedTabName(spreadsheetId, targetTabString + "-" + currentMonthKey);
+    const tabName = await getResolvedTabName(spreadsheetId, targetTabString, currentMonthKey);
     
     if (!tabName) {
       return { error: `No sheet tab found matching '${targetTabString}'.` };
