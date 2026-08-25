@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Task, ContextType } from "@/lib/types";
-import { X, Tag, AlignLeft, Calendar, Flag, Clock, Trash2 } from "lucide-react";
+import { X, Tag, AlignLeft, Calendar, Flag, Clock, Trash2, Users } from "lucide-react";
 import { useGlobalContext } from "./global-context";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
@@ -150,6 +150,31 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
               )} />
             </button>
           </div>
+
+          {/* Joint Task Toggle (WORK only) */}
+          {task.domain === "WORK" && (
+            <div className="flex items-center justify-between group py-2">
+              <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
+                <Users className="w-3 h-3" />
+                <span className="text-[9px] uppercase tracking-widest font-semibold">
+                  Joint Task
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onUpdate(task.id, { is_joint: !task.is_joint })}
+                className={cn(
+                  "w-8 h-4 rounded-full transition-colors relative",
+                  task.is_joint ? "bg-white" : "bg-white/10"
+                )}
+              >
+                <div className={cn(
+                  "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
+                  task.is_joint ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
+                )} />
+              </button>
+            </div>
+          )}
           
           {/* Bottom Actions */}
           <div className="flex items-end justify-end">

@@ -652,7 +652,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {currentDomain === "WORK" ? (
               DOMAIN_MAP[currentDomain].map(contextName => {
-                const contextTasks = selectedDayTasks.filter(t => t.context === contextName);
+                const contextTasks = selectedDayTasks.filter(t => t.context === contextName || (t.is_joint && ['Eryk', 'Alex'].includes(contextName)));
                 
                 return (
                   <div key={contextName} className="flex flex-col gap-4">

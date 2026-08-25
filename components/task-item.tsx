@@ -5,7 +5,7 @@ import { Task } from "@/lib/types";
 import { CustomCheckbox } from "./ui/custom-checkbox";
 import { cn } from "@/lib/utils";
 import { differenceInDays, startOfDay } from "date-fns";
-import { Repeat } from "lucide-react";
+import { Repeat, Users } from "lucide-react";
 import { ProgressSlider } from "./ui/progress-slider";
 
 interface TaskItemProps {
@@ -79,6 +79,9 @@ export function TaskItem({ task, onToggleStatus, onSelect, onUpdate }: TaskItemP
             </span>
             {task.is_daily && (
               <Repeat className="w-3 h-3 text-muted-foreground ml-1" />
+            )}
+            {task.is_joint && (
+              <Users className="w-3 h-3 text-blue-400 ml-1" />
             )}
             {task.domain === "CONTENT" && task.context && (
               <span className={cn(

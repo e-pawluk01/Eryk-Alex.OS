@@ -30,6 +30,7 @@ export interface Task {
   kanban_column?: "idea" | "scripting" | "filming" | "editing" | null;
   created_at: string;
   subTasks?: Task[];
+  is_joint?: boolean;
   is_daily?: boolean;
 }
 

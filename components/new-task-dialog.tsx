@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ContextType, Task } from "@/lib/types";
-import { Plus, X, Flag, Repeat } from "lucide-react";
+import { Plus, X, Flag, Repeat, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
@@ -32,6 +32,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
   const [description, setDescription] = useState("");
   const [isDaily, setIsDaily] = useState(false);
   const [trackProgress, setTrackProgress] = useState(false);
+  const [isJoint, setIsJoint] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,6 +53,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
         is_daily: isDaily,
         track_progress: trackProgress,
         progress: 0,
+        is_joint: domain === "WORK" ? isJoint : false,
         domain: domain || "WORK",
       };
 
@@ -65,6 +67,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
       setDueDate(null);
       setIsDaily(false);
       setTrackProgress(false);
+      setIsJoint(false);
     } catch (err) {
       console.error(err);
     } finally {
@@ -194,6 +197,31 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
                     )} />
                   </button>
                 </div>
+
+                {/* Joint Task Toggle (WORK only) */}
+                {domain === "WORK" && (
+                  <div className="flex items-center justify-between group py-2">
+                    <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
+                      <Users className="w-3 h-3" />
+                      <span className="text-[9px] uppercase tracking-widest font-semibold">
+                        Joint Task
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsJoint(!isJoint)}
+                      className={cn(
+                        "w-8 h-4 rounded-full transition-colors relative",
+                        isJoint ? "bg-white" : "bg-white/10"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
+                        isJoint ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
+                      )} />
+                    </button>
+                  </div>
+                )}
 
               </div>
 
