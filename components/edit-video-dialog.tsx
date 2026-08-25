@@ -33,6 +33,7 @@ export function EditVideoDialog({ video, children, onVideoUpdated, onVideoDelete
   const [tag, setTag] = useState(video.tag);
   const [selectedContext, setSelectedContext] = useState<ContextType>(video.context);
   const [selectedColor, setSelectedColor] = useState(video.color);
+  const [videoType, setVideoType] = useState<"long" | "short">(video.type || "long");
   const [shortsTarget, setShortsTarget] = useState(video.shorts_target || 0);
   const [scheduledDate, setScheduledDate] = useState<Date>(parseISO(video.scheduled_date || format(new Date(), "yyyy-MM-dd")));
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,6 +50,7 @@ export function EditVideoDialog({ video, children, onVideoUpdated, onVideoDelete
       setTag(video.tag);
       setSelectedContext(video.context);
       setSelectedColor(video.color);
+      setVideoType(video.type || "long");
       setShortsTarget(video.shorts_target || 0);
       setScheduledDate(parseISO(video.scheduled_date || format(new Date(), "yyyy-MM-dd")));
     }
@@ -103,7 +105,8 @@ export function EditVideoDialog({ video, children, onVideoUpdated, onVideoDelete
         tag: tag.trim(),
         context: selectedContext,
         color: selectedColor,
-        shorts_target: shortsTarget,
+        type: videoType,
+        shorts_target: videoType === "short" ? 0 : shortsTarget,
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
       };
 
@@ -237,26 +240,60 @@ export function EditVideoDialog({ video, children, onVideoUpdated, onVideoDelete
 
                 <div className="flex flex-col gap-2 group">
                   <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 group-focus-within:text-white/60 transition-colors">
-                    Shorts Target
+                    Format
                   </label>
-                  <div className="flex items-center gap-4">
-                    <button 
+                  <div className="flex items-center gap-2">
+                    <button
                       type="button"
-                      onClick={() => setShortsTarget(Math.max(0, shortsTarget - 1))}
-                      className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                      onClick={() => setVideoType("long")}
+                      className={cn(
+                        "px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest border transition-all",
+                        videoType === "long" 
+                          ? "bg-white/10 text-white border-white/20" 
+                          : "bg-transparent text-white/40 border-white/5 hover:border-white/10"
+                      )}
                     >
-                      -
+                      Long Form
                     </button>
-                    <span className="text-sm font-semibold">{shortsTarget}</span>
-                    <button 
+                    <button
                       type="button"
-                      onClick={() => setShortsTarget(shortsTarget + 1)}
-                      className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                      onClick={() => setVideoType("short")}
+                      className={cn(
+                        "px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest border transition-all",
+                        videoType === "short" 
+                          ? "bg-white/10 text-white border-white/20" 
+                          : "bg-transparent text-white/40 border-white/5 hover:border-white/10"
+                      )}
                     >
-                      <Plus className="w-4 h-4" />
+                      Short Form
                     </button>
                   </div>
                 </div>
+
+                {videoType === "long" && (
+                  <div className="flex flex-col gap-2 group">
+                    <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 group-focus-within:text-white/60 transition-colors">
+                      Shorts Target
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <button 
+                        type="button"
+                        onClick={() => setShortsTarget(Math.max(0, shortsTarget - 1))}
+                        className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                      >
+                        -
+                      </button>
+                      <span className="text-sm font-semibold">{shortsTarget}</span>
+                      <button 
+                        type="button"
+                        onClick={() => setShortsTarget(shortsTarget + 1)}
+                        className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-2">
                   <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">

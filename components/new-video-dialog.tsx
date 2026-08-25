@@ -30,6 +30,7 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
   const [tag, setTag] = useState("");
   const [selectedContext, setSelectedContext] = useState<ContextType>(contextName);
   const [selectedColor, setSelectedColor] = useState(COLORS[0].class);
+  const [videoType, setVideoType] = useState<"long" | "short">("long");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [customColors, setCustomColors] = useState<string[]>([]);
@@ -91,6 +92,7 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
         color: selectedColor,
         stage: "idea",
         shorts_target: 0,
+        type: videoType,
         scheduled_date: format(new Date(), "yyyy-MM-dd"),
       };
 
@@ -192,6 +194,38 @@ export function NewVideoDialog({ contextName, onVideoAdded }: NewVideoDialogProp
                         {ctx}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 group">
+                  <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 group-focus-within:text-white/60 transition-colors">
+                    Format
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setVideoType("long")}
+                      className={cn(
+                        "px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest border transition-all",
+                        videoType === "long" 
+                          ? "bg-white/10 text-white border-white/20" 
+                          : "bg-transparent text-white/40 border-white/5 hover:border-white/10"
+                      )}
+                    >
+                      Long Form
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVideoType("short")}
+                      className={cn(
+                        "px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest border transition-all",
+                        videoType === "short" 
+                          ? "bg-white/10 text-white border-white/20" 
+                          : "bg-transparent text-white/40 border-white/5 hover:border-white/10"
+                      )}
+                    >
+                      Short Form
+                    </button>
                   </div>
                 </div>
 

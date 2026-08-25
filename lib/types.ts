@@ -55,6 +55,7 @@ export interface Video {
   stage: "idea" | "scripting" | "filming" | "editing" | "subtitles" | "uploaded";
   scheduled_date: string; // "yyyy-MM-dd"
   shorts_target: number;
+  type?: "long" | "short";
   created_at: string;
 }
 
