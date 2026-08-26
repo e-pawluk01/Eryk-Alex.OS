@@ -86,6 +86,9 @@ export async function getMonthlyAnalytics(dateIso?: string) {
     let revenue = 0;
     let cogs = 0;
     let itemsSold = 0;
+    
+    // Store raw sales details for PDF snapshot
+    const salesTable = [];
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -99,6 +102,16 @@ export async function getMonthlyAnalytics(dateIso?: string) {
         revenue += sfValue;
         cogs += spValue;
         itemsSold++;
+        
+        // Push sales row strictly adhering to requested columns (no Item Name, no UP)
+        // Headers: Notes (0), Buy (1), Sold (2), SKU (3), TTS (4), Upload Platform (5)
+        salesTable.push({
+          sku: row[3] || "N/A",
+          buy: spValue,
+          sold: sfValue,
+          profit: sfValue - spValue,
+          tts: row[4] || "N/A"
+        });
       }
     }
 
@@ -116,12 +129,69 @@ export async function getMonthlyAnalytics(dateIso?: string) {
         itemsSold,
         avgSalePrice,
         avgProfitPerItem,
-        monthLabel: tabName
+        monthLabel: tabName,
+        salesTable
       }
     };
 
   } catch (error: any) {
     console.error("Error fetching analytics:", error);
     return { error: error.message || "Failed to fetch analytics from Google Sheets." };
+  }
+}
+
+export async function createNextMonthTab(newMonthName: string) {
+  if (!process.env.GOOGLE_OAUTH_REFRESH_TOKEN || !process.env.GOOGLE_SHEET_ID) {
+    return { error: "Google Sheets integration is missing environment variables." };
+  }
+
+  try {
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    const sheets = getGoogleSheetsClient();
+    
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+    const existingSheets = spreadsheet.data.sheets || [];
+    
+    // 1. Guard against duplicates
+    const targetNormalized = newMonthName.replace(/\s+/g, "").toLowerCase();
+    const alreadyExists = existingSheets.find(
+      (s: any) => s.properties?.title?.replace(/\s+/g, "").toLowerCase() === targetNormalized
+    );
+
+    if (alreadyExists) {
+      console.log(`Tab '${newMonthName}' already exists. Skipping creation.`);
+      return { success: true, skipped: true };
+    }
+
+    // 2. Find Template tab
+    const templateSheet = existingSheets.find(
+      (s: any) => s.properties?.title?.toLowerCase() === "template"
+    );
+
+    if (!templateSheet || templateSheet.properties?.sheetId === undefined) {
+      throw new Error("Could not find 'Template' tab in Google Sheets to duplicate.");
+    }
+
+    // 3. Duplicate and Rename
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            duplicateSheet: {
+              sourceSheetId: templateSheet.properties.sheetId,
+              insertSheetIndex: 0,
+              newSheetName: newMonthName
+            }
+          }
+        ]
+      }
+    });
+
+    console.log(`Successfully created new tab: ${newMonthName}`);
+    return { success: true, skipped: false };
+  } catch (error: any) {
+    console.error("Error creating new tab:", error);
+    return { error: error.message || "Failed to create next month tab." };
   }
 }
