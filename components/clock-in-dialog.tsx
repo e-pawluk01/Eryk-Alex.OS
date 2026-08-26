@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { useGlobalContext } from "./global-context";
 
 const TASKS = [
+  "Development",
+  "Content",
   "Sourcing",
   "Cleaning / Restoration",
   "Photography",
