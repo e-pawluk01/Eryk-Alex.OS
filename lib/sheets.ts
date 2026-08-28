@@ -43,7 +43,7 @@ const getTabData = unstable_cache(
     const sheets = getGoogleSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${tabName}'!A:F`,
+      range: `'${tabName}'!A:I`,
     });
     return response.data.values || [];
   },
@@ -87,41 +87,59 @@ export async function getMonthlyAnalytics(dateIso?: string) {
     let cogs = 0;
     let itemsSold = 0;
     
+    // Inventory tracking
+    let inventoryCost = 0;
+    let expectedRevenue = 0;
+    let expectedProfit = 0;
+    let espItemCount = 0;
+    
     // Store raw sales details for PDF snapshot
-    const salesTable = [];
+    const salesTable: any[] = [];
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      const spStr = row[1] || "";
-      const sfStr = row[2] || "";
-      
-      const sfValue = parseFloat(sfStr.replace(/[^0-9.-]+/g, "")) || 0;
-      const spValue = parseFloat(spStr.replace(/[^0-9.-]+/g, "")) || 0;
+      const spStr  = row[1] || "";
+      const sfStr  = row[2] || "";
+      const espStr = row[8] || ""; // Column I = ESP
+
+      const spValue  = parseFloat(spStr.replace(/[^0-9.-]+/g, ""))  || 0;
+      const sfValue  = parseFloat(sfStr.replace(/[^0-9.-]+/g, ""))  || 0;
+      const espValue = parseFloat(espStr.replace(/[^0-9.-]+/g, "")) || 0;
 
       if (sfValue > 0) {
+        // SOLD — contributes to monthly metrics only
         revenue += sfValue;
-        cogs += spValue;
+        cogs    += spValue;
         itemsSold++;
         
-        // Push sales row strictly adhering to requested columns (no Item Name, no UP)
-        // Headers: Notes (0), Buy (1), Sold (2), SKU (3), TTS (4), Upload Platform (5)
         salesTable.push({
-          sku: row[3] || "N/A",
-          buy: spValue,
-          sold: sfValue,
+          sku:    row[3] || "N/A",
+          buy:    spValue,
+          sold:   sfValue,
           profit: sfValue - spValue,
-          tts: row[4] || "N/A"
+          tts:    row[4] || "N/A"
         });
+      } else if (spValue > 0) {
+        // UNSOLD INVENTORY — SF is empty, SP is present
+        inventoryCost += spValue;
+
+        if (espValue > 0) {
+          expectedRevenue += espValue;
+          expectedProfit  += espValue - spValue;
+          espItemCount++;
+        }
       }
     }
 
-    const grossProfit = revenue - cogs;
-    const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
-    const avgSalePrice = itemsSold > 0 ? revenue / itemsSold : 0;
-    const avgProfitPerItem = itemsSold > 0 ? grossProfit / itemsSold : 0;
+    const grossProfit        = revenue - cogs;
+    const grossMargin        = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+    const avgSalePrice       = itemsSold > 0 ? revenue / itemsSold : 0;
+    const avgProfitPerItem   = itemsSold > 0 ? grossProfit / itemsSold : 0;
+    const avgExpectedSalePrice = espItemCount > 0 ? expectedRevenue / espItemCount : null;
 
     return {
       data: {
+        // Monthly metrics
         revenue,
         cogs,
         grossProfit,
@@ -130,7 +148,12 @@ export async function getMonthlyAnalytics(dateIso?: string) {
         avgSalePrice,
         avgProfitPerItem,
         monthLabel: tabName,
-        salesTable
+        salesTable,
+        // Inventory metrics (null = no ESP data available, render as "—")
+        inventoryCost,
+        expectedRevenue:    espItemCount > 0 ? expectedRevenue    : null,
+        expectedProfit:     espItemCount > 0 ? expectedProfit     : null,
+        avgExpectedSalePrice
       }
     };
 

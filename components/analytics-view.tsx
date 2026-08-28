@@ -90,7 +90,11 @@ export function AnalyticsView() {
     itemsSold: 0,
     avgSalePrice: 0,
     avgProfitPerItem: 0,
-    monthLabel: "Current Month"
+    monthLabel: "Current Month",
+    inventoryCost: 0,
+    expectedRevenue: null,
+    expectedProfit: null,
+    avgExpectedSalePrice: null
   };
 
   const profitPerHour = totalHours > 0 ? safeData.grossProfit / totalHours : 0;
@@ -175,8 +179,35 @@ export function AnalyticsView() {
         />
       </div>
 
-      <div className="mt-12 flex justify-center border border-dashed border-border rounded-lg py-8 text-center bg-card/20 text-muted-foreground/50">
-        <p className="text-[10px] uppercase tracking-widest">(The rest will be updated in the next phase)</p>
+      <div className="mt-8 flex flex-col gap-4">
+        <div className="flex items-center border-b border-border pb-4">
+          <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
+            Inventory
+          </h2>
+        </div>
+
+        <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 transition-opacity duration-300 ${loading ? "opacity-50" : "opacity-100"}`}>
+          <MetricCard
+            title="Inventory Cost"
+            value={formatCurrency(safeData.inventoryCost ?? 0)}
+            prefix="£"
+          />
+          <MetricCard
+            title="Expected Revenue"
+            value={safeData.expectedRevenue !== null ? formatCurrency(safeData.expectedRevenue) : "—"}
+            prefix={safeData.expectedRevenue !== null ? "£" : undefined}
+          />
+          <MetricCard
+            title="Expected Profit"
+            value={safeData.expectedProfit !== null ? formatCurrency(safeData.expectedProfit) : "—"}
+            prefix={safeData.expectedProfit !== null ? "£" : undefined}
+          />
+          <MetricCard
+            title="Avg Expected Sale"
+            value={safeData.avgExpectedSalePrice !== null ? formatCurrency(safeData.avgExpectedSalePrice) : "—"}
+            prefix={safeData.avgExpectedSalePrice !== null ? "£" : undefined}
+          />
+        </div>
       </div>
     </div>
   );
