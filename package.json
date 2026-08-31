@@ -24,6 +24,7 @@
     "googleapis": "^140.0.1",
     "lucide-react": "^1.26.0",
     "next": "^16.2.11",
+    "nodemailer": "^9.1.0",
     "react": "19.0.0",
     "react-colorful": "^5.8.0",
     "react-dom": "19.0.0",
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^8",
