@@ -89,6 +89,7 @@ export async function getMonthlyAnalytics(dateIso?: string) {
     
     // Inventory tracking
     let inventoryCost = 0;
+    let itemsInStock = 0;
     let expectedRevenue = 0;
     let expectedProfit = 0;
     let espItemCount = 0;
@@ -122,6 +123,7 @@ export async function getMonthlyAnalytics(dateIso?: string) {
       } else if (spValue > 0) {
         // UNSOLD INVENTORY — SF is empty, SP is present
         inventoryCost += spValue;
+        itemsInStock++;
 
         if (espValue > 0) {
           expectedRevenue += espValue;
@@ -136,6 +138,7 @@ export async function getMonthlyAnalytics(dateIso?: string) {
     const avgSalePrice       = itemsSold > 0 ? revenue / itemsSold : 0;
     const avgProfitPerItem   = itemsSold > 0 ? grossProfit / itemsSold : 0;
     const avgExpectedSalePrice = espItemCount > 0 ? expectedRevenue / espItemCount : null;
+    const returnOnCost = cogs > 0 ? (grossProfit / cogs) * 100 : null;
 
     return {
       data: {
@@ -151,6 +154,8 @@ export async function getMonthlyAnalytics(dateIso?: string) {
         salesTable,
         // Inventory metrics (null = no ESP data available, render as "—")
         inventoryCost,
+        itemsInStock,
+        returnOnCost,
         expectedRevenue:    espItemCount > 0 ? expectedRevenue    : null,
         expectedProfit:     espItemCount > 0 ? expectedProfit     : null,
         avgExpectedSalePrice
