@@ -2,103 +2,63 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet, renderToBuffer } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
-  page: {
-    backgroundColor: '#ffffff',
-    padding: 40,
-    fontFamily: 'Helvetica',
-    color: '#111111',
+  page: { backgroundColor: '#ffffff', padding: 40, fontFamily: 'Helvetica', color: '#111111' },
+
+  header: { marginBottom: 24, borderBottomWidth: 1, borderBottomColor: '#cfc9bd', paddingBottom: 10 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 5 },
+  subtitle: { fontSize: 11, color: '#666666', textTransform: 'uppercase', letterSpacing: 2 },
+
+  section: { marginBottom: 18 },
+  sectionHead: {
+    flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
+    borderBottomWidth: 1, borderBottomColor: '#e7e3da', paddingBottom: 5, marginBottom: 10,
   },
-  header: {
-    marginBottom: 30,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eeeeee',
-    paddingBottom: 10,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: '#666666',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 30,
-    gap: 15,
-  },
-  metricCard: {
-    width: '30%',
-    padding: 10,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#eeeeee',
-  },
-  metricTitle: {
-    fontSize: 8,
-    color: '#666666',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  metricValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  table: {
-    width: 'auto',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderColor: '#eeeeee',
-    borderRightWidth: 0,
-    borderBottomWidth: 0,
-  },
-  tableRow: {
-    flexDirection: 'row',
-  },
-  tableColHeader: {
-    width: '20%',
-    borderStyle: 'solid',
-    borderBottomWidth: 1,
-    borderRightWidth: 1,
-    borderColor: '#eeeeee',
-    backgroundColor: '#f4f4f4',
-    padding: 6,
-  },
-  tableCol: {
-    width: '20%',
-    borderStyle: 'solid',
-    borderBottomWidth: 1,
-    borderRightWidth: 1,
-    borderColor: '#eeeeee',
-    padding: 6,
-  },
-  tableCellHeader: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-  },
-  tableCell: {
-    fontSize: 9,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    marginTop: 20,
-  }
+  sectionLabel: { fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1.6, color: '#35564f' },
+  sectionCaption: { fontSize: 8, color: '#999999', letterSpacing: 0.4 },
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  card: { width: '31.8%', padding: 10, backgroundColor: '#f7f5f1', borderRadius: 4, borderWidth: 1, borderColor: '#e7e3da' },
+  cardLabel: { fontSize: 8, color: '#666666', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  cardValue: { fontSize: 14, fontWeight: 'bold' },
+  cardValueMuted: { fontSize: 14, fontWeight: 'bold', color: '#999999' },
+
+  salesTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 10, marginTop: 14 },
+  table: { width: 'auto', borderStyle: 'solid', borderWidth: 1, borderColor: '#e7e3da', borderRightWidth: 0, borderBottomWidth: 0 },
+  tableRow: { flexDirection: 'row' },
+  tableColHeader: { width: '20%', borderStyle: 'solid', borderBottomWidth: 1, borderRightWidth: 1, borderColor: '#e7e3da', backgroundColor: '#f1efe9', padding: 6 },
+  tableCol: { width: '20%', borderStyle: 'solid', borderBottomWidth: 1, borderRightWidth: 1, borderColor: '#e7e3da', padding: 6 },
+  tableCellHeader: { fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase' },
+  tableCell: { fontSize: 9 },
+
+  footer: { marginTop: 22, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e7e3da', flexDirection: 'row', justifyContent: 'space-between' },
+  footerText: { fontSize: 8, color: '#999999', textTransform: 'uppercase', letterSpacing: 1.4 },
 });
 
-const MonthlyReportPDF = ({ snapshot }: { snapshot: any }) => {
-  const formatCurrency = (val: number) => `£${Number(val || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const formatPercent = (val: number) => `${Number(val || 0).toFixed(1)}%`;
+const fmtCurrency = (val: any) =>
+  `£${Number(val || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtPercent = (val: any) => `${Number(val || 0).toFixed(1)}%`;
+const isNil = (v: any) => v === null || v === undefined;
 
+const Metric = ({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) => (
+  <View style={styles.card}>
+    <Text style={styles.cardLabel}>{label}</Text>
+    <Text style={muted ? styles.cardValueMuted : styles.cardValue}>{value}</Text>
+  </View>
+);
+
+const Section = ({ label, caption, children }: { label: string; caption?: string; children: React.ReactNode }) => (
+  <View style={styles.section}>
+    <View style={styles.sectionHead}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      {caption ? <Text style={styles.sectionCaption}>{caption}</Text> : null}
+    </View>
+    <View style={styles.grid}>{children}</View>
+  </View>
+);
+
+const MonthlyReportPDF = ({ snapshot }: { snapshot: any }) => {
   const sales = Array.isArray(snapshot.sales_details) ? snapshot.sales_details : [];
+  const generatedOn = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
     <Document>
@@ -108,47 +68,42 @@ const MonthlyReportPDF = ({ snapshot }: { snapshot: any }) => {
           <Text style={styles.subtitle}>{snapshot.month_label} Report</Text>
         </View>
 
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricTitle}>Revenue</Text>
-            <Text style={styles.metricValue}>{formatCurrency(snapshot.revenue)}</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricTitle}>Gross Profit</Text>
-            <Text style={styles.metricValue}>{formatCurrency(snapshot.gross_profit)}</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricTitle}>COGS</Text>
-            <Text style={styles.metricValue}>{formatCurrency(snapshot.cogs)}</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricTitle}>Gross Margin</Text>
-            <Text style={styles.metricValue}>{formatPercent(snapshot.gross_margin)}</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricTitle}>Items Sold</Text>
-            <Text style={styles.metricValue}>{snapshot.items_sold || 0}</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricTitle}>Avg Sale Price</Text>
-            <Text style={styles.metricValue}>{formatCurrency(snapshot.average_sale_price)}</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricTitle}>Avg Profit/Item</Text>
-            <Text style={styles.metricValue}>{formatCurrency(snapshot.average_profit_per_item)}</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricTitle}>Total Hours</Text>
-            <Text style={styles.metricValue}>{Number(snapshot.total_hours || 0).toFixed(1)}</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricTitle}>Profit / Hour</Text>
-            <Text style={styles.metricValue}>{formatCurrency(snapshot.profit_per_hour)}</Text>
-          </View>
-        </View>
+        <Section label="Performance">
+          <Metric label="Revenue" value={fmtCurrency(snapshot.revenue)} />
+          <Metric label="COGS" value={fmtCurrency(snapshot.cogs)} />
+          <Metric label="Gross Profit" value={fmtCurrency(snapshot.gross_profit)} />
+          <Metric label="Gross Margin" value={fmtPercent(snapshot.gross_margin)} />
+          <Metric label="Profit / Hour" value={fmtCurrency(snapshot.profit_per_hour)} />
+          <Metric label="Total Hours" value={Number(snapshot.total_hours || 0).toFixed(1)} />
+        </Section>
 
-        <Text style={styles.sectionTitle}>Sales Details</Text>
-        
+        <Section label="Unit Economics">
+          <Metric label="Items Sold" value={String(snapshot.items_sold || 0)} />
+          <Metric label="Avg Sale Price" value={fmtCurrency(snapshot.average_sale_price)} />
+          <Metric label="Avg Profit / Item" value={fmtCurrency(snapshot.average_profit_per_item)} />
+          <Metric
+            label="Return on Cost"
+            value={isNil(snapshot.return_on_cost) ? '—' : fmtPercent(snapshot.return_on_cost)}
+            muted={isNil(snapshot.return_on_cost)}
+          />
+        </Section>
+
+        <Section label="Inventory" caption="Position at month close">
+          <Metric label="Items in Stock" value={String(snapshot.items_in_stock ?? 0)} />
+          <Metric label="Inventory Cost" value={fmtCurrency(snapshot.inventory_cost)} />
+          <Metric
+            label="Expected Revenue"
+            value={isNil(snapshot.expected_revenue) ? '—' : fmtCurrency(snapshot.expected_revenue)}
+            muted={isNil(snapshot.expected_revenue)}
+          />
+          <Metric
+            label="Expected Profit"
+            value={isNil(snapshot.expected_profit) ? '—' : fmtCurrency(snapshot.expected_profit)}
+            muted={isNil(snapshot.expected_profit)}
+          />
+        </Section>
+
+        <Text style={styles.salesTitle}>Sales Detail</Text>
         {sales.length > 0 ? (
           <View style={styles.table}>
             <View style={styles.tableRow}>
@@ -158,13 +113,13 @@ const MonthlyReportPDF = ({ snapshot }: { snapshot: any }) => {
               <View style={styles.tableColHeader}><Text style={styles.tableCellHeader}>Profit</Text></View>
               <View style={styles.tableColHeader}><Text style={styles.tableCellHeader}>TTS</Text></View>
             </View>
-            
+
             {sales.map((item: any, i: number) => (
               <View style={styles.tableRow} key={i}>
                 <View style={styles.tableCol}><Text style={styles.tableCell}>{item.sku}</Text></View>
-                <View style={styles.tableCol}><Text style={styles.tableCell}>{formatCurrency(item.buy)}</Text></View>
-                <View style={styles.tableCol}><Text style={styles.tableCell}>{formatCurrency(item.sold)}</Text></View>
-                <View style={styles.tableCol}><Text style={styles.tableCell}>{formatCurrency(item.profit)}</Text></View>
+                <View style={styles.tableCol}><Text style={styles.tableCell}>{fmtCurrency(item.buy)}</Text></View>
+                <View style={styles.tableCol}><Text style={styles.tableCell}>{fmtCurrency(item.sold)}</Text></View>
+                <View style={styles.tableCol}><Text style={styles.tableCell}>{fmtCurrency(item.profit)}</Text></View>
                 <View style={styles.tableCol}><Text style={styles.tableCell}>{item.tts}</Text></View>
               </View>
             ))}
@@ -173,6 +128,10 @@ const MonthlyReportPDF = ({ snapshot }: { snapshot: any }) => {
           <Text style={{ fontSize: 10, color: '#666' }}>No items sold this month.</Text>
         )}
 
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Generated {generatedOn}</Text>
+          <Text style={styles.footerText}>Task OS · Monthly Rollover</Text>
+        </View>
       </Page>
     </Document>
   );
