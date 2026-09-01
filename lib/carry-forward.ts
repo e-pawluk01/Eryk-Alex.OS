@@ -65,12 +65,17 @@ export async function carryForwardUnsold(fromTab: string, toTab: string) {
     return { copied: 0, alreadyThere, from: fromTab, to: toTab };
   }
 
-  await sheets.spreadsheets.values.append({
+  // Write directly after the last row that actually holds data. `append` was
+  // landing rows far down the sheet because it keys off the destination's
+  // formatted range, not its real contents.
+  const firstEmptyRow = dstRows.length + 1;
+
+  await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${toTab}'!A:J`,
+    range: `'${toTab}'!A${firstEmptyRow}`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: toCopy },
   });
 
-  return { copied: toCopy.length, alreadyThere, from: fromTab, to: toTab };
+  return { copied: toCopy.length, alreadyThere, startRow: firstEmptyRow, from: fromTab, to: toTab };
 }
