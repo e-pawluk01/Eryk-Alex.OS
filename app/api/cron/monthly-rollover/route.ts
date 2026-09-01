@@ -64,7 +64,13 @@ export async function GET(request: Request) {
         average_profit_per_item: prevSheets.avgProfitPerItem,
         total_hours: prevHours,
         profit_per_hour: profitPerHour,
-        sales_details: prevSheets.salesTable
+        sales_details: prevSheets.salesTable,
+        // Inventory position at month close (nullable — null where no ESP data)
+        items_in_stock: prevSheets.itemsInStock,
+        inventory_cost: prevSheets.inventoryCost,
+        return_on_cost: prevSheets.returnOnCost,
+        expected_revenue: prevSheets.expectedRevenue,
+        expected_profit: prevSheets.expectedProfit
       };
 
       const { data: newSnapshot, error: insertError } = await supabase

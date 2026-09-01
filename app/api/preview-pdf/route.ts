@@ -6,13 +6,23 @@ import { generateMonthlyReportBuffer } from '@/lib/pdf';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+
+  // Gate the route: financial data. Accept either the Authorization header
+  // (curl / scripts) or a ?key= query param (so it opens in a browser).
+  const authHeader = request.headers.get('authorization');
+  const key = searchParams.get('key');
+  const secret = process.env.CRON_SECRET;
+  if (authHeader !== `Bearer ${secret}` && key !== secret) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
   const monthParam = searchParams.get('month'); // e.g., "2026-08"
 
   const dateObj = monthParam ? new Date(`${monthParam}-02T00:00:00Z`) : new Date(); // Use 2nd day to avoid timezone underflow
   const monthKey = `${dateObj.getFullYear()}-${(dateObj.getMonth() + 1).toString().padStart(2, '0')}`;
 
   try {
-    let payload;
+    let payload: any;
 
     // 1. Try to fetch an existing snapshot from Supabase
     const { data: snapshot, error: snapshotError } = await supabase
@@ -23,6 +33,22 @@ export async function GET(request: Request) {
 
     if (snapshot && !snapshotError) {
       payload = snapshot;
+
+      // Snapshots created before the inventory columns existed have them null.
+      // Backfill from the sheet so historical previews still render in full.
+      if (payload.items_in_stock === null || payload.items_in_stock === undefined) {
+        const inv = await getMonthlyAnalytics(dateObj.toISOString());
+        if (inv.data) {
+          payload = {
+            ...payload,
+            items_in_stock: inv.data.itemsInStock,
+            inventory_cost: inv.data.inventoryCost,
+            return_on_cost: inv.data.returnOnCost,
+            expected_revenue: inv.data.expectedRevenue,
+            expected_profit: inv.data.expectedProfit,
+          };
+        }
+      }
     } else {
       // 2. If no snapshot exists, generate a simulated payload live
       const [sheetsResult, currentHours] = await Promise.all([
@@ -49,7 +75,12 @@ export async function GET(request: Request) {
         average_profit_per_item: sheets.avgProfitPerItem,
         total_hours: currentHours,
         profit_per_hour: profitPerHour,
-        sales_details: sheets.salesTable || []
+        sales_details: sheets.salesTable || [],
+        items_in_stock: sheets.itemsInStock,
+        inventory_cost: sheets.inventoryCost,
+        return_on_cost: sheets.returnOnCost,
+        expected_revenue: sheets.expectedRevenue,
+        expected_profit: sheets.expectedProfit,
       };
     }
 
