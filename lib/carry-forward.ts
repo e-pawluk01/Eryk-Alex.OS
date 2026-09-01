@@ -65,10 +65,18 @@ export async function carryForwardUnsold(fromTab: string, toTab: string) {
     return { copied: 0, alreadyThere, from: fromTab, to: toTab };
   }
 
-  // Write directly after the last row that actually holds data. `append` was
-  // landing rows far down the sheet because it keys off the destination's
-  // formatted range, not its real contents.
-  const firstEmptyRow = dstRows.length + 1;
+  // Write directly after the last row with a real item on it. We can't trust
+  // dstRows.length or `append`: a column of empty checkboxes (col F reads
+  // "FALSE") makes the sheet look ~1000 rows long. Only a name (A) or SKU (D)
+  // marks a genuine row.
+  let lastItemRow = 1; // header
+  for (let i = 1; i < dstRows.length; i++) {
+    const r = dstRows[i] || [];
+    const hasItem =
+      (r[0] ?? "").toString().trim() !== "" || (r[IDX_SKU] ?? "").toString().trim() !== "";
+    if (hasItem) lastItemRow = i + 1; // 0-indexed array -> 1-indexed sheet row
+  }
+  const firstEmptyRow = lastItemRow + 1;
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
