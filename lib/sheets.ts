@@ -99,20 +99,26 @@ export async function getMonthlyAnalytics(dateIso?: string) {
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      const spStr  = row[1] || "";
-      const sfStr  = row[2] || "";
-      const espStr = row[8] || ""; // Column I = ESP
+      const spStr  = (row[1] ?? "").toString().trim();
+      const sfStr  = (row[2] ?? "").toString().trim();
+      const espStr = (row[8] ?? "").toString().trim(); // Column I = ESP
 
       const spValue  = parseFloat(spStr.replace(/[^0-9.-]+/g, ""))  || 0;
       const sfValue  = parseFloat(sfStr.replace(/[^0-9.-]+/g, ""))  || 0;
       const espValue = parseFloat(espStr.replace(/[^0-9.-]+/g, "")) || 0;
 
-      if (sfValue > 0) {
+      // An item is IN STOCK if the SP cell has ANYTHING in it — a price, "£0",
+      // or a placeholder like "Ask Alex" — and it has not sold. It still counts
+      // as an item even when SP doesn't parse to a number; it just adds £0 to cost.
+      const hasSP  = spStr !== "";
+      const isSold = sfValue > 0;
+
+      if (isSold) {
         // SOLD — contributes to monthly metrics only
         revenue += sfValue;
         cogs    += spValue;
         itemsSold++;
-        
+
         salesTable.push({
           sku:    row[3] || "N/A",
           buy:    spValue,
@@ -120,8 +126,8 @@ export async function getMonthlyAnalytics(dateIso?: string) {
           profit: sfValue - spValue,
           tts:    row[4] || "N/A"
         });
-      } else if (spValue > 0) {
-        // UNSOLD INVENTORY — SF is empty, SP is present
+      } else if (hasSP) {
+        // UNSOLD INVENTORY
         inventoryCost += spValue;
         itemsInStock++;
 
