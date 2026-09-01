@@ -1,20 +1,7 @@
 "use server";
 
-import { google } from "googleapis";
 import { unstable_cache } from "next/cache";
-
-function getGoogleSheetsClient() {
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_OAUTH_CLIENT_ID,
-    process.env.GOOGLE_OAUTH_CLIENT_SECRET
-  );
-  
-  oauth2Client.setCredentials({
-    refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN,
-  });
-
-  return google.sheets({ version: "v4", auth: oauth2Client });
-}
+import { getGoogleSheetsClient } from "./google-client";
 
 // 1. Heavy Cache: Resolve the actual tab name (e.g. "Aug 26") for the current month
 // Caches for 24 hours, but automatically invalidates on month rollover due to the dynamic key.
