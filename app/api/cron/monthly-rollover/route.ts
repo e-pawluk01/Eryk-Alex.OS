@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 // client to get past RLS on analytics_monthly_snapshots.
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { getMonthlyAnalytics, createNextMonthTab } from '@/lib/sheets';
+import { carryForwardUnsold } from '@/lib/carry-forward';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { generateMonthlyReportBuffer } from '@/lib/pdf';
 import { sendMonthlyReportEmail, sendErrorAlertEmail } from '@/lib/email';
@@ -18,10 +19,12 @@ export async function GET(request: Request) {
   const prevMonthKey = `${prevDate.getFullYear()}-${(prevDate.getMonth() + 1).toString().padStart(2, '0')}`;
   
   const currentMonthName = now.toLocaleString("en-US", { month: "short" }) + " " + now.getFullYear().toString().slice(2);
-  
+  const prevMonthName = prevDate.toLocaleString("en-US", { month: "short" }) + " " + prevDate.getFullYear().toString().slice(2);
+
   const results = {
     phaseA: "pending",
-    phaseB: "pending"
+    phaseB: "pending",
+    phaseC: "pending"
   };
 
   // ==========================================
@@ -134,6 +137,23 @@ export async function GET(request: Request) {
     console.error("[Phase B Error]", error);
     results.phaseB = `failed: ${error.message}`;
     await sendErrorAlertEmail("Phase B (Tab Creation)", error.message || String(error));
+  }
+
+  // ==========================================
+  // PHASE C: CARRY UNSOLD STOCK INTO NEW TAB
+  // ==========================================
+  try {
+    console.log(`[Phase C] Carrying unsold stock: '${prevMonthName}' -> '${currentMonthName}'`);
+    const carry = await carryForwardUnsold(prevMonthName, currentMonthName);
+
+    if ('error' in carry) {
+      throw new Error(carry.error);
+    }
+    results.phaseC = `copied ${carry.copied} (skipped ${carry.alreadyThere} already present)`;
+  } catch (error: any) {
+    console.error("[Phase C Error]", error);
+    results.phaseC = `failed: ${error.message}`;
+    await sendErrorAlertEmail("Phase C (Carry Forward)", error.message || String(error));
   }
 
   return NextResponse.json({
