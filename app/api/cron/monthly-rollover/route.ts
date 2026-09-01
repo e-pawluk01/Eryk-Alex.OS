@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+// Cron runs server-side with no user session, so it uses the service-role
+// client to get past RLS on analytics_monthly_snapshots.
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { getMonthlyAnalytics, createNextMonthTab } from '@/lib/sheets';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { generateMonthlyReportBuffer } from '@/lib/pdf';
