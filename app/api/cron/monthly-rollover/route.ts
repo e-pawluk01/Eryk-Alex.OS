@@ -65,6 +65,7 @@ export async function GET(request: Request) {
         items_sold: prevSheets.itemsSold,
         average_sale_price: prevSheets.avgSalePrice,
         average_profit_per_item: prevSheets.avgProfitPerItem,
+        selling_costs: prevSheets.sellingCosts,
         total_hours: prevHours,
         profit_per_hour: profitPerHour,
         sales_details: prevSheets.salesTable,

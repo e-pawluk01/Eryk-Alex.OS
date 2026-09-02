@@ -41,6 +41,7 @@ export async function GET(request: Request) {
         if (inv.data) {
           payload = {
             ...payload,
+            selling_costs: payload.selling_costs ?? inv.data.sellingCosts,
             items_in_stock: inv.data.itemsInStock,
             inventory_cost: inv.data.inventoryCost,
             return_on_cost: inv.data.returnOnCost,
@@ -68,6 +69,7 @@ export async function GET(request: Request) {
         month_label: sheets.monthLabel,
         revenue: sheets.revenue,
         cogs: sheets.cogs,
+        selling_costs: sheets.sellingCosts,
         gross_profit: sheets.grossProfit,
         gross_margin: sheets.grossMargin,
         items_sold: sheets.itemsSold,

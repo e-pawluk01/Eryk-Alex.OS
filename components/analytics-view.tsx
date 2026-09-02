@@ -94,6 +94,7 @@ export function AnalyticsView() {
     avgSalePrice: 0,
     avgProfitPerItem: 0,
     monthLabel: "Current Month",
+    sellingCosts: 0,
     inventoryCost: 0,
     itemsInStock: 0,
     returnOnCost: null,
@@ -144,6 +145,8 @@ export function AnalyticsView() {
             comparison={showArrows ? getComparison(safeData.revenue, prevSnapshot.revenue) : null} />
           <MetricCard title="COGS" value={formatCurrency(safeData.cogs)} prefix="£"
             comparison={showArrows ? getComparison(safeData.cogs, prevSnapshot.cogs) : null} />
+          <MetricCard title="Selling Costs" value={formatCurrency(safeData.sellingCosts ?? 0)} prefix="£"
+            comparison={showArrows ? getComparison(safeData.sellingCosts ?? 0, prevSnapshot.selling_costs) : null} />
           <MetricCard title="Gross Profit" value={formatCurrency(safeData.grossProfit)} prefix="£"
             comparison={showArrows ? getComparison(safeData.grossProfit, prevSnapshot.gross_profit) : null} />
           <MetricCard title="Gross Margin" value={formatPercent(safeData.grossMargin)} suffix="%"

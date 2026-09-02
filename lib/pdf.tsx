@@ -71,6 +71,7 @@ const MonthlyReportPDF = ({ snapshot }: { snapshot: any }) => {
         <Section label="Performance">
           <Metric label="Revenue" value={fmtCurrency(snapshot.revenue)} />
           <Metric label="COGS" value={fmtCurrency(snapshot.cogs)} />
+          <Metric label="Selling Costs" value={fmtCurrency(snapshot.selling_costs)} />
           <Metric label="Gross Profit" value={fmtCurrency(snapshot.gross_profit)} />
           <Metric label="Gross Margin" value={fmtPercent(snapshot.gross_margin)} />
           <Metric label="Profit / Hour" value={fmtCurrency(snapshot.profit_per_hour)} />

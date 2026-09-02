@@ -30,7 +30,7 @@ const getTabData = unstable_cache(
     const sheets = getGoogleSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${tabName}'!A:I`,
+      range: `'${tabName}'!A:L`,
     });
     return response.data.values || [];
   },
@@ -72,8 +72,9 @@ export async function getMonthlyAnalytics(dateIso?: string) {
     // Calculate metrics
     let revenue = 0;
     let cogs = 0;
+    let sellingCosts = 0; // Depop/marketplace fees + postage you paid, on sold items
     let itemsSold = 0;
-    
+
     // Inventory tracking
     let inventoryCost = 0;
     let itemsInStock = 0;
@@ -88,11 +89,15 @@ export async function getMonthlyAnalytics(dateIso?: string) {
       const row = rows[i];
       const spStr  = (row[1] ?? "").toString().trim();
       const sfStr  = (row[2] ?? "").toString().trim();
-      const espStr = (row[8] ?? "").toString().trim(); // Column I = ESP
+      const espStr = (row[8] ?? "").toString().trim();  // Column I = ESP
+      const feeStr = (row[10] ?? "").toString().trim(); // Column K = Fees
+      const shipStr = (row[11] ?? "").toString().trim(); // Column L = Ship Cost
 
       const spValue  = parseFloat(spStr.replace(/[^0-9.-]+/g, ""))  || 0;
       const sfValue  = parseFloat(sfStr.replace(/[^0-9.-]+/g, ""))  || 0;
       const espValue = parseFloat(espStr.replace(/[^0-9.-]+/g, "")) || 0;
+      const feeValue  = parseFloat(feeStr.replace(/[^0-9.-]+/g, ""))  || 0;
+      const shipValue = parseFloat(shipStr.replace(/[^0-9.-]+/g, "")) || 0;
 
       // An item is IN STOCK if the SP cell has ANYTHING in it — a price, "£0",
       // or a placeholder like "Ask Alex" — and it has not sold. It still counts
@@ -102,15 +107,18 @@ export async function getMonthlyAnalytics(dateIso?: string) {
 
       if (isSold) {
         // SOLD — contributes to monthly metrics only
-        revenue += sfValue;
-        cogs    += spValue;
+        revenue      += sfValue;
+        cogs         += spValue;
+        sellingCosts += feeValue + shipValue;
         itemsSold++;
 
         salesTable.push({
           sku:    row[3] || "N/A",
           buy:    spValue,
           sold:   sfValue,
-          profit: sfValue - spValue,
+          fees:   feeValue,
+          ship:   shipValue,
+          profit: sfValue - spValue - feeValue - shipValue,
           tts:    row[4] || "N/A"
         });
       } else if (hasSP) {
@@ -126,7 +134,7 @@ export async function getMonthlyAnalytics(dateIso?: string) {
       }
     }
 
-    const grossProfit        = revenue - cogs;
+    const grossProfit        = revenue - cogs - sellingCosts;
     const grossMargin        = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
     const avgSalePrice       = itemsSold > 0 ? revenue / itemsSold : 0;
     const avgProfitPerItem   = itemsSold > 0 ? grossProfit / itemsSold : 0;
@@ -138,6 +146,7 @@ export async function getMonthlyAnalytics(dateIso?: string) {
         // Monthly metrics
         revenue,
         cogs,
+        sellingCosts,
         grossProfit,
         grossMargin,
         itemsSold,
