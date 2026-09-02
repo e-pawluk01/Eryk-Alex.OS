@@ -49,13 +49,18 @@ export function HistoricalSnapshotView({ snapshot, onBack }: HistoricalSnapshotV
           value={formatCurrency(snapshot.gross_profit)} 
           prefix="£" 
         />
-        <MetricCard 
-          title="COGS" 
-          value={formatCurrency(snapshot.cogs)} 
-          prefix="£" 
+        <MetricCard
+          title="COGS"
+          value={formatCurrency(snapshot.cogs)}
+          prefix="£"
         />
-        <MetricCard 
-          title="Gross Margin" 
+        <MetricCard
+          title="Selling Costs"
+          value={formatCurrency(snapshot.selling_costs)}
+          prefix="£"
+        />
+        <MetricCard
+          title="Gross Margin"
           value={formatPercent(snapshot.gross_margin)} 
           suffix="%" 
         />
