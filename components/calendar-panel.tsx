@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Task, Event } from "@/lib/types";
 import { DomainType } from "./global-context";
-import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Wrench } from "lucide-react";
 import { 
   startOfMonth, endOfMonth, eachDayOfInterval, format, 
   isSameDay, isToday, addMonths, subMonths, parseISO, startOfDay
@@ -42,9 +42,11 @@ interface CalendarPanelProps {
   onSelectEvent: (event: Event) => void;
   onAnalyticsToggle?: () => void;
   showAnalytics?: boolean;
+  onToolsToggle?: () => void;
+  showTools?: boolean;
 }
 
-export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics }: CalendarPanelProps) {
+export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics, onToolsToggle, showTools }: CalendarPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
@@ -90,11 +92,19 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
           <Calendar className="w-5 h-5 text-white/80" />
         </button>
         {currentDomain === "WORK" && onAnalyticsToggle && (
-          <button 
+          <button
             onClick={onAnalyticsToggle}
             className="p-3 py-4 hover:bg-white/10 transition-colors"
           >
             {showAnalytics ? <X className="w-5 h-5 text-white/80" /> : <TrendingUp className="w-5 h-5 text-white/80" />}
+          </button>
+        )}
+        {currentDomain === "WORK" && onToolsToggle && (
+          <button
+            onClick={onToolsToggle}
+            className="p-3 py-4 hover:bg-white/10 transition-colors"
+          >
+            {showTools ? <X className="w-5 h-5 text-white/80" /> : <Wrench className="w-5 h-5 text-white/80" />}
           </button>
         )}
       </div>
