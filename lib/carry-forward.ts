@@ -1,8 +1,10 @@
 import { getGoogleSheetsClient } from "./google-client";
 
-// Columns A..J (0-indexed): A notes, B SP, C SF, D SKU, E TTS, F UP,
-// G listing-start, H accum-days, I ESP, J sourced-date.
-const COLS = 10;
+// Columns A..M (0-indexed): A notes, B SP, C SF, D SKU, E TTS, F UP(V),
+// G listing-start, H accum-days, I ESP, J sourced-date, K fees, L ship
+// cost, M UP(D). Carrying F/M forward means "still listed" status follows
+// an unsold item into the new month instead of resetting.
+const COLS = 13;
 const IDX_SP = 1;
 const IDX_SF = 2;
 const IDX_SKU = 3;
@@ -23,8 +25,8 @@ export async function carryForwardUnsold(fromTab: string, toTab: string) {
   const sheets = getGoogleSheetsClient();
 
   const [srcResp, dstResp] = await Promise.all([
-    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${fromTab}'!A:J` }),
-    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${toTab}'!A:J` }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${fromTab}'!A:M` }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${toTab}'!A:M` }),
   ]);
 
   const srcRows: any[][] = srcResp.data.values || [];
