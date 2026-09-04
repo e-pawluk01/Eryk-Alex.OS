@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { PastMonthsDialog } from "./past-months-dialog";
 import { HistoricalSnapshotView } from "./historical-snapshot-view";
+import { SetGoalDialog } from "./set-goal-dialog";
 
 export function AnalyticsView() {
   const [loading, setLoading] = useState(true);
@@ -17,6 +18,8 @@ export function AnalyticsView() {
   const [totalHours, setTotalHours] = useState<number>(0);
   const [prevSnapshot, setPrevSnapshot] = useState<any>(null);
   const [snapshotCount, setSnapshotCount] = useState<number>(0);
+  const [goal, setGoal] = useState<any>(null);
+  const [isGoalDialogOpen, setGoalDialogOpen] = useState(false);
 
   const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
 
@@ -26,14 +29,16 @@ export function AnalyticsView() {
       const now = new Date();
       const prevDate = subMonths(now, 1);
       const prevMonthKey = `${prevDate.getFullYear()}-${(prevDate.getMonth() + 1).toString().padStart(2, '0')}`;
+      const currentMonthKey = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
 
-      // 1. Fetch live current month, last month's snapshot, and how many
-      //    closed snapshots exist in total (drives whether arrows show).
-      const [sheetsResult, sessionsResult, prevSnapshotResult, snapshotCountResult] = await Promise.all([
+      // 1. Fetch live current month, last month's snapshot, how many closed
+      //    snapshots exist (drives whether arrows show), and this month's goal.
+      const [sheetsResult, sessionsResult, prevSnapshotResult, snapshotCountResult, goalResult] = await Promise.all([
         getMonthlyAnalytics(),
         fetchCurrentMonthHours(now),
         supabase.from("analytics_monthly_snapshots").select("*").eq("month", prevMonthKey).maybeSingle(),
         supabase.from("analytics_monthly_snapshots").select("id", { count: "exact", head: true }),
+        supabase.from("monthly_goals").select("*").eq("month", currentMonthKey).maybeSingle(),
       ]);
 
       if (sheetsResult.error) {
@@ -45,6 +50,7 @@ export function AnalyticsView() {
       setTotalHours(sessionsResult);
       setPrevSnapshot(prevSnapshotResult?.data || null);
       setSnapshotCount(snapshotCountResult?.count || 0);
+      setGoal(goalResult?.data || null);
     } catch (err: any) {
       setError(err.message || "Failed to load analytics.");
     } finally {
@@ -105,6 +111,20 @@ export function AnalyticsView() {
 
   const profitPerHour = totalHours > 0 ? safeData.grossProfit / totalHours : 0;
 
+  // GOAL — deterministic, not a forecast: what's needed vs. what's set.
+  const today = new Date();
+  const currentMonthKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+  const daysLeft = Math.max(1, endOfMonth(today).getDate() - today.getDate() + 1);
+
+  const goalAmount: number | null = goal?.gross_profit_goal ?? null;
+  const progressPct = goalAmount ? (safeData.grossProfit / goalAmount) * 100 : null;
+  const remaining = goalAmount !== null ? Math.max(0, goalAmount - safeData.grossProfit) : null;
+  const estSalesRemaining =
+    remaining === null ? null :
+    remaining === 0 ? 0 :
+    safeData.avgProfitPerItem > 0 ? Math.ceil(remaining / safeData.avgProfitPerItem) : null;
+  const paceNeeded = remaining === null ? null : remaining === 0 ? 0 : remaining / daysLeft;
+
   // Arrows stay hidden until there are at least 3 closed monthly snapshots —
   // comparing one thin month against another is noise, not signal.
   const showArrows = snapshotCount >= 3 && !!prevSnapshot;
@@ -139,6 +159,27 @@ export function AnalyticsView() {
       )}
 
       <div className="flex flex-col">
+        {/* GOAL — where you're trying to get to this month */}
+        <MetricSection title="Goal" loading={loading}>
+          <button onClick={() => setGoalDialogOpen(true)} className="text-left">
+            <MetricCard title="Gross Profit Goal"
+              value={goalAmount !== null ? formatCurrency(goalAmount) : "Set Goal"}
+              prefix={goalAmount !== null ? "£" : undefined} />
+          </button>
+          <MetricCard title="Progress"
+            value={progressPct !== null ? formatPercent(progressPct) : "—"}
+            suffix={progressPct !== null ? "%" : undefined} />
+          <MetricCard title="Remaining"
+            value={remaining === null ? "—" : remaining === 0 ? "Goal met" : formatCurrency(remaining)}
+            prefix={remaining !== null && remaining > 0 ? "£" : undefined} />
+          <MetricCard title="Est. Sales Remaining"
+            value={estSalesRemaining === null ? "—" : String(estSalesRemaining)} />
+          <MetricCard title="Pace Needed"
+            value={remaining === null ? "—" : remaining === 0 ? "Goal met" : formatCurrency(paceNeeded as number)}
+            prefix={remaining !== null && remaining > 0 ? "£" : undefined}
+            suffix={remaining !== null && remaining > 0 ? "/day" : undefined} />
+        </MetricSection>
+
         {/* PERFORMANCE — money from sales this month */}
         <MetricSection title="Performance" loading={loading}>
           <MetricCard title="Revenue" value={formatCurrency(safeData.revenue)} prefix="£"
@@ -180,6 +221,18 @@ export function AnalyticsView() {
             prefix={safeData.expectedProfit !== null ? "£" : undefined} />
         </MetricSection>
       </div>
+
+      <SetGoalDialog
+        isOpen={isGoalDialogOpen}
+        onClose={() => setGoalDialogOpen(false)}
+        monthKey={currentMonthKey}
+        monthLabel={safeData.monthLabel}
+        currentGoal={goalAmount}
+        onSaved={(newGoal) => {
+          setGoal({ month: currentMonthKey, gross_profit_goal: newGoal });
+          setGoalDialogOpen(false);
+        }}
+      />
     </div>
   );
 }
