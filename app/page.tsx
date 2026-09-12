@@ -11,7 +11,7 @@ import { TaskDetailsPanel } from "@/components/task-details-panel";
 import { EventDetailsPanel } from "@/components/event-details-panel";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { AnalyticsView } from "@/components/analytics-view";
-import { ToolsView } from "@/components/tools-view";
+import { ListingsView } from "@/components/listings-view";
 import { ActiveSessionWidget } from "@/components/active-session-widget";
 import { NewTaskDialog } from "@/components/new-task-dialog";
 import { NewGoalDialog } from "@/components/new-goal-dialog";
@@ -51,7 +51,7 @@ export default function Home() {
   const [videoFilter, setVideoFilter] = useState<"All" | "Eryk" | "Alex">("All");
   const [contentTab, setContentTab] = useState<"videos" | "uploading">("videos");
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [showTools, setShowTools] = useState(false);
+  const [showListings, setShowListings] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [isHallOfFameOpen, setIsHallOfFameOpen] = useState(false);
@@ -421,8 +421,8 @@ export default function Home() {
       {currentDomain === "WORK" && (
         <ActiveSessionWidget />
       )}
-      {currentDomain === "WORK" && showTools ? (
-        <ToolsView />
+      {currentDomain === "WORK" && showListings ? (
+        <ListingsView />
       ) : currentDomain === "WORK" && showAnalytics ? (
         <AnalyticsView />
       ) : (
@@ -794,10 +794,10 @@ export default function Home() {
         onAddEvent={handleAddEvent}
         onSelectTask={setSelectedTask}
         onSelectEvent={setSelectedEvent}
-        onAnalyticsToggle={() => { setShowAnalytics(!showAnalytics); setShowTools(false); }}
+        onAnalyticsToggle={() => { setShowAnalytics(!showAnalytics); setShowListings(false); }}
         showAnalytics={showAnalytics}
-        onToolsToggle={() => { setShowTools(!showTools); setShowAnalytics(false); }}
-        showTools={showTools}
+        onListingsToggle={() => { setShowListings(!showListings); setShowAnalytics(false); }}
+        showListings={showListings}
       />
 
       <HallOfFamePanel 
