@@ -15,12 +15,15 @@ interface PhotoSlot {
 export function ListingsView() {
   const [isSkuDialogOpen, setIsSkuDialogOpen] = useState(false);
   const [photos, setPhotos] = useState<PhotoSlot[]>([]);
+  const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addPhotos = (files: FileList | null) => {
     if (!files) return;
     const room = MAX_PHOTOS - photos.length;
-    const toAdd = Array.from(files).slice(0, room);
+    const toAdd = Array.from(files)
+      .filter((file) => file.type.startsWith("image/"))
+      .slice(0, room);
     const newSlots: PhotoSlot[] = toAdd.map((file) => ({
       id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
       file,
@@ -49,7 +52,18 @@ export function ListingsView() {
         </button>
       </div>
 
-      <div className="max-w-2xl w-full bg-[#111] border border-white/5 rounded-2xl p-6 flex flex-col gap-3">
+      <div
+        onDragOver={(e) => { e.preventDefault(); setIsDragActive(true); }}
+        onDragLeave={() => setIsDragActive(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragActive(false);
+          addPhotos(e.dataTransfer.files);
+        }}
+        className={`max-w-2xl w-full bg-[#111] border rounded-2xl p-6 flex flex-col gap-3 transition-colors ${
+          isDragActive ? "border-white/40" : "border-white/5"
+        }`}
+      >
         <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">
           Photos ({photos.length}/{MAX_PHOTOS})
         </label>
