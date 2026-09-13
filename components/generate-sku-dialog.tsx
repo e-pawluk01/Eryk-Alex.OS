@@ -13,9 +13,10 @@ interface SkuResult {
 interface GenerateSkuDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onGenerated?: (sku: string) => void;
 }
 
-export function GenerateSkuDialog({ isOpen, onClose }: GenerateSkuDialogProps) {
+export function GenerateSkuDialog({ isOpen, onClose, onGenerated }: GenerateSkuDialogProps) {
   const [category, setCategory] = useState(SKU_CATEGORIES[0].name);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SkuResult | null>(null);
@@ -33,7 +34,10 @@ export function GenerateSkuDialog({ isOpen, onClose }: GenerateSkuDialogProps) {
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || "Failed to generate SKU.");
-      else setResult(data);
+      else {
+        setResult(data);
+        onGenerated?.(data.sku);
+      }
     } catch {
       setError("Couldn't reach the server.");
     } finally {
