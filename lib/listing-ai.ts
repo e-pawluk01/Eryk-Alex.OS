@@ -2,7 +2,7 @@
 // The AI only ever returns these discrete fields as JSON — it never writes the
 // full file itself, so the fixed template wording in lib/listing-templates.ts
 // can never be altered by a model response.
-const DEPOP_SYSTEM_PROMPT = `You write Depop resale listings for a secondhand fashion shop. Look at the item photos and the details given, then reply with strict JSON only (no markdown, no commentary) in exactly this shape:
+const DEPOP_SYSTEM_PROMPT = `You write Depop resale listings for a secondhand fashion shop. Look at the item photos and the details given, then reply with strict JSON only (no markdown, no commentary) in exactly this shape. If seller notes are given, trust them over what you can see in the photos — they exist specifically to tell you about things a photo can't show (a hidden flaw, how it actually fits, a repair, etc.), so factor them into the description when relevant:
 {
   "title": string,        // short, punchy, aesthetic-led title in a vintage/Y2K resale voice. Do not start with the brand and do not include the size.
   "description": string,  // maximum 2 sentences of plain prose, no hashtags
@@ -23,6 +23,7 @@ interface DepopContentInput {
   size: string;
   condition: string;
   measurementsNotes: string;
+  sellerNotes: string;
 }
 
 export interface DepopContent {
@@ -40,6 +41,7 @@ export async function generateDepopContent(input: DepopContentInput): Promise<De
     `Size: ${input.size}`,
     `Condition: ${input.condition}`,
     `Measurement notes: ${input.measurementsNotes || "(none given)"}`,
+    `Seller notes (things not visible in the photos): ${input.sellerNotes || "(none given)"}`,
   ].join("\n");
 
   const content: unknown[] = [{ type: "text", text: userText }];

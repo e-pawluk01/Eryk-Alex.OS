@@ -27,6 +27,7 @@ export function ListingsView() {
   const [size, setSize] = useState("");
   const [condition, setCondition] = useState("Very good");
   const [measurements, setMeasurements] = useState("");
+  const [notes, setNotes] = useState("");
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
@@ -84,6 +85,7 @@ export function ListingsView() {
       formData.set("size", size);
       formData.set("condition", condition);
       formData.set("measurements", measurements);
+      formData.set("notes", notes);
       photos.forEach((p) => formData.append("photos", p.file));
 
       const res = await fetch("/api/listings/generate", { method: "POST", body: formData });
@@ -216,6 +218,16 @@ export function ListingsView() {
             value={measurements}
             onChange={(e) => setMeasurements(e.target.value)}
             placeholder="Pit to pit: 20 inches..."
+            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white placeholder:text-white/20 outline-none focus:border-white/50 transition-colors min-h-[64px] resize-none"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Notes for the AI</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Anything not visible in the photos — a stain, how it fits, a repair..."
             className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white placeholder:text-white/20 outline-none focus:border-white/50 transition-colors min-h-[64px] resize-none"
           />
         </div>
