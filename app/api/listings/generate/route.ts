@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
     const size = String(formData.get("size") || "");
     const condition = String(formData.get("condition") || "");
     const measurements = String(formData.get("measurements") || "");
+    const notes = String(formData.get("notes") || "");
 
     if (!sku) {
       return NextResponse.json({ error: "Generate a SKU before generating a listing." }, { status: 400 });
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       size,
       condition,
       measurementsNotes: measurements,
+      sellerNotes: notes,
     });
 
     const depopText = buildDepopText({ ...content, brand, size, condition, sku, category });
