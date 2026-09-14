@@ -3,6 +3,10 @@ import { generateDepopContent } from "@/lib/listing-ai";
 import { buildDepopText } from "@/lib/listing-templates";
 import { uploadListingTextFile } from "@/lib/google-drive";
 
+// Photos + an AI vision call + two Drive round-trips routinely take longer
+// than the platform's default function timeout — give it real headroom.
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
