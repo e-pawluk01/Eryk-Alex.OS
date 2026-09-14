@@ -32,18 +32,51 @@ export function ListingsView() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [fileLink, setFileLink] = useState<string | null>(null);
+  const [autoSkuNotice, setAutoSkuNotice] = useState<string | null>(null);
 
-  const addPhotos = (files: FileList | null) => {
+  // Real phone photos routinely add up to more than Vercel's ~4.5MB request
+  // limit once you have 2-3 of them. Shrink before they ever leave the
+  // browser; fall back to the original file if a photo can't be decoded
+  // client-side (e.g. some HEIC cases) rather than blocking the upload.
+  const compressImage = async (file: File, maxDimension = 1280, quality = 0.7): Promise<File> => {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+      const width = Math.round(bitmap.width * scale);
+      const height = Math.round(bitmap.height * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return file;
+      ctx.drawImage(bitmap, 0, 0, width, height);
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (!blob) return file;
+      return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+    } catch {
+      return file;
+    }
+  };
+
+  const addPhotos = async (files: FileList | null) => {
     if (!files) return;
     const room = MAX_PHOTOS - photos.length;
     const toAdd = Array.from(files)
       .filter((file) => file.type.startsWith("image/"))
       .slice(0, room);
-    const newSlots: PhotoSlot[] = toAdd.map((file) => ({
-      id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
-      file,
-      previewUrl: URL.createObjectURL(file),
-    }));
+
+    const newSlots: PhotoSlot[] = await Promise.all(
+      toAdd.map(async (file) => {
+        const compressed = await compressImage(file);
+        return {
+          id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
+          file: compressed,
+          previewUrl: URL.createObjectURL(compressed),
+        };
+      })
+    );
     setPhotos((prev) => [...prev, ...newSlots]);
   };
 
@@ -62,24 +95,8 @@ export function ListingsView() {
     setGenerateError(null);
     setFileLink(null);
     try {
-      let activeSku = sku;
-      if (!activeSku) {
-        const skuRes = await fetch("/api/sku/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ category }),
-        });
-        const skuData = await skuRes.json();
-        if (!skuRes.ok) {
-          setGenerateError(skuData.error || "Failed to generate a SKU.");
-          return;
-        }
-        activeSku = skuData.sku;
-        setSku(activeSku);
-      }
-
       const formData = new FormData();
-      formData.set("sku", activeSku!);
+      if (sku) formData.set("sku", sku);
       formData.set("category", category);
       formData.set("brand", brand);
       formData.set("size", size);
@@ -90,6 +107,15 @@ export function ListingsView() {
 
       const res = await fetch("/api/listings/generate", { method: "POST", body: formData });
       const data = await res.json();
+
+      // The server only spends a SKU once the AI content has already
+      // succeeded — if one comes back here, it's real and already in the
+      // sheet, whether or not the rest of this request went on to succeed.
+      if (data.sku && data.newlyGeneratedSku) {
+        setSku(data.sku);
+        setAutoSkuNotice(data.sku);
+      }
+
       if (!res.ok) setGenerateError(data.error || "Failed to generate the listing.");
       else setFileLink(data.fileLink);
     } catch {
@@ -263,6 +289,27 @@ export function ListingsView() {
         onClose={() => setIsSkuDialogOpen(false)}
         onGenerated={(newSku) => setSku(newSku)}
       />
+
+      {autoSkuNotice && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-md transition-opacity animate-in fade-in duration-300"
+            onClick={() => setAutoSkuNotice(null)}
+          />
+          <div className="relative bg-zinc-950/80 backdrop-blur-3xl border border-white/5 rounded-2xl w-[90%] max-w-sm shadow-2xl shadow-black/50 animate-in fade-in zoom-in-[0.98] duration-300 slide-in-from-bottom-4 p-6 flex flex-col items-center gap-3 text-center">
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-t-2xl" />
+            <span className="text-[9px] uppercase tracking-widest text-emerald-400/80 font-semibold">SKU Generated</span>
+            <span className="text-3xl font-mono text-white tracking-wider">{autoSkuNotice}</span>
+            <span className="text-[10px] text-white/40">Added to the sheet — this is used now no matter what happens next.</span>
+            <button
+              onClick={() => setAutoSkuNotice(null)}
+              className="w-full py-2.5 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-white/90 transition-all mt-2"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,25 @@
 import { google } from "googleapis";
 
+const REQUIRED_ENV_VARS = [
+  "GOOGLE_DRIVE_OAUTH_CLIENT_ID",
+  "GOOGLE_DRIVE_OAUTH_CLIENT_SECRET",
+  "GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN",
+  "GOOGLE_DRIVE_PARENT_FOLDER_ID",
+] as const;
+
+// Fail loudly with a plain message rather than letting a missing variable
+// turn into a confusing Google API error further down the line (e.g. an
+// undefined parent folder id silently becoming the literal text "undefined"
+// in a Drive search query).
+function assertDriveEnvIsConfigured() {
+  const missing = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
+  if (missing.length > 0) {
+    throw new Error(
+      `Drive isn't configured: missing ${missing.join(", ")} in Vercel. Check they're saved, spelled exactly right, ticked for Production, and that the app's been redeployed since adding them.`
+    );
+  }
+}
+
 // Separate OAuth client for Drive, deliberately using its own env vars
 // (GOOGLE_DRIVE_OAUTH_*) so it can't collide with the Sheets client in
 // lib/google-client.ts.
@@ -41,6 +61,7 @@ async function findOrCreateSkuFolder(drive: ReturnType<typeof getDriveClient>, s
 }
 
 export async function uploadListingTextFile(sku: string, filename: string, content: string): Promise<string> {
+  assertDriveEnvIsConfigured();
   const drive = getDriveClient();
   const folderId = await findOrCreateSkuFolder(drive, sku);
 
