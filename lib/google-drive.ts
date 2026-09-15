@@ -73,3 +73,26 @@ export async function uploadListingTextFile(sku: string, filename: string, conte
 
   return uploaded.data.webViewLink ?? "";
 }
+
+// For uploading more than one file to the same SKU (e.g. depop.txt and
+// vinted.txt together) — resolves the folder exactly once, so two uploads
+// running at the same time can never race and create duplicate folders.
+export async function uploadListingTextFiles(
+  sku: string,
+  files: { filename: string; content: string }[]
+): Promise<string[]> {
+  assertDriveEnvIsConfigured();
+  const drive = getDriveClient();
+  const folderId = await findOrCreateSkuFolder(drive, sku);
+
+  return Promise.all(
+    files.map(async ({ filename, content }) => {
+      const uploaded = await drive.files.create({
+        requestBody: { name: filename, parents: [folderId] },
+        media: { mimeType: "text/plain", body: content },
+        fields: "webViewLink",
+      });
+      return uploaded.data.webViewLink ?? "";
+    })
+  );
+}

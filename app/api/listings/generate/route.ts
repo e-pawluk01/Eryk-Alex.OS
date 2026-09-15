@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateDepopContent } from "@/lib/listing-ai";
-import { buildDepopText } from "@/lib/listing-templates";
-import { uploadListingTextFile } from "@/lib/google-drive";
+import { generateDepopContent, generateVintedContent } from "@/lib/listing-ai";
+import { buildDepopText, buildVintedText } from "@/lib/listing-templates";
+import { uploadListingTextFiles } from "@/lib/google-drive";
 import { generateSku } from "@/lib/sku";
 
 // Photos + an AI vision call + two Drive round-trips routinely take longer
@@ -36,17 +36,22 @@ export async function POST(req: NextRequest) {
       }))
     );
 
-    // 1. Write the content first — this doesn't need a SKU at all, so a
-    // failure here costs nothing.
-    const content = await generateDepopContent({
+    const itemInput = {
       photos,
       category,
       brand,
       size,
-      condition,
       measurementsNotes: measurements,
       sellerNotes: notes,
-    });
+    };
+
+    // 1. Write both platforms' content first — neither needs a SKU at all,
+    // so a failure here costs nothing. Run them together since they're
+    // independent AI calls.
+    const [depopContent, vintedContent] = await Promise.all([
+      generateDepopContent(itemInput),
+      generateVintedContent(itemInput),
+    ]);
 
     // 2. Only now spend a SKU, and only if the caller didn't already bring
     // one in (from the standalone popup, or typed in manually).
@@ -61,12 +66,17 @@ export async function POST(req: NextRequest) {
       newlyGeneratedSku = true;
     }
 
-    // 3. File it — from here on the SKU is spent regardless of outcome,
+    // 3. File both — from here on the SKU is spent regardless of outcome,
     // since Drive needs it to name the folder.
-    const depopText = buildDepopText({ ...content, brand, size, condition, sku, category });
-    const fileLink = await uploadListingTextFile(sku, "depop.txt", depopText);
+    const depopText = buildDepopText({ ...depopContent, brand, size, condition, sku, category });
+    const vintedText = buildVintedText({ ...vintedContent, brand, size, condition, sku });
 
-    return NextResponse.json({ fileLink, sku, newlyGeneratedSku });
+    const [depopLink, vintedLink] = await uploadListingTextFiles(sku, [
+      { filename: "depop.txt", content: depopText },
+      { filename: "vinted.txt", content: vintedText },
+    ]);
+
+    return NextResponse.json({ depopLink, vintedLink, sku, newlyGeneratedSku });
   } catch (err) {
     console.error("Listing generation failed:", err);
     const message = err instanceof Error ? err.message : "Something went wrong generating the listing.";

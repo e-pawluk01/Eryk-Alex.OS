@@ -31,7 +31,8 @@ export function ListingsView() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [fileLink, setFileLink] = useState<string | null>(null);
+  const [depopLink, setDepopLink] = useState<string | null>(null);
+  const [vintedLink, setVintedLink] = useState<string | null>(null);
   const [autoSkuNotice, setAutoSkuNotice] = useState<string | null>(null);
 
   // Real phone photos routinely add up to more than Vercel's ~4.5MB request
@@ -93,7 +94,8 @@ export function ListingsView() {
   const generateListing = async () => {
     setIsGenerating(true);
     setGenerateError(null);
-    setFileLink(null);
+    setDepopLink(null);
+    setVintedLink(null);
     try {
       const formData = new FormData();
       if (sku) formData.set("sku", sku);
@@ -116,8 +118,12 @@ export function ListingsView() {
         setAutoSkuNotice(data.sku);
       }
 
-      if (!res.ok) setGenerateError(data.error || "Failed to generate the listing.");
-      else setFileLink(data.fileLink);
+      if (!res.ok) {
+        setGenerateError(data.error || "Failed to generate the listing.");
+      } else {
+        setDepopLink(data.depopLink);
+        setVintedLink(data.vintedLink);
+      }
     } catch {
       setGenerateError("Couldn't reach the server.");
     } finally {
@@ -274,12 +280,24 @@ export function ListingsView() {
           </div>
         )}
 
-        {fileLink && (
-          <div className="flex items-center justify-center gap-2 text-emerald-400/80 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2.5 text-xs">
-            <Check className="w-4 h-4 shrink-0" />
-            <a href={fileLink} target="_blank" rel="noreferrer" className="underline">
-              Depop listing saved to Drive
-            </a>
+        {(depopLink || vintedLink) && (
+          <div className="flex flex-col gap-2">
+            {depopLink && (
+              <div className="flex items-center justify-center gap-2 text-emerald-400/80 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2.5 text-xs">
+                <Check className="w-4 h-4 shrink-0" />
+                <a href={depopLink} target="_blank" rel="noreferrer" className="underline">
+                  Depop listing saved to Drive
+                </a>
+              </div>
+            )}
+            {vintedLink && (
+              <div className="flex items-center justify-center gap-2 text-emerald-400/80 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2.5 text-xs">
+                <Check className="w-4 h-4 shrink-0" />
+                <a href={vintedLink} target="_blank" rel="noreferrer" className="underline">
+                  Vinted listing saved to Drive
+                </a>
+              </div>
+            )}
           </div>
         )}
       </div>
