@@ -148,27 +148,3 @@ ${VOICE_EXAMPLES}`;
     measurement2Value: (parsed.measurement2Value as string) ?? "",
   };
 }
-
-export interface TitlesOnly {
-  depopTitle: string;
-  vintedTitle: string;
-}
-
-// A deliberately lighter call than the full generators above — just fresh
-// titles, no description/tags/measurements, no SKU, no Drive. For re-listing
-// an item that already has everything else and just needs a new title.
-export async function generateTitlesOnly(input: ItemInput): Promise<TitlesOnly> {
-  const systemPrompt = `You write listing titles for a secondhand fashion shop specialising in Y2K and niche aesthetics. Look at the item photos and the details given, then reply with strict JSON only (no markdown, no commentary) in exactly this shape:
-{
-  "depopTitle": string,  // short, punchy, aesthetic-led title. Lean on specific subculture/aesthetic vocabulary (${NICHE_VOCAB}) rather than generic phrases. Do not start with the brand and do not include the size.
-  "vintedTitle": string  // ONE dense, keyword-stacked title: brand, size, fit, wash/colour, standout features, and aesthetic terms. Aim for 90-98 characters, NEVER exceed 100. Style target: "Y2K Mudd Rhinestone Embellished Cross Flap Pocket Jeans Dark Wash Contrast Stitch Vintage" (91 characters).
-}
-
-${VOICE_EXAMPLES}`;
-
-  const parsed = await callOpenRouter(systemPrompt, buildUserText(input), input.photos);
-  return {
-    depopTitle: (parsed.depopTitle as string) ?? "",
-    vintedTitle: ((parsed.vintedTitle as string) ?? "").slice(0, 100),
-  };
-}

@@ -5,7 +5,6 @@ import { Loader2, Check, AlertTriangle } from "lucide-react";
 import { GenerateSkuDialog } from "@/components/generate-sku-dialog";
 import { ListingPhotoPicker, PhotoSlot } from "@/components/listing-photo-picker";
 import { SkuGeneratedNotice } from "@/components/sku-generated-notice";
-import { RegenerateTitlePanel } from "@/components/regenerate-title-panel";
 import { SKU_CATEGORIES } from "@/lib/sku-categories";
 
 export function ListingsView() {
@@ -197,15 +196,6 @@ export function ListingsView() {
             )}
           </div>
         )}
-
-        <RegenerateTitlePanel
-          photos={photos}
-          category={category}
-          brand={brand}
-          size={size}
-          measurements={measurements}
-          notes={notes}
-        />
       </div>
 
       <GenerateSkuDialog
