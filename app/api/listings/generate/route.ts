@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     // 3. File both — from here on the SKU is spent regardless of outcome,
     // since Drive needs it to name the folder.
     const depopText = buildDepopText({ ...depopContent, brand, size, condition, sku, category });
-    const vintedText = buildVintedText({ ...vintedContent, brand, size, condition, sku });
+    const vintedText = buildVintedText({ ...vintedContent, brand, size, condition, sku, category });
 
     const [depopLink, vintedLink] = await uploadListingTextFiles(sku, [
       { filename: "depop.txt", content: depopText },

@@ -5,6 +5,7 @@ import { Loader2, Check, AlertTriangle } from "lucide-react";
 import { GenerateSkuDialog } from "@/components/generate-sku-dialog";
 import { ListingPhotoPicker, PhotoSlot } from "@/components/listing-photo-picker";
 import { SkuGeneratedNotice } from "@/components/sku-generated-notice";
+import { RegenerateTitlePanel } from "@/components/regenerate-title-panel";
 import { SKU_CATEGORIES } from "@/lib/sku-categories";
 
 export function ListingsView() {
@@ -82,7 +83,7 @@ export function ListingsView() {
               onChange={(e) => setManualSku(e.target.value)}
               onBlur={() => { if (manualSku.trim()) setSku(manualSku.trim()); }}
               placeholder="existing SKU"
-              className="w-28 bg-transparent border-b border-white/10 text-[10px] font-mono text-white/50 placeholder:text-white/15 outline-none focus:border-white/30 tracking-wider py-1"
+              className="w-32 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-white/70 placeholder:text-white/30 outline-none focus:border-white/30 tracking-wider transition-colors"
             />
           )}
           <button
@@ -94,7 +95,7 @@ export function ListingsView() {
         </div>
       </div>
 
-      <div className="max-w-2xl w-full bg-[#111] border border-white/5 rounded-2xl p-6 flex flex-col gap-5">
+      <div className="max-w-4xl w-full mx-auto bg-[#111] border border-white/5 rounded-2xl p-6 flex flex-col gap-5">
         <ListingPhotoPicker photos={photos} onChange={setPhotos} />
 
         <div className="flex flex-col gap-2 bg-white/5 border border-white/10 rounded-xl p-4">
@@ -196,6 +197,15 @@ export function ListingsView() {
             )}
           </div>
         )}
+
+        <RegenerateTitlePanel
+          photos={photos}
+          category={category}
+          brand={brand}
+          size={size}
+          measurements={measurements}
+          notes={notes}
+        />
       </div>
 
       <GenerateSkuDialog
