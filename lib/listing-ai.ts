@@ -117,16 +117,24 @@ export interface VintedContent {
   title: string;
   tags: string[];
   itemType: string;
+  measurement1Value: string;
+  measurement2Value: string;
 }
 
 export async function generateVintedContent(input: ItemInput): Promise<VintedContent> {
+  const labels = getMeasurementLabels(input.category);
+  const measurementInstruction = labels
+    ? `"measurement1Value": string, // the "${labels[0]}" measurement in inches, ONLY if explicitly given in the measurement notes, else ""\n  "measurement2Value": string, // the "${labels[1]}" measurement in inches, ONLY if explicitly given in the measurement notes, else ""`
+    : `"measurement1Value": "", "measurement2Value": "" // this category has no flat-measurement section — always leave these blank`;
+
   const systemPrompt = `You write Vinted listing titles and tags for a secondhand fashion shop specialising in Y2K and niche aesthetics. Look at the item photos and the details given, then reply with strict JSON only (no markdown, no commentary) in exactly this shape:
 {
   "title": string,    // ONE dense, keyword-stacked title: brand, size, fit, wash/colour, standout features, and aesthetic terms (${NICHE_VOCAB}). Aim for 90-98 characters, NEVER exceed 100. Style target: "Y2K Mudd Rhinestone Embellished Cross Flap Pocket Jeans Dark Wash Contrast Stitch Vintage" (91 characters) — real searchable density, no filler words.
   "tags": string[],   // exactly 15 tags. Each tag is a single lowercase word or squashed-together compound with NO spaces. Mix broad aesthetic tags, specific micro-trends, precise item descriptors, and the brand.
-  "itemType": string  // a natural singular or plural noun for this item (e.g. "jeans", "top", "dress") for use in the sentence "Sale includes ONLY the {itemType}"
+  "itemType": string, // a natural singular or plural noun for this item (e.g. "jeans", "top", "dress") for use in the sentence "Sale includes ONLY the {itemType}"
+  ${measurementInstruction}
 }
-Never invent a detail that wasn't given.
+Never invent or estimate a measurement that wasn't actually given — leave it blank rather than guess.
 
 ${VOICE_EXAMPLES}`;
 
@@ -136,5 +144,31 @@ ${VOICE_EXAMPLES}`;
     title,
     tags: Array.isArray(parsed.tags) ? (parsed.tags as string[]).slice(0, 15) : [],
     itemType: (parsed.itemType as string) ?? input.category,
+    measurement1Value: (parsed.measurement1Value as string) ?? "",
+    measurement2Value: (parsed.measurement2Value as string) ?? "",
+  };
+}
+
+export interface TitlesOnly {
+  depopTitle: string;
+  vintedTitle: string;
+}
+
+// A deliberately lighter call than the full generators above — just fresh
+// titles, no description/tags/measurements, no SKU, no Drive. For re-listing
+// an item that already has everything else and just needs a new title.
+export async function generateTitlesOnly(input: ItemInput): Promise<TitlesOnly> {
+  const systemPrompt = `You write listing titles for a secondhand fashion shop specialising in Y2K and niche aesthetics. Look at the item photos and the details given, then reply with strict JSON only (no markdown, no commentary) in exactly this shape:
+{
+  "depopTitle": string,  // short, punchy, aesthetic-led title. Lean on specific subculture/aesthetic vocabulary (${NICHE_VOCAB}) rather than generic phrases. Do not start with the brand and do not include the size.
+  "vintedTitle": string  // ONE dense, keyword-stacked title: brand, size, fit, wash/colour, standout features, and aesthetic terms. Aim for 90-98 characters, NEVER exceed 100. Style target: "Y2K Mudd Rhinestone Embellished Cross Flap Pocket Jeans Dark Wash Contrast Stitch Vintage" (91 characters).
+}
+
+${VOICE_EXAMPLES}`;
+
+  const parsed = await callOpenRouter(systemPrompt, buildUserText(input), input.photos);
+  return {
+    depopTitle: (parsed.depopTitle as string) ?? "",
+    vintedTitle: ((parsed.vintedTitle as string) ?? "").slice(0, 100),
   };
 }

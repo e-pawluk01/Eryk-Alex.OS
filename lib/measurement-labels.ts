@@ -1,8 +1,9 @@
-// Which two flat-measurement fields belong on a Depop listing, by category.
-// null means the category doesn't get a measurements section at all.
-// Lingerie & nightwear / Activewear aren't clean "top" or "bottom" fits, so
-// they're left out (no section) rather than guessing wrong labels.
-export const DEPOP_MEASUREMENT_LABELS: Record<string, [string, string] | null> = {
+// Which two flat-measurement fields belong on a listing, by category — shared
+// between Depop and Vinted, since it's a property of the item, not the
+// platform. null means the category doesn't get a measurements section at
+// all. Lingerie & nightwear / Activewear aren't clean "top" or "bottom" fits,
+// so they're left out (no section) rather than guessing wrong labels.
+export const MEASUREMENT_LABELS_BY_CATEGORY: Record<string, [string, string] | null> = {
   "Outerwear": ["Pit to pit", "Length"],
   "Jumpers & Sweaters": ["Pit to pit", "Length"],
   "Suits & Blazers": ["Pit to pit", "Length"],
@@ -21,5 +22,5 @@ export const DEPOP_MEASUREMENT_LABELS: Record<string, [string, string] | null> =
 };
 
 export function getMeasurementLabels(category: string): [string, string] | null {
-  return DEPOP_MEASUREMENT_LABELS[category] ?? null;
+  return MEASUREMENT_LABELS_BY_CATEGORY[category] ?? null;
 }
