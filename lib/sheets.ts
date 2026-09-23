@@ -91,6 +91,8 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
     let revenue = 0;
     let cogs = 0;
     let sellingCosts = 0; // Depop/marketplace fees + postage you paid, on sold items
+    let sellingFees = 0;
+    let shippingCosts = 0;
     let itemsSold = 0;
     // True only if every sold row has a readable Sold date (column N).
     let soldDatesComplete = true;
@@ -135,6 +137,8 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
         revenue      += sfValue;
         cogs         += spValue;
         sellingCosts += feeValue + shipValue;
+        sellingFees  += feeValue;
+        shippingCosts += shipValue;
         itemsSold++;
 
         salesTable.push({
@@ -144,7 +148,8 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
           fees:   feeValue,
           ship:   shipValue,
           profit: sfValue - spValue - feeValue - shipValue,
-          tts:    row[4] || "N/A"
+          tts:    row[4] || "N/A",
+          soldOn: soldOn,
         });
       } else if (hasSP) {
         // UNSOLD INVENTORY
@@ -172,6 +177,8 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
         revenue,
         cogs,
         sellingCosts,
+        sellingFees,
+        shippingCosts,
         grossProfit,
         grossMargin,
         itemsSold,

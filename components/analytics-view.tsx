@@ -3,78 +3,40 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { getMonthlyAnalytics } from "@/lib/sheets";
-import { MetricCard, MetricComparison } from "./metric-card";
+import { MetricCard } from "./metric-card";
 import { MetricSection } from "./metric-section";
-import { supabase } from "@/lib/supabase";
-import { startOfMonth, endOfMonth, endOfDay, subMonths, addDays, format } from "date-fns";
 import { PastMonthsDialog } from "./past-months-dialog";
 import { HistoricalSnapshotView } from "./historical-snapshot-view";
 import { SessionsPanel } from "./sessions-panel";
 import { SessionFormDialog } from "./session-form-dialog";
+import { RevenueBreakdownPanel, TaskBreakdownPanel, SalesTablePanel } from "./analytics-details";
 import { useGlobalContext } from "./global-context";
-import { WorkSession, SESSIONS_CHANGED_EVENT } from "@/lib/work-sessions";
-
-// This month's finished sessions, newest first.
-async function fetchMonthSessions(date: Date): Promise<WorkSession[]> {
-  const { data, error } = await supabase
-    .from("work_sessions")
-    .select("id, person, task, started_at, ended_at, duration")
-    .gte("started_at", startOfMonth(date).toISOString())
-    .lte("started_at", endOfMonth(date).toISOString())
-    .not("ended_at", "is", null)
-    .order("started_at", { ascending: false });
-  if (error || !data) return [];
-  return data as WorkSession[];
-}
-
-// Hours logged between two moments (finished sessions only).
-async function fetchHoursBetween(from: Date, to: Date): Promise<number> {
-  const { data, error } = await supabase
-    .from("work_sessions")
-    .select("duration")
-    .gte("started_at", from.toISOString())
-    .lte("started_at", to.toISOString())
-    .not("ended_at", "is", null);
-  if (error || !data) return 0;
-  return data.reduce((acc, s) => acc + (s.duration || 0), 0) / 3600;
-}
-
-// When clocking in first started, across everyone.
-async function fetchFirstSessionAt(): Promise<string | null> {
-  const { data } = await supabase
-    .from("work_sessions")
-    .select("started_at")
-    .order("started_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  return data?.started_at ?? null;
-}
-
-// Arrows compare this month so far with the same days of last month, e.g.
-// 1–23 Oct vs 1–23 Sep. subMonths clamps, so 31 Mar compares with 1–28 Feb.
-function comparisonWindow(now: Date) {
-  const cutoff = subMonths(now, 1);
-  cutoff.setHours(12, 0, 0, 0);
-  return {
-    cutoff,
-    start: startOfMonth(cutoff),
-    end: endOfDay(cutoff),
-    soldBy: format(cutoff, "yyyy-MM-dd"),
-    label: cutoff.getDate() === 1
-      ? `vs ${format(cutoff, "MMM")} 1`
-      : `vs ${format(cutoff, "MMM")} 1–${format(cutoff, "d")}`,
-  };
-}
+import { WorkSession, SESSIONS_CHANGED_EVENT, formatMinutes } from "@/lib/work-sessions";
+import {
+  fetchMonthSessions, fetchHoursBetween, fetchFirstSessionAt, comparisonWindow,
+  hoursCoverLastMonth, makeComparison, hoursByTask, Tone,
+} from "@/lib/analytics-data";
 
 type SessionDialog = { mode: "edit"; session: WorkSession } | { mode: "add" } | null;
-type Tone = "more-is-good" | "neutral";
+type OpenCard = "revenue" | "hours" | "tasks" | "sales" | null;
+
+const EMPTY_DATA = {
+  revenue: 0, cogs: 0, sellingCosts: 0, sellingFees: 0, shippingCosts: 0,
+  grossProfit: 0, grossMargin: 0, itemsSold: 0, avgSalePrice: 0, avgProfitPerItem: 0,
+  monthLabel: "Current Month", salesTable: [],
+  inventoryCost: 0, itemsInStock: 0, returnOnCost: null,
+  expectedRevenue: null, expectedProfit: null, avgExpectedSalePrice: null,
+};
+
+const formatCurrency = (val: number) => val.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatPercent = (val: number) => val.toFixed(1);
 
 export function AnalyticsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
   const [sessions, setSessions] = useState<WorkSession[]>([]);
-  const [hoursOpen, setHoursOpen] = useState(false);
+  const [openCard, setOpenCard] = useState<OpenCard>(null);
   const [sessionDialog, setSessionDialog] = useState<SessionDialog>(null);
   const { userEmail } = useGlobalContext();
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
@@ -128,68 +90,37 @@ export function AnalyticsView() {
     return () => window.removeEventListener(SESSIONS_CHANGED_EVENT, refresh);
   }, []);
 
-  const totalHours = sessions.reduce((acc, s) => acc + (s.duration || 0), 0) / 3600;
-
   if (selectedHistorical) {
     return <HistoricalSnapshotView snapshot={selectedHistorical} onBack={() => setSelectedHistorical(null)} />;
   }
 
-  const formatCurrency = (val: number) => {
-    return val.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  const safeData = data || EMPTY_DATA;
+  const now = new Date();
+  const span = comparisonWindow(now);
 
-  const formatPercent = (val: number) => {
-    return val.toFixed(1);
-  };
-
-  const safeData = data || {
-    revenue: 0,
-    cogs: 0,
-    grossProfit: 0,
-    grossMargin: 0,
-    itemsSold: 0,
-    avgSalePrice: 0,
-    avgProfitPerItem: 0,
-    monthLabel: "Current Month",
-    sellingCosts: 0,
-    inventoryCost: 0,
-    itemsInStock: 0,
-    returnOnCost: null,
-    expectedRevenue: null,
-    expectedProfit: null,
-    avgExpectedSalePrice: null,
-  };
-
+  // --- Hours ---------------------------------------------------------------
+  const totalHours = sessions.reduce((acc, s) => acc + (s.duration || 0), 0) / 3600;
   const profitPerHour = totalHours > 0 ? safeData.grossProfit / totalHours : 0;
+  const hoursPerWeek = totalHours / (now.getDate() / 7);
+  const minutesPerItem = safeData.itemsSold > 0 && totalHours > 0 ? (totalHours * 60) / safeData.itemsSold : null;
+  const tasks = hoursByTask(sessions);
+  const topTask = tasks[0] ?? null;
 
+  // --- Arrows --------------------------------------------------------------
   // An arrow only shows once the data behind it covers all of last month:
-  // - sales: every sale last month has a Sold date (column N)
-  // - hours: clocking in had started by the 3rd of last month
-  const span = comparisonWindow(new Date());
+  // sales need every sale last month to have a Sold date (column N); hours
+  // need clocking to have started by the 3rd of last month.
   const salesComparable = !!prevSales?.soldDatesComplete;
-  const hoursComparable = !!firstSessionAt && new Date(firstSessionAt) < addDays(span.start, 3);
-  const prevProfitPerHour = prevHours > 0 && prevSales ? prevSales.grossProfit / prevHours : null;
+  const hoursComparable = hoursCoverLastMonth(firstSessionAt, span.start);
+  const bothComparable = salesComparable && hoursComparable;
+  const prevItems = prevSales?.itemsSold ?? 0;
 
-  const getComparison = (
-    current: number,
-    previous: number | null | undefined,
-    tone: Tone,
-    comparable: boolean
-  ): MetricComparison | null => {
-    if (!comparable || previous === undefined || previous === null || previous === 0) return null;
-    const diff = current - previous;
-    const up = diff >= 0;
-    return {
-      percentage: Math.abs((diff / previous) * 100),
-      direction: up ? "up" : "down",
-      // Costs and hours rising isn't good or bad on its own (more stock, more
-      // sales, more work), so those arrows stay grey.
-      tone: tone === "neutral" ? "neutral" : up ? "good" : "bad",
-      label: span.label,
-    };
-  };
-  const salesComparison = (current: number, previous: number | undefined, tone: Tone = "more-is-good") =>
-    getComparison(current, previous, tone, salesComparable);
+  const compare = (current: number, previous: number | null | undefined, tone: Tone, comparable: boolean) =>
+    makeComparison(current, previous, tone, comparable, span.label);
+  const sales = (current: number, previous: number | undefined) =>
+    compare(current, previous, "more-is-good", salesComparable);
+
+  const toggle = (card: Exclude<OpenCard, null>) => setOpenCard(openCard === card ? null : card);
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-500 relative">
@@ -211,46 +142,65 @@ export function AnalyticsView() {
 
       <div className="flex flex-col">
         {/* PERFORMANCE — money from sales this month */}
-        <MetricSection title="Performance" loading={loading}>
+        <MetricSection
+          title="Performance"
+          loading={loading}
+          detail={openCard === "revenue" ? <RevenueBreakdownPanel data={safeData} /> : null}
+        >
           <MetricCard title="Revenue" value={formatCurrency(safeData.revenue)} prefix="£"
-            comparison={salesComparison(safeData.revenue, prevSales?.revenue)} />
-          <MetricCard title="COGS" value={formatCurrency(safeData.cogs)} prefix="£"
-            comparison={salesComparison(safeData.cogs, prevSales?.cogs, "neutral")} />
-          <MetricCard title="Selling Costs" value={formatCurrency(safeData.sellingCosts ?? 0)} prefix="£"
-            comparison={salesComparison(safeData.sellingCosts ?? 0, prevSales?.sellingCosts, "neutral")} />
+            comparison={sales(safeData.revenue, prevSales?.revenue)}
+            onClick={() => toggle("revenue")} expanded={openCard === "revenue"} />
           <MetricCard title="Gross Profit" value={formatCurrency(safeData.grossProfit)} prefix="£"
-            comparison={salesComparison(safeData.grossProfit, prevSales?.grossProfit)} />
+            comparison={sales(safeData.grossProfit, prevSales?.grossProfit)} />
           <MetricCard title="Gross Margin" value={formatPercent(safeData.grossMargin)} suffix="%"
-            comparison={salesComparison(safeData.grossMargin, prevSales?.grossMargin)} />
+            comparison={sales(safeData.grossMargin, prevSales?.grossMargin)} />
           <MetricCard title="Profit / Hour" value={formatCurrency(profitPerHour)} prefix="£"
-            comparison={getComparison(profitPerHour, prevProfitPerHour, "more-is-good", salesComparable && hoursComparable)} />
+            comparison={compare(profitPerHour, prevHours > 0 && prevSales ? prevSales.grossProfit / prevHours : null, "more-is-good", bothComparable)} />
         </MetricSection>
 
         {/* TIME — where the hours go */}
         <MetricSection
           title="Time"
           loading={loading}
-          detail={hoursOpen ? (
-            <SessionsPanel
-              sessions={sessions}
-              onEdit={(session) => setSessionDialog({ mode: "edit", session })}
-              onAdd={() => setSessionDialog({ mode: "add" })}
-            />
-          ) : null}
+          detail={
+            openCard === "hours" ? (
+              <SessionsPanel
+                sessions={sessions}
+                onEdit={(session) => setSessionDialog({ mode: "edit", session })}
+                onAdd={() => setSessionDialog({ mode: "add" })}
+              />
+            ) : openCard === "tasks" ? <TaskBreakdownPanel tasks={tasks} /> : null
+          }
         >
           <MetricCard title="Total Hours" value={totalHours.toFixed(1)} suffix="h"
-            comparison={getComparison(totalHours, prevHours, "neutral", hoursComparable)}
-            onClick={() => setHoursOpen(!hoursOpen)} expanded={hoursOpen} />
+            comparison={compare(totalHours, prevHours, "neutral", hoursComparable)}
+            onClick={() => toggle("hours")} expanded={openCard === "hours"} />
+          <MetricCard title="Hours / Week" value={hoursPerWeek.toFixed(1)} suffix="h"
+            comparison={compare(hoursPerWeek, prevHours / (span.cutoff.getDate() / 7), "neutral", hoursComparable)} />
+          <MetricCard title="Hours / Item Sold" compact
+            value={minutesPerItem !== null ? formatMinutes(Math.round(minutesPerItem)) : "—"}
+            comparison={minutesPerItem !== null
+              ? compare(minutesPerItem, prevItems > 0 && prevHours > 0 ? (prevHours * 60) / prevItems : null, "neutral", bothComparable)
+              : null} />
+          <MetricCard title="Top Task" compact
+            value={topTask ? topTask.task : "—"}
+            sub={topTask ? `${topTask.hours.toFixed(1)}h · ${Math.round((topTask.hours / totalHours) * 100)}% of time` : undefined}
+            onClick={topTask ? () => toggle("tasks") : undefined} expanded={openCard === "tasks"} />
         </MetricSection>
 
         {/* UNIT ECONOMICS — quality of each sale */}
-        <MetricSection title="Unit Economics" loading={loading}>
+        <MetricSection
+          title="Unit Economics"
+          loading={loading}
+          detail={openCard === "sales" ? <SalesTablePanel sales={safeData.salesTable || []} /> : null}
+        >
           <MetricCard title="Items Sold" value={safeData.itemsSold}
-            comparison={salesComparison(safeData.itemsSold, prevSales?.itemsSold)} />
+            comparison={sales(safeData.itemsSold, prevSales?.itemsSold)}
+            onClick={() => toggle("sales")} expanded={openCard === "sales"} />
           <MetricCard title="Avg Sale Price" value={formatCurrency(safeData.avgSalePrice)} prefix="£"
-            comparison={salesComparison(safeData.avgSalePrice, prevSales?.avgSalePrice)} />
+            comparison={sales(safeData.avgSalePrice, prevSales?.avgSalePrice)} />
           <MetricCard title="Avg Profit/Item" value={formatCurrency(safeData.avgProfitPerItem)} prefix="£"
-            comparison={salesComparison(safeData.avgProfitPerItem, prevSales?.avgProfitPerItem)} />
+            comparison={sales(safeData.avgProfitPerItem, prevSales?.avgProfitPerItem)} />
           <MetricCard title="Return on Cost"
             value={safeData.returnOnCost !== null ? formatPercent(safeData.returnOnCost) : "—"}
             suffix={safeData.returnOnCost !== null ? "%" : undefined} />
