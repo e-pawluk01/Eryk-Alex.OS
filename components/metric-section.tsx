@@ -4,12 +4,14 @@ interface MetricSectionProps {
   title: string;
   loading?: boolean;
   children: React.ReactNode;
+  // Expanded card details, shown full-width under the cards.
+  detail?: React.ReactNode;
 }
 
 // Shared wrapper for a titled block of MetricCards on the analytics dashboard.
 // Matches the existing heading + 2x4 grid pattern; first section sits flush,
 // the rest are separated by mt-8.
-export function MetricSection({ title, loading, children }: MetricSectionProps) {
+export function MetricSection({ title, loading, children, detail }: MetricSectionProps) {
   return (
     <div className="flex flex-col gap-4 mt-8 first:mt-0">
       <div className="flex items-center border-b border-border pb-4">
@@ -22,6 +24,7 @@ export function MetricSection({ title, loading, children }: MetricSectionProps) 
       >
         {children}
       </div>
+      {detail}
     </div>
   );
 }

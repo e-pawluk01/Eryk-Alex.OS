@@ -9,12 +9,35 @@ import { supabase } from "@/lib/supabase";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { PastMonthsDialog } from "./past-months-dialog";
 import { HistoricalSnapshotView } from "./historical-snapshot-view";
+import { SessionsPanel } from "./sessions-panel";
+import { SessionFormDialog } from "./session-form-dialog";
+import { useGlobalContext } from "./global-context";
+import { WorkSession, SESSIONS_CHANGED_EVENT } from "@/lib/work-sessions";
+
+// This month's finished sessions, newest first.
+async function fetchMonthSessions(date: Date): Promise<WorkSession[]> {
+  const { data, error } = await supabase
+    .from("work_sessions")
+    .select("id, person, task, started_at, ended_at, duration")
+    .gte("started_at", startOfMonth(date).toISOString())
+    .lte("started_at", endOfMonth(date).toISOString())
+    .not("ended_at", "is", null)
+    .order("started_at", { ascending: false });
+  if (error || !data) return [];
+  return data as WorkSession[];
+}
+
+type SessionDialog = { mode: "edit"; session: WorkSession } | { mode: "add" } | null;
 
 export function AnalyticsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
-  const [totalHours, setTotalHours] = useState<number>(0);
+  const [sessions, setSessions] = useState<WorkSession[]>([]);
+  const [hoursOpen, setHoursOpen] = useState(false);
+  const [sessionDialog, setSessionDialog] = useState<SessionDialog>(null);
+  const { userEmail } = useGlobalContext();
+  const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
   const [prevSnapshot, setPrevSnapshot] = useState<any>(null);
   const [snapshotCount, setSnapshotCount] = useState<number>(0);
 
@@ -31,7 +54,7 @@ export function AnalyticsView() {
       //    closed snapshots exist in total (drives whether arrows show).
       const [sheetsResult, sessionsResult, prevSnapshotResult, snapshotCountResult] = await Promise.all([
         getMonthlyAnalytics(),
-        fetchCurrentMonthHours(now),
+        fetchMonthSessions(now),
         supabase.from("analytics_monthly_snapshots").select("*").eq("month", prevMonthKey).maybeSingle(),
         supabase.from("analytics_monthly_snapshots").select("id", { count: "exact", head: true }),
       ]);
@@ -42,7 +65,7 @@ export function AnalyticsView() {
         setData(sheetsResult.data);
       }
 
-      setTotalHours(sessionsResult);
+      setSessions(sessionsResult);
       setPrevSnapshot(prevSnapshotResult?.data || null);
       setSnapshotCount(snapshotCountResult?.count || 0);
     } catch (err: any) {
@@ -56,22 +79,14 @@ export function AnalyticsView() {
     fetchLiveAndPreviousData();
   }, [fetchLiveAndPreviousData]);
 
-  const fetchCurrentMonthHours = async (date: Date): Promise<number> => {
-    const start = startOfMonth(date).toISOString();
-    const end = endOfMonth(date).toISOString();
+  // Clocking out, editing or adding a session anywhere refreshes the hours.
+  useEffect(() => {
+    const refresh = () => { fetchMonthSessions(new Date()).then(setSessions); };
+    window.addEventListener(SESSIONS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(SESSIONS_CHANGED_EVENT, refresh);
+  }, []);
 
-    const { data: sessions, error } = await supabase
-      .from("work_sessions")
-      .select("duration")
-      .gte("started_at", start)
-      .lte("started_at", end)
-      .not("ended_at", "is", null);
-
-    if (error) return 0;
-    if (!sessions) return 0;
-    const totalSeconds = sessions.reduce((acc, curr) => acc + (curr.duration || 0), 0);
-    return totalSeconds / 3600;
-  };
+  const totalHours = sessions.reduce((acc, s) => acc + (s.duration || 0), 0) / 3600;
 
   if (selectedHistorical) {
     return <HistoricalSnapshotView snapshot={selectedHistorical} onBack={() => setSelectedHistorical(null)} />;
@@ -155,6 +170,22 @@ export function AnalyticsView() {
             comparison={showArrows ? getComparison(profitPerHour, prevSnapshot.profit_per_hour) : null} />
         </MetricSection>
 
+        {/* TIME — where the hours go */}
+        <MetricSection
+          title="Time"
+          loading={loading}
+          detail={hoursOpen ? (
+            <SessionsPanel
+              sessions={sessions}
+              onEdit={(session) => setSessionDialog({ mode: "edit", session })}
+              onAdd={() => setSessionDialog({ mode: "add" })}
+            />
+          ) : null}
+        >
+          <MetricCard title="Total Hours" value={totalHours.toFixed(1)} suffix="h"
+            onClick={() => setHoursOpen(!hoursOpen)} expanded={hoursOpen} />
+        </MetricSection>
+
         {/* UNIT ECONOMICS — quality of each sale */}
         <MetricSection title="Unit Economics" loading={loading}>
           <MetricCard title="Items Sold" value={safeData.itemsSold}
@@ -180,6 +211,16 @@ export function AnalyticsView() {
             prefix={safeData.expectedProfit !== null ? "£" : undefined} />
         </MetricSection>
       </div>
+
+      {sessionDialog && (
+        <SessionFormDialog
+          mode={sessionDialog.mode}
+          session={sessionDialog.mode === "edit" ? sessionDialog.session : undefined}
+          person={userContextName}
+          onClose={() => setSessionDialog(null)}
+          onSaved={() => setSessionDialog(null)}
+        />
+      )}
     </div>
   );
 }

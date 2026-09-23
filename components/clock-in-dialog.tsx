@@ -4,18 +4,9 @@ import React, { useState } from "react";
 import { X, Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useGlobalContext } from "./global-context";
+import { WORK_TASKS } from "@/lib/work-sessions";
 
-const TASKS = [
-  "Development",
-  "Content",
-  "Sourcing",
-  "Cleaning / Restoration",
-  "Photography",
-  "Listing",
-  "Packing / Shipping",
-  "Admin",
-  "Other"
-];
+const TASKS = WORK_TASKS;
 
 interface ClockInDialogProps {
   onSessionStarted: () => void;
@@ -24,7 +15,7 @@ interface ClockInDialogProps {
 
 export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [task, setTask] = useState(TASKS[0]);
+  const [task, setTask] = useState<string>(TASKS[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { userEmail } = useGlobalContext();
 
