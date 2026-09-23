@@ -4,7 +4,9 @@ import { ArrowUpRight, ArrowDownRight, ChevronDown } from "lucide-react";
 
 export interface MetricComparison {
   percentage: number;
-  isPositive: boolean;
+  direction: "up" | "down";
+  // good = green, bad = red, neutral = grey (e.g. hours: more isn't better or worse)
+  tone: "good" | "bad" | "neutral";
   label: string;
 }
 
@@ -52,9 +54,11 @@ export function MetricCard({ title, value, prefix, suffix, className, comparison
       {comparison && (
         <div className={cn(
           "flex items-center gap-1 mt-2 text-[10px] uppercase font-bold tracking-widest",
-          comparison.isPositive ? "text-emerald-400/80" : "text-red-400/80"
+          comparison.tone === "good" && "text-emerald-400/80",
+          comparison.tone === "bad" && "text-red-400/80",
+          comparison.tone === "neutral" && "text-muted-foreground/75"
         )}>
-          {comparison.isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+          {comparison.direction === "up" ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
           <span>{comparison.percentage.toFixed(1)}% {comparison.label}</span>
         </div>
       )}

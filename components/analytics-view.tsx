@@ -6,7 +6,7 @@ import { getMonthlyAnalytics } from "@/lib/sheets";
 import { MetricCard, MetricComparison } from "./metric-card";
 import { MetricSection } from "./metric-section";
 import { supabase } from "@/lib/supabase";
-import { startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, endOfDay, subMonths, addDays, format } from "date-fns";
 import { PastMonthsDialog } from "./past-months-dialog";
 import { HistoricalSnapshotView } from "./historical-snapshot-view";
 import { SessionsPanel } from "./sessions-panel";
@@ -27,7 +27,47 @@ async function fetchMonthSessions(date: Date): Promise<WorkSession[]> {
   return data as WorkSession[];
 }
 
+// Hours logged between two moments (finished sessions only).
+async function fetchHoursBetween(from: Date, to: Date): Promise<number> {
+  const { data, error } = await supabase
+    .from("work_sessions")
+    .select("duration")
+    .gte("started_at", from.toISOString())
+    .lte("started_at", to.toISOString())
+    .not("ended_at", "is", null);
+  if (error || !data) return 0;
+  return data.reduce((acc, s) => acc + (s.duration || 0), 0) / 3600;
+}
+
+// When clocking in first started, across everyone.
+async function fetchFirstSessionAt(): Promise<string | null> {
+  const { data } = await supabase
+    .from("work_sessions")
+    .select("started_at")
+    .order("started_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data?.started_at ?? null;
+}
+
+// Arrows compare this month so far with the same days of last month, e.g.
+// 1–23 Oct vs 1–23 Sep. subMonths clamps, so 31 Mar compares with 1–28 Feb.
+function comparisonWindow(now: Date) {
+  const cutoff = subMonths(now, 1);
+  cutoff.setHours(12, 0, 0, 0);
+  return {
+    cutoff,
+    start: startOfMonth(cutoff),
+    end: endOfDay(cutoff),
+    soldBy: format(cutoff, "yyyy-MM-dd"),
+    label: cutoff.getDate() === 1
+      ? `vs ${format(cutoff, "MMM")} 1`
+      : `vs ${format(cutoff, "MMM")} 1–${format(cutoff, "d")}`,
+  };
+}
+
 type SessionDialog = { mode: "edit"; session: WorkSession } | { mode: "add" } | null;
+type Tone = "more-is-good" | "neutral";
 
 export function AnalyticsView() {
   const [loading, setLoading] = useState(true);
@@ -38,8 +78,10 @@ export function AnalyticsView() {
   const [sessionDialog, setSessionDialog] = useState<SessionDialog>(null);
   const { userEmail } = useGlobalContext();
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
-  const [prevSnapshot, setPrevSnapshot] = useState<any>(null);
-  const [snapshotCount, setSnapshotCount] = useState<number>(0);
+  // Last month, cut off at the same day of the month as today.
+  const [prevSales, setPrevSales] = useState<any>(null);
+  const [prevHours, setPrevHours] = useState<number>(0);
+  const [firstSessionAt, setFirstSessionAt] = useState<string | null>(null);
 
   const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
 
@@ -47,16 +89,15 @@ export function AnalyticsView() {
     setLoading(true);
     try {
       const now = new Date();
-      const prevDate = subMonths(now, 1);
-      const prevMonthKey = `${prevDate.getFullYear()}-${(prevDate.getMonth() + 1).toString().padStart(2, '0')}`;
+      const span = comparisonWindow(now);
 
-      // 1. Fetch live current month, last month's snapshot, and how many
-      //    closed snapshots exist in total (drives whether arrows show).
-      const [sheetsResult, sessionsResult, prevSnapshotResult, snapshotCountResult] = await Promise.all([
+      // This month live, plus the same stretch of last month for the arrows.
+      const [sheetsResult, sessionsResult, prevSalesResult, prevHoursResult, firstSessionResult] = await Promise.all([
         getMonthlyAnalytics(),
         fetchMonthSessions(now),
-        supabase.from("analytics_monthly_snapshots").select("*").eq("month", prevMonthKey).maybeSingle(),
-        supabase.from("analytics_monthly_snapshots").select("id", { count: "exact", head: true }),
+        getMonthlyAnalytics(span.cutoff.toISOString(), span.soldBy),
+        fetchHoursBetween(span.start, span.end),
+        fetchFirstSessionAt(),
       ]);
 
       if (sheetsResult.error) {
@@ -66,8 +107,9 @@ export function AnalyticsView() {
       }
 
       setSessions(sessionsResult);
-      setPrevSnapshot(prevSnapshotResult?.data || null);
-      setSnapshotCount(snapshotCountResult?.count || 0);
+      setPrevSales(prevSalesResult.error ? null : prevSalesResult.data);
+      setPrevHours(prevHoursResult);
+      setFirstSessionAt(firstSessionResult);
     } catch (err: any) {
       setError(err.message || "Failed to load analytics.");
     } finally {
@@ -120,20 +162,34 @@ export function AnalyticsView() {
 
   const profitPerHour = totalHours > 0 ? safeData.grossProfit / totalHours : 0;
 
-  // Arrows stay hidden until there are at least 3 closed monthly snapshots —
-  // comparing one thin month against another is noise, not signal.
-  const showArrows = snapshotCount >= 3 && !!prevSnapshot;
+  // An arrow only shows once the data behind it covers all of last month:
+  // - sales: every sale last month has a Sold date (column N)
+  // - hours: clocking in had started by the 3rd of last month
+  const span = comparisonWindow(new Date());
+  const salesComparable = !!prevSales?.soldDatesComplete;
+  const hoursComparable = !!firstSessionAt && new Date(firstSessionAt) < addDays(span.start, 3);
+  const prevProfitPerHour = prevHours > 0 && prevSales ? prevSales.grossProfit / prevHours : null;
 
-  const getComparison = (current: number, previous: number | undefined): MetricComparison | null => {
-    if (previous === undefined || previous === null || previous === 0) return null;
+  const getComparison = (
+    current: number,
+    previous: number | null | undefined,
+    tone: Tone,
+    comparable: boolean
+  ): MetricComparison | null => {
+    if (!comparable || previous === undefined || previous === null || previous === 0) return null;
     const diff = current - previous;
-    const percentage = (diff / previous) * 100;
+    const up = diff >= 0;
     return {
-      percentage: Math.abs(percentage),
-      isPositive: diff >= 0,
-      label: `vs ${prevSnapshot.month_label}`,
+      percentage: Math.abs((diff / previous) * 100),
+      direction: up ? "up" : "down",
+      // Costs and hours rising isn't good or bad on its own (more stock, more
+      // sales, more work), so those arrows stay grey.
+      tone: tone === "neutral" ? "neutral" : up ? "good" : "bad",
+      label: span.label,
     };
   };
+  const salesComparison = (current: number, previous: number | undefined, tone: Tone = "more-is-good") =>
+    getComparison(current, previous, tone, salesComparable);
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-500 relative">
@@ -157,17 +213,17 @@ export function AnalyticsView() {
         {/* PERFORMANCE — money from sales this month */}
         <MetricSection title="Performance" loading={loading}>
           <MetricCard title="Revenue" value={formatCurrency(safeData.revenue)} prefix="£"
-            comparison={showArrows ? getComparison(safeData.revenue, prevSnapshot.revenue) : null} />
+            comparison={salesComparison(safeData.revenue, prevSales?.revenue)} />
           <MetricCard title="COGS" value={formatCurrency(safeData.cogs)} prefix="£"
-            comparison={showArrows ? getComparison(safeData.cogs, prevSnapshot.cogs) : null} />
+            comparison={salesComparison(safeData.cogs, prevSales?.cogs, "neutral")} />
           <MetricCard title="Selling Costs" value={formatCurrency(safeData.sellingCosts ?? 0)} prefix="£"
-            comparison={showArrows ? getComparison(safeData.sellingCosts ?? 0, prevSnapshot.selling_costs) : null} />
+            comparison={salesComparison(safeData.sellingCosts ?? 0, prevSales?.sellingCosts, "neutral")} />
           <MetricCard title="Gross Profit" value={formatCurrency(safeData.grossProfit)} prefix="£"
-            comparison={showArrows ? getComparison(safeData.grossProfit, prevSnapshot.gross_profit) : null} />
+            comparison={salesComparison(safeData.grossProfit, prevSales?.grossProfit)} />
           <MetricCard title="Gross Margin" value={formatPercent(safeData.grossMargin)} suffix="%"
-            comparison={showArrows ? getComparison(safeData.grossMargin, prevSnapshot.gross_margin) : null} />
+            comparison={salesComparison(safeData.grossMargin, prevSales?.grossMargin)} />
           <MetricCard title="Profit / Hour" value={formatCurrency(profitPerHour)} prefix="£"
-            comparison={showArrows ? getComparison(profitPerHour, prevSnapshot.profit_per_hour) : null} />
+            comparison={getComparison(profitPerHour, prevProfitPerHour, "more-is-good", salesComparable && hoursComparable)} />
         </MetricSection>
 
         {/* TIME — where the hours go */}
@@ -183,17 +239,18 @@ export function AnalyticsView() {
           ) : null}
         >
           <MetricCard title="Total Hours" value={totalHours.toFixed(1)} suffix="h"
+            comparison={getComparison(totalHours, prevHours, "neutral", hoursComparable)}
             onClick={() => setHoursOpen(!hoursOpen)} expanded={hoursOpen} />
         </MetricSection>
 
         {/* UNIT ECONOMICS — quality of each sale */}
         <MetricSection title="Unit Economics" loading={loading}>
           <MetricCard title="Items Sold" value={safeData.itemsSold}
-            comparison={showArrows ? getComparison(safeData.itemsSold, prevSnapshot.items_sold) : null} />
+            comparison={salesComparison(safeData.itemsSold, prevSales?.itemsSold)} />
           <MetricCard title="Avg Sale Price" value={formatCurrency(safeData.avgSalePrice)} prefix="£"
-            comparison={showArrows ? getComparison(safeData.avgSalePrice, prevSnapshot.average_sale_price) : null} />
+            comparison={salesComparison(safeData.avgSalePrice, prevSales?.avgSalePrice)} />
           <MetricCard title="Avg Profit/Item" value={formatCurrency(safeData.avgProfitPerItem)} prefix="£"
-            comparison={showArrows ? getComparison(safeData.avgProfitPerItem, prevSnapshot.average_profit_per_item) : null} />
+            comparison={salesComparison(safeData.avgProfitPerItem, prevSales?.avgProfitPerItem)} />
           <MetricCard title="Return on Cost"
             value={safeData.returnOnCost !== null ? formatPercent(safeData.returnOnCost) : "—"}
             suffix={safeData.returnOnCost !== null ? "%" : undefined} />
