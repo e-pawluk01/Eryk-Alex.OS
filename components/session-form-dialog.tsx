@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { addDays, format, isSameDay, startOfDay } from "date-fns";
+import { addDays, format, isSameDay, startOfDay, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TimeField } from "./ui/time-field";
 import { DatePills } from "./ui/date-pills";
@@ -182,7 +182,8 @@ export function SessionFormDialog({ mode, session, person, onClose, onSaved }: S
             {mode !== "clockout" && (
               <div className="flex flex-col gap-2">
                 <span className={fieldLabel}>Date</span>
-                <DatePills value={day} onChange={setDay} />
+                {/* Closed months have a locked report, so sessions stay in this month. */}
+                <DatePills value={day} onChange={setDay} earliest={startOfMonth(new Date())} />
               </div>
             )}
 
