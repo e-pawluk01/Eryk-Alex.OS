@@ -4,14 +4,15 @@ import React, { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useGlobalContext } from "./global-context";
 import { ClockInDialog } from "./clock-in-dialog";
-import { Square, Loader2, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { SessionFormDialog } from "./session-form-dialog";
+import { Square, Clock } from "lucide-react";
+import { WorkSession } from "@/lib/work-sessions";
 
 export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () => void }) {
-  const [activeSession, setActiveSession] = useState<any>(null);
+  const [activeSession, setActiveSession] = useState<WorkSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [isClockingOut, setIsClockingOut] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
   const { userEmail } = useGlobalContext();
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
 
@@ -55,29 +56,12 @@ export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () =>
     return () => clearInterval(interval);
   }, [activeSession]);
 
-  const handleClockOut = async () => {
-    if (!activeSession || isClockingOut) return;
-    setIsClockingOut(true);
-    try {
-      const endedAt = new Date().toISOString();
-      const duration = elapsedSeconds;
-
-      const { error } = await supabase
-        .from("work_sessions")
-        .update({ ended_at: endedAt, duration })
-        .eq("id", activeSession.id);
-
-      if (error) throw error;
-      
-      setActiveSession(null);
-      setElapsedSeconds(0);
-      if (onHoursUpdated) onHoursUpdated();
-    } catch (err) {
-      console.error("Failed to clock out", err);
-      alert("Failed to clock out. Please try again.");
-    } finally {
-      setIsClockingOut(false);
-    }
+  // Clocking out always goes through the "are these hours correct?" check.
+  const handleClockedOut = () => {
+    setCheckingOut(false);
+    setActiveSession(null);
+    setElapsedSeconds(0);
+    if (onHoursUpdated) onHoursUpdated();
   };
 
   const formatTime = (totalSeconds: number) => {
@@ -122,16 +106,22 @@ export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () =>
       </div>
 
       <button 
-        onClick={handleClockOut}
-        disabled={isClockingOut}
-        className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors disabled:opacity-50 group"
+        onClick={() => setCheckingOut(true)}
+        aria-label="Clock out"
+        className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
       >
-        {isClockingOut ? (
-          <Loader2 className="w-4 h-4 animate-spin text-white/80" />
-        ) : (
-          <Square className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />
-        )}
+        <Square className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />
       </button>
+
+      {checkingOut && (
+        <SessionFormDialog
+          mode="clockout"
+          session={activeSession}
+          person={userContextName}
+          onClose={() => setCheckingOut(false)}
+          onSaved={handleClockedOut}
+        />
+      )}
     </div>
   );
 }
