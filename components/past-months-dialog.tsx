@@ -109,7 +109,7 @@ export function PastMonthsDialog({ onOpenSnapshot, trigger }: PastMonthsDialogPr
                           <td className="py-4 text-xs font-semibold text-emerald-400/80">{formatCurrency(s.gross_profit)}</td>
                           <td className="py-4 text-xs font-semibold text-white/60">{Number(s.gross_margin).toFixed(1)}%</td>
                           <td className="py-4 text-xs font-semibold text-white/60">{s.items_sold}</td>
-                          <td className="py-4 text-xs font-semibold text-white/60">{formatCurrency(s.profit_per_hour)}</td>
+                          <td className="py-4 text-xs font-semibold text-white/60">{s.profit_per_hour ? formatCurrency(s.profit_per_hour) : "—"}</td>
                         </tr>
                       ))}
                     </tbody>

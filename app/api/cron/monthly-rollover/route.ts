@@ -5,6 +5,7 @@ import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { getMonthlyAnalytics, createNextMonthTab } from '@/lib/sheets';
 import { carryForwardUnsold } from '@/lib/carry-forward';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { fetchFirstSessionAt, profitPerHourFor } from '@/lib/hours-coverage';
 import { generateMonthlyReportBuffer } from '@/lib/pdf';
 import { sendMonthlyReportEmail, sendErrorAlertEmail } from '@/lib/email';
 
@@ -43,9 +44,10 @@ export async function GET(request: Request) {
     if (!finalSnapshot) {
       console.log(`[Phase A] No snapshot found for ${prevMonthKey}. Generating...`);
       
-      const [sheetsResult, prevHours] = await Promise.all([
+      const [sheetsResult, prevHours, firstSessionAt] = await Promise.all([
         getMonthlyAnalytics(prevDate.toISOString()),
-        fetchCurrentMonthHours(prevDate)
+        fetchCurrentMonthHours(prevDate),
+        fetchFirstSessionAt(supabase)
       ]);
 
       if (sheetsResult.error || !sheetsResult.data) {
@@ -53,7 +55,9 @@ export async function GET(request: Request) {
       }
 
       const prevSheets = sheetsResult.data;
-      const profitPerHour = prevHours > 0 ? prevSheets.grossProfit / prevHours : 0;
+      // Null for a month that wasn't clocked from the start — the hours
+      // logged don't cover the work behind that month's profit.
+      const profitPerHour = profitPerHourFor(prevDate, prevSheets.grossProfit, prevHours, firstSessionAt);
 
       const payload = {
         month: prevMonthKey,
@@ -77,11 +81,21 @@ export async function GET(request: Request) {
         expected_profit: prevSheets.expectedProfit
       };
 
-      const { data: newSnapshot, error: insertError } = await supabase
+      let { data: newSnapshot, error: insertError } = await supabase
         .from("analytics_monthly_snapshots")
         .insert([payload])
         .select()
         .single();
+
+      // If the column doesn't accept blanks, fall back to 0 rather than
+      // failing the whole month close.
+      if (insertError && payload.profit_per_hour === null && /null value.*profit_per_hour/i.test(insertError.message)) {
+        ({ data: newSnapshot, error: insertError } = await supabase
+          .from("analytics_monthly_snapshots")
+          .insert([{ ...payload, profit_per_hour: 0 }])
+          .select()
+          .single());
+      }
 
       if (insertError) throw insertError;
       finalSnapshot = newSnapshot;

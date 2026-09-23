@@ -6,7 +6,8 @@ import { getMonthlyAnalytics } from "@/lib/sheets";
 import { MetricCard, MetricComparison } from "./metric-card";
 import { MetricSection } from "./metric-section";
 import { supabase } from "@/lib/supabase";
-import { startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, addMonths, format } from "date-fns";
+import { fetchFirstSessionAt, profitPerHourFor } from "@/lib/hours-coverage";
 import { PastMonthsDialog } from "./past-months-dialog";
 import { HistoricalSnapshotView } from "./historical-snapshot-view";
 import { SessionsPanel } from "./sessions-panel";
@@ -40,6 +41,7 @@ export function AnalyticsView() {
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
   const [prevSnapshot, setPrevSnapshot] = useState<any>(null);
   const [snapshotCount, setSnapshotCount] = useState<number>(0);
+  const [firstSessionAt, setFirstSessionAt] = useState<string | null>(null);
 
   const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
 
@@ -52,11 +54,12 @@ export function AnalyticsView() {
 
       // 1. Fetch live current month, last month's snapshot, and how many
       //    closed snapshots exist in total (drives whether arrows show).
-      const [sheetsResult, sessionsResult, prevSnapshotResult, snapshotCountResult] = await Promise.all([
+      const [sheetsResult, sessionsResult, prevSnapshotResult, snapshotCountResult, firstSessionResult] = await Promise.all([
         getMonthlyAnalytics(),
         fetchMonthSessions(now),
         supabase.from("analytics_monthly_snapshots").select("*").eq("month", prevMonthKey).maybeSingle(),
         supabase.from("analytics_monthly_snapshots").select("id", { count: "exact", head: true }),
+        fetchFirstSessionAt(supabase),
       ]);
 
       if (sheetsResult.error) {
@@ -68,6 +71,7 @@ export function AnalyticsView() {
       setSessions(sessionsResult);
       setPrevSnapshot(prevSnapshotResult?.data || null);
       setSnapshotCount(snapshotCountResult?.count || 0);
+      setFirstSessionAt(firstSessionResult);
     } catch (err: any) {
       setError(err.message || "Failed to load analytics.");
     } finally {
@@ -118,7 +122,8 @@ export function AnalyticsView() {
     avgExpectedSalePrice: null,
   };
 
-  const profitPerHour = totalHours > 0 ? safeData.grossProfit / totalHours : 0;
+  // Null until a month has been clocked from the start (see hours-coverage).
+  const profitPerHour = profitPerHourFor(new Date(), safeData.grossProfit, totalHours, firstSessionAt);
 
   // Arrows stay hidden until there are at least 3 closed monthly snapshots —
   // comparing one thin month against another is noise, not signal.
@@ -166,8 +171,11 @@ export function AnalyticsView() {
             comparison={showArrows ? getComparison(safeData.grossProfit, prevSnapshot.gross_profit) : null} />
           <MetricCard title="Gross Margin" value={formatPercent(safeData.grossMargin)} suffix="%"
             comparison={showArrows ? getComparison(safeData.grossMargin, prevSnapshot.gross_margin) : null} />
-          <MetricCard title="Profit / Hour" value={formatCurrency(profitPerHour)} prefix="£"
-            comparison={showArrows ? getComparison(profitPerHour, prevSnapshot.profit_per_hour) : null} />
+          <MetricCard title="Profit / Hour"
+            value={profitPerHour !== null ? formatCurrency(profitPerHour) : "—"}
+            prefix={profitPerHour !== null ? "£" : undefined}
+            note={profitPerHour === null ? `Starts ${format(addMonths(new Date(), 1), "MMMM")}` : undefined}
+            comparison={showArrows && profitPerHour !== null ? getComparison(profitPerHour, prevSnapshot.profit_per_hour) : null} />
         </MetricSection>
 
         {/* TIME — where the hours go */}

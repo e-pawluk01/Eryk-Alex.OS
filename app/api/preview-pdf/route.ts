@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getMonthlyAnalytics } from '@/lib/sheets';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { fetchFirstSessionAt, profitPerHourFor } from '@/lib/hours-coverage';
 import { generateMonthlyReportBuffer } from '@/lib/pdf';
 
 export async function GET(request: Request) {
@@ -52,9 +53,10 @@ export async function GET(request: Request) {
       }
     } else {
       // 2. If no snapshot exists, generate a simulated payload live
-      const [sheetsResult, currentHours] = await Promise.all([
+      const [sheetsResult, currentHours, firstSessionAt] = await Promise.all([
         getMonthlyAnalytics(dateObj.toISOString()),
-        fetchCurrentMonthHours(dateObj)
+        fetchCurrentMonthHours(dateObj),
+        fetchFirstSessionAt(supabase)
       ]);
 
       if (sheetsResult.error || !sheetsResult.data) {
@@ -62,7 +64,7 @@ export async function GET(request: Request) {
       }
 
       const sheets = sheetsResult.data;
-      const profitPerHour = currentHours > 0 ? sheets.grossProfit / currentHours : 0;
+      const profitPerHour = profitPerHourFor(dateObj, sheets.grossProfit, currentHours, firstSessionAt);
 
       payload = {
         month: monthKey,

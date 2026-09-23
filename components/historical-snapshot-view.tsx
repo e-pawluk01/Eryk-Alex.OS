@@ -81,8 +81,8 @@ export function HistoricalSnapshotView({ snapshot, onBack }: HistoricalSnapshotV
         />
         <MetricCard 
           title="Profit / Hour" 
-          value={formatCurrency(snapshot.profit_per_hour)} 
-          prefix="£" 
+          value={snapshot.profit_per_hour ? formatCurrency(snapshot.profit_per_hour) : "—"} 
+          prefix={snapshot.profit_per_hour ? "£" : undefined} 
         />
       </div>
       
