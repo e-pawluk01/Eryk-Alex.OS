@@ -67,7 +67,7 @@ function comparisonWindow(now: Date) {
 }
 
 type SessionDialog = { mode: "edit"; session: WorkSession } | { mode: "add" } | null;
-type Tone = "more-is-good" | "cost" | "neutral";
+type Tone = "more-is-good" | "neutral";
 
 export function AnalyticsView() {
   const [loading, setLoading] = useState(true);
@@ -182,8 +182,9 @@ export function AnalyticsView() {
     return {
       percentage: Math.abs((diff / previous) * 100),
       direction: up ? "up" : "down",
-      // Costs going up is bad; hours going up is neither good nor bad.
-      tone: tone === "neutral" ? "neutral" : (tone === "cost" ? !up : up) ? "good" : "bad",
+      // Costs and hours rising isn't good or bad on its own (more stock, more
+      // sales, more work), so those arrows stay grey.
+      tone: tone === "neutral" ? "neutral" : up ? "good" : "bad",
       label: span.label,
     };
   };
@@ -214,9 +215,9 @@ export function AnalyticsView() {
           <MetricCard title="Revenue" value={formatCurrency(safeData.revenue)} prefix="£"
             comparison={salesComparison(safeData.revenue, prevSales?.revenue)} />
           <MetricCard title="COGS" value={formatCurrency(safeData.cogs)} prefix="£"
-            comparison={salesComparison(safeData.cogs, prevSales?.cogs, "cost")} />
+            comparison={salesComparison(safeData.cogs, prevSales?.cogs, "neutral")} />
           <MetricCard title="Selling Costs" value={formatCurrency(safeData.sellingCosts ?? 0)} prefix="£"
-            comparison={salesComparison(safeData.sellingCosts ?? 0, prevSales?.sellingCosts, "cost")} />
+            comparison={salesComparison(safeData.sellingCosts ?? 0, prevSales?.sellingCosts, "neutral")} />
           <MetricCard title="Gross Profit" value={formatCurrency(safeData.grossProfit)} prefix="£"
             comparison={salesComparison(safeData.grossProfit, prevSales?.grossProfit)} />
           <MetricCard title="Gross Margin" value={formatPercent(safeData.grossMargin)} suffix="%"
