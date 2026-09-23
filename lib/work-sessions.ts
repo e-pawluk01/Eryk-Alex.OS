@@ -74,26 +74,44 @@ export async function saveSessionPieces(
     duration: Math.round((p.endedAt.getTime() - p.startedAt.getTime()) / 1000),
   }));
 
-  let toInsert = rows;
-  if (replaceId) {
-    const [first, ...rest] = rows;
-    const { data, error } = await supabase
-      .from("work_sessions")
-      .update(first)
-      .eq("id", replaceId)
-      .select("id");
-    if (error) return { error: error.message };
-    if (!data || data.length === 0) return { error: "This session couldn't be updated. It may have been deleted." };
-    toInsert = rest;
+  if (!replaceId) {
+    // One multi-row insert: either every piece is saved or none is.
+    const { error } = await supabase.from("work_sessions").insert(rows);
+    if (error) return { error: friendlyError(error.message) };
+    notifySessionsChanged();
+    return {};
   }
 
-  if (toInsert.length > 0) {
-    const { error } = await supabase.from("work_sessions").insert(toInsert);
-    if (error) return { error: error.message };
+  // Insert the extra pieces first, so a failure leaves the original session
+  // (and a running timer) untouched instead of half-saved.
+  const [first, ...rest] = rows;
+  let insertedIds: string[] = [];
+  if (rest.length > 0) {
+    const { data, error } = await supabase.from("work_sessions").insert(rest).select("id");
+    if (error) return { error: friendlyError(error.message) };
+    insertedIds = (data || []).map((r) => r.id);
+  }
+
+  const { data, error } = await supabase
+    .from("work_sessions")
+    .update(first)
+    .eq("id", replaceId)
+    .select("id");
+  if (error || !data || data.length === 0) {
+    if (insertedIds.length > 0) {
+      await supabase.from("work_sessions").delete().in("id", insertedIds);
+    }
+    return { error: error ? friendlyError(error.message) : "This session couldn't be updated. It may have been deleted." };
   }
 
   notifySessionsChanged();
   return {};
+}
+
+function friendlyError(message: string) {
+  return message.includes("row-level security")
+    ? "The database blocked this save (permissions). Nothing was changed."
+    : message;
 }
 
 export async function deleteSession(id: string): Promise<{ error?: string }> {
@@ -102,7 +120,7 @@ export async function deleteSession(id: string): Promise<{ error?: string }> {
     .delete()
     .eq("id", id)
     .select("id");
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   // RLS silently skips rows it won't let us delete, so check something went.
   if (!data || data.length === 0) return { error: "The database didn't allow this session to be deleted." };
   notifySessionsChanged();
