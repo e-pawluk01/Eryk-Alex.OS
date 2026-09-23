@@ -15,14 +15,12 @@ interface MetricCardProps {
   suffix?: string;
   className?: string;
   comparison?: MetricComparison | null;
-  // Small grey line under the value, e.g. why a number isn't shown yet.
-  note?: string;
   // Makes the card tappable; its details open underneath the section.
   onClick?: () => void;
   expanded?: boolean;
 }
 
-export function MetricCard({ title, value, prefix, suffix, className, comparison, note, onClick, expanded }: MetricCardProps) {
+export function MetricCard({ title, value, prefix, suffix, className, comparison, onClick, expanded }: MetricCardProps) {
   const Tag = onClick ? "button" : "div";
   return (
     <Tag
@@ -59,9 +57,6 @@ export function MetricCard({ title, value, prefix, suffix, className, comparison
           {comparison.isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
           <span>{comparison.percentage.toFixed(1)}% {comparison.label}</span>
         </div>
-      )}
-      {!comparison && note && (
-        <div className="mt-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50">{note}</div>
       )}
     </Tag>
   );

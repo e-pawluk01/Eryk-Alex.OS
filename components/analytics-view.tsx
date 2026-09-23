@@ -6,7 +6,7 @@ import { getMonthlyAnalytics } from "@/lib/sheets";
 import { MetricCard, MetricComparison } from "./metric-card";
 import { MetricSection } from "./metric-section";
 import { supabase } from "@/lib/supabase";
-import { startOfMonth, endOfMonth, subMonths, addMonths, format } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { fetchFirstSessionAt, profitPerHourFor } from "@/lib/hours-coverage";
 import { PastMonthsDialog } from "./past-months-dialog";
 import { HistoricalSnapshotView } from "./historical-snapshot-view";
@@ -174,7 +174,6 @@ export function AnalyticsView() {
           <MetricCard title="Profit / Hour"
             value={profitPerHour !== null ? formatCurrency(profitPerHour) : "—"}
             prefix={profitPerHour !== null ? "£" : undefined}
-            note={profitPerHour === null ? `Starts ${format(addMonths(new Date(), 1), "MMMM")}` : undefined}
             comparison={showArrows && profitPerHour !== null ? getComparison(profitPerHour, prevSnapshot.profit_per_hour) : null} />
         </MetricSection>
 
