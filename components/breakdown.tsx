@@ -1,4 +1,7 @@
+"use client";
+
 import React from "react";
+import { useHoverTip } from "./ui/hover-tip";
 import { cn } from "@/lib/utils";
 
 export interface BreakdownItem {
@@ -18,6 +21,8 @@ interface BreakdownProps {
 export function Breakdown({ items, format }: BreakdownProps) {
   const total = items.reduce((acc, it) => acc + it.value, 0);
   const shown = items.filter((it) => it.value > 0);
+  const { bind, layer } = useHoverTip();
+  const pct = (v: number) => (total > 0 ? Math.round((v / total) * 100) : 0);
 
   return (
     <div className="flex flex-col">
@@ -25,7 +30,7 @@ export function Breakdown({ items, format }: BreakdownProps) {
         {shown.map((it) => (
           <i
             key={it.label}
-            title={`${it.label}: ${format(it.value)}`}
+            {...bind(`${it.label}\n${format(it.value)} · ${pct(it.value)}%`)}
             className="block h-full min-w-[3px] first:rounded-l last:rounded-r"
             style={{ flex: it.value, background: it.color }}
           />
@@ -37,10 +42,11 @@ export function Breakdown({ items, format }: BreakdownProps) {
           <span className={cn("truncate", it.strong ? "text-white font-semibold" : "text-foreground")}>{it.label}</span>
           <span className={cn("text-right tabular-nums text-white", it.strong && "font-semibold")}>{format(it.value)}</span>
           <span className="text-right tabular-nums text-xs text-muted-foreground/50">
-            {total > 0 ? Math.round((it.value / total) * 100) : 0}%
+            {pct(it.value)}%
           </span>
         </div>
       ))}
+      {layer}
     </div>
   );
 }

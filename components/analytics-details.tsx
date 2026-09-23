@@ -112,13 +112,13 @@ export function SalesTablePanel({ sales }: { sales: Sale[] }) {
           </tbody>
         </table>
       </div>
-      {!showAll && sales.length > INITIAL_SALES && (
+      {sales.length > INITIAL_SALES && (
         <button
           type="button"
-          onClick={() => setShowAll(true)}
+          onClick={() => setShowAll(!showAll)}
           className="pt-2.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-white transition-colors"
         >
-          Show all {sales.length}
+          {showAll ? "Show less" : `Show all ${sales.length}`}
         </button>
       )}
     </DetailPanel>

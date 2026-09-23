@@ -72,13 +72,13 @@ export function SessionsPanel({ sessions, onEdit, onAdd }: SessionsPanelProps) {
             })}
           </div>
           <div className="flex gap-5">
-            {!showAll && sessions.length > INITIAL_ROWS && (
+            {sessions.length > INITIAL_ROWS && (
               <button
                 type="button"
-                onClick={() => setShowAll(true)}
+                onClick={() => setShowAll(!showAll)}
                 className="pt-2.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-white transition-colors"
               >
-                Show all {sessions.length}
+                {showAll ? "Show less" : `Show all ${sessions.length}`}
               </button>
             )}
             <button
