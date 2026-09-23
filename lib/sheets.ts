@@ -30,7 +30,7 @@ const getTabData = unstable_cache(
     const sheets = getGoogleSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${tabName}'!A:L`,
+      range: `'${tabName}'!A:N`, // N = Sold date, stamped by the sheet's script
     });
     return response.data.values || [];
   },
@@ -38,7 +38,25 @@ const getTabData = unstable_cache(
   { revalidate: 300 } // 5 minutes
 );
 
-export async function getMonthlyAnalytics(dateIso?: string) {
+// Sold dates come back as the sheet displays them: "2026-10-05" as the
+// script writes it, or "05/10/2026" if the cell got turned into a UK date.
+function soldDateKey(raw: string): string | null {
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  const uk = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (uk) {
+    const year = uk[3].length === 2 ? `20${uk[3]}` : uk[3];
+    return `${year}-${uk[2].padStart(2, "0")}-${uk[1].padStart(2, "0")}`;
+  }
+  return null;
+}
+
+/**
+ * @param soldBy "yyyy-MM-dd" — when given, only sales with a Sold date on or
+ * before this day count towards the sales metrics (for like-for-like
+ * comparisons against part of a month).
+ */
+export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
   if (!process.env.GOOGLE_OAUTH_REFRESH_TOKEN || !process.env.GOOGLE_SHEET_ID) {
     return { error: "Google Sheets integration is missing environment variables." };
   }
@@ -74,6 +92,8 @@ export async function getMonthlyAnalytics(dateIso?: string) {
     let cogs = 0;
     let sellingCosts = 0; // Depop/marketplace fees + postage you paid, on sold items
     let itemsSold = 0;
+    // True only if every sold row has a readable Sold date (column N).
+    let soldDatesComplete = true;
 
     // Inventory tracking
     let inventoryCost = 0;
@@ -105,7 +125,12 @@ export async function getMonthlyAnalytics(dateIso?: string) {
       const hasSP  = spStr !== "";
       const isSold = sfValue > 0;
 
-      if (isSold) {
+      const soldOn = soldDateKey((row[13] ?? "").toString().trim());
+      if (isSold && !soldOn) soldDatesComplete = false;
+
+      if (isSold && soldBy && (!soldOn || soldOn > soldBy)) {
+        // Sold after the cut-off day: outside a like-for-like window.
+      } else if (isSold) {
         // SOLD — contributes to monthly metrics only
         revenue      += sfValue;
         cogs         += spValue;
@@ -154,6 +179,7 @@ export async function getMonthlyAnalytics(dateIso?: string) {
         avgProfitPerItem,
         monthLabel: tabName,
         salesTable,
+        soldDatesComplete,
         // Inventory metrics (null = no ESP data available, render as "—")
         inventoryCost,
         itemsInStock,
