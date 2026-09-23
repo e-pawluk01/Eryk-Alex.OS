@@ -13,6 +13,7 @@ export function PastMonthsDialog({ onOpenSnapshot, trigger }: PastMonthsDialogPr
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [snapshots, setSnapshots] = useState<any[]>([]);
+  const [goalsByMonth, setGoalsByMonth] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (isOpen) {
@@ -23,13 +24,17 @@ export function PastMonthsDialog({ onOpenSnapshot, trigger }: PastMonthsDialogPr
   const fetchSnapshots = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("analytics_monthly_snapshots")
-        .select("*")
-        .order("month", { ascending: false });
+      const [snapshotsResult, goalsResult] = await Promise.all([
+        supabase.from("analytics_monthly_snapshots").select("*").order("month", { ascending: false }),
+        supabase.from("monthly_goals").select("month, gross_profit_goal"),
+      ]);
 
-      if (error) throw error;
-      setSnapshots(data || []);
+      if (snapshotsResult.error) throw snapshotsResult.error;
+      setSnapshots(snapshotsResult.data || []);
+
+      const goalMap: Record<string, number> = {};
+      (goalsResult.data || []).forEach((g: any) => { goalMap[g.month] = g.gross_profit_goal; });
+      setGoalsByMonth(goalMap);
     } catch (err) {
       console.error("Failed to fetch past months", err);
     } finally {
@@ -87,6 +92,7 @@ export function PastMonthsDialog({ onOpenSnapshot, trigger }: PastMonthsDialogPr
                     <thead>
                       <tr className="border-b border-white/5 text-[10px] uppercase tracking-widest text-white/30">
                         <th className="pb-3 font-semibold">Month</th>
+                        <th className="pb-3 font-semibold">Goal</th>
                         <th className="pb-3 font-semibold">Revenue</th>
                         <th className="pb-3 font-semibold">Profit</th>
                         <th className="pb-3 font-semibold">Margin</th>
@@ -105,6 +111,9 @@ export function PastMonthsDialog({ onOpenSnapshot, trigger }: PastMonthsDialogPr
                           className="border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors group"
                         >
                           <td className="py-4 text-xs font-bold text-white/80 group-hover:text-white">{s.month_label}</td>
+                          <td className="py-4 text-xs font-semibold text-white/60">
+                            {goalsByMonth[s.month] !== undefined ? formatCurrency(goalsByMonth[s.month]) : "—"}
+                          </td>
                           <td className="py-4 text-xs font-semibold text-white/60">{formatCurrency(s.revenue)}</td>
                           <td className="py-4 text-xs font-semibold text-emerald-400/80">{formatCurrency(s.gross_profit)}</td>
                           <td className="py-4 text-xs font-semibold text-white/60">{Number(s.gross_margin).toFixed(1)}%</td>
