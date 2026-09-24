@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+// Gated by CRON_SECRET below; the service-role client sees snapshots and
+// sessions past RLS, like the monthly cron does.
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { getMonthlyAnalytics } from '@/lib/sheets';
-import { startOfMonth, endOfMonth } from 'date-fns';
 import { generateMonthlyReportBuffer } from '@/lib/pdf';
+import { fetchSessionsForMonth, buildTimeBreakdown } from '@/lib/time-breakdown';
+import { fetchReportHistory } from '@/lib/report-history';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -52,10 +55,11 @@ export async function GET(request: Request) {
       }
     } else {
       // 2. If no snapshot exists, generate a simulated payload live
-      const [sheetsResult, currentHours] = await Promise.all([
+      const [sheetsResult, sessions] = await Promise.all([
         getMonthlyAnalytics(dateObj.toISOString()),
-        fetchCurrentMonthHours(dateObj)
+        fetchSessionsForMonth(supabase, dateObj)
       ]);
+      const currentHours = sessions.reduce((acc, s) => acc + (s.duration || 0), 0) / 3600;
 
       if (sheetsResult.error || !sheetsResult.data) {
         return new NextResponse(`Failed to fetch Google Sheets data: ${sheetsResult.error}`, { status: 500 });
@@ -83,11 +87,13 @@ export async function GET(request: Request) {
         return_on_cost: sheets.returnOnCost,
         expected_revenue: sheets.expectedRevenue,
         expected_profit: sheets.expectedProfit,
+        time_breakdown: buildTimeBreakdown(sessions, dateObj),
       };
     }
 
     // Generate the PDF exactly as the cron job does
-    const pdfBuffer = await generateMonthlyReportBuffer(payload);
+    const history = await fetchReportHistory(supabase, monthKey);
+    const pdfBuffer = await generateMonthlyReportBuffer(payload, history);
 
     return new NextResponse(pdfBuffer as any, {
       headers: {
@@ -100,22 +106,4 @@ export async function GET(request: Request) {
     console.error("Preview Route Error:", error);
     return new NextResponse(`Error generating PDF preview: ${error.message}`, { status: 500 });
   }
-}
-
-// Helper function duplicated from cron logic
-async function fetchCurrentMonthHours(date: Date): Promise<number> {
-  const start = startOfMonth(date).toISOString();
-  const end = endOfMonth(date).toISOString();
-
-  const { data: sessions, error } = await supabase
-    .from("work_sessions")
-    .select("duration")
-    .gte("started_at", start)
-    .lte("started_at", end)
-    .not("ended_at", "is", null);
-
-  if (error) return 0;
-  if (!sessions) return 0;
-  const totalSeconds = sessions.reduce((acc, curr) => acc + (curr.duration || 0), 0);
-  return totalSeconds / 3600;
 }
