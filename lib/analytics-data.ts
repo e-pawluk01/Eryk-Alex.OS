@@ -88,3 +88,18 @@ export function hoursByTask(sessions: WorkSession[]) {
   sessions.forEach((s) => totals.set(s.task, (totals.get(s.task) || 0) + (s.duration || 0) / 3600));
   return [...totals.entries()].map(([task, hours]) => ({ task, hours })).sort((a, b) => b.hours - a.hours);
 }
+
+// The last few closed months (oldest first) for the Performance chart.
+export async function fetchRecentMonths(count: number) {
+  const { data, error } = await supabase
+    .from("analytics_monthly_snapshots")
+    .select("month, month_label, revenue, gross_profit")
+    .order("month", { ascending: false })
+    .limit(count);
+  if (error || !data) return [];
+  return data.reverse().map((m) => ({
+    label: String(m.month_label ?? m.month).split(" ")[0],
+    revenue: Number(m.revenue) || 0,
+    grossProfit: Number(m.gross_profit) || 0,
+  }));
+}

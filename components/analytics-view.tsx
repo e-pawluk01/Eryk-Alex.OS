@@ -10,12 +10,14 @@ import { HistoricalSnapshotView } from "./historical-snapshot-view";
 import { SessionsPanel } from "./sessions-panel";
 import { SessionFormDialog } from "./session-form-dialog";
 import { RevenueBreakdownPanel, TaskBreakdownPanel, SalesTablePanel } from "./analytics-details";
+import { PerformanceChart, HoursByWeekChart, ProfitBandsChart, StockChart } from "./charts/analytics-charts";
 import { useGlobalContext } from "./global-context";
 import { WorkSession, SESSIONS_CHANGED_EVENT, formatMinutes } from "@/lib/work-sessions";
 import {
   fetchMonthSessions, fetchHoursBetween, fetchFirstSessionAt, comparisonWindow,
-  hoursCoverLastMonth, makeComparison, hoursByTask, Tone,
+  hoursCoverLastMonth, makeComparison, hoursByTask, fetchRecentMonths, Tone,
 } from "@/lib/analytics-data";
+import { format } from "date-fns";
 
 type SessionDialog = { mode: "edit"; session: WorkSession } | { mode: "add" } | null;
 type OpenCard = "revenue" | "hours" | "tasks" | "sales" | null;
@@ -44,6 +46,7 @@ export function AnalyticsView() {
   const [prevSales, setPrevSales] = useState<any>(null);
   const [prevHours, setPrevHours] = useState<number>(0);
   const [firstSessionAt, setFirstSessionAt] = useState<string | null>(null);
+  const [recentMonths, setRecentMonths] = useState<{ label: string; revenue: number; grossProfit: number }[]>([]);
 
   const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
 
@@ -54,12 +57,13 @@ export function AnalyticsView() {
       const span = comparisonWindow(now);
 
       // This month live, plus the same stretch of last month for the arrows.
-      const [sheetsResult, sessionsResult, prevSalesResult, prevHoursResult, firstSessionResult] = await Promise.all([
+      const [sheetsResult, sessionsResult, prevSalesResult, prevHoursResult, firstSessionResult, recentResult] = await Promise.all([
         getMonthlyAnalytics(),
         fetchMonthSessions(now),
         getMonthlyAnalytics(span.cutoff.toISOString(), span.soldBy),
         fetchHoursBetween(span.start, span.end),
         fetchFirstSessionAt(),
+        fetchRecentMonths(5),
       ]);
 
       if (sheetsResult.error) {
@@ -72,6 +76,7 @@ export function AnalyticsView() {
       setPrevSales(prevSalesResult.error ? null : prevSalesResult.data);
       setPrevHours(prevHoursResult);
       setFirstSessionAt(firstSessionResult);
+      setRecentMonths(recentResult);
     } catch (err: any) {
       setError(err.message || "Failed to load analytics.");
     } finally {
@@ -145,6 +150,10 @@ export function AnalyticsView() {
         <MetricSection
           title="Performance"
           loading={loading}
+          chart={<PerformanceChart history={[
+            ...recentMonths,
+            { label: format(now, "MMM"), revenue: safeData.revenue, grossProfit: safeData.grossProfit, live: true },
+          ]} />}
           detail={openCard === "revenue" ? <RevenueBreakdownPanel data={safeData} /> : null}
         >
           <MetricCard title="Revenue" value={formatCurrency(safeData.revenue)} prefix="£"
@@ -162,6 +171,7 @@ export function AnalyticsView() {
         <MetricSection
           title="Time"
           loading={loading}
+          chart={<HoursByWeekChart sessions={sessions} month={now} />}
           detail={
             openCard === "hours" ? (
               <SessionsPanel
@@ -192,6 +202,7 @@ export function AnalyticsView() {
         <MetricSection
           title="Unit Economics"
           loading={loading}
+          chart={<ProfitBandsChart sales={safeData.salesTable || []} />}
           detail={openCard === "sales" ? <SalesTablePanel sales={safeData.salesTable || []} /> : null}
         >
           <MetricCard title="Items Sold" value={safeData.itemsSold}
@@ -207,7 +218,12 @@ export function AnalyticsView() {
         </MetricSection>
 
         {/* INVENTORY — money tied up in unsold stock, as of now */}
-        <MetricSection title="Inventory" loading={loading}>
+        <MetricSection
+          title="Inventory"
+          loading={loading}
+          chart={<StockChart itemsInStock={safeData.itemsInStock ?? 0} inventoryCost={safeData.inventoryCost ?? 0}
+            expectedRevenue={safeData.expectedRevenue} expectedProfit={safeData.expectedProfit} />}
+        >
           <MetricCard title="Items in Stock" value={safeData.itemsInStock ?? 0} />
           <MetricCard title="Inventory Cost" value={formatCurrency(safeData.inventoryCost ?? 0)} prefix="£" />
           <MetricCard title="Expected Revenue"
