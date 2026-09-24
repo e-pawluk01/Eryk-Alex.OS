@@ -4,8 +4,10 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { getMonthlyAnalytics, createNextMonthTab } from '@/lib/sheets';
 import { carryForwardUnsold } from '@/lib/carry-forward';
-import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { subMonths } from 'date-fns';
 import { generateMonthlyReportBuffer } from '@/lib/pdf';
+import { fetchSessionsForMonth, buildTimeBreakdown } from '@/lib/time-breakdown';
+import { fetchReportHistory } from '@/lib/report-history';
 import { sendMonthlyReportEmail, sendErrorAlertEmail } from '@/lib/email';
 
 export async function GET(request: Request) {
@@ -43,10 +45,11 @@ export async function GET(request: Request) {
     if (!finalSnapshot) {
       console.log(`[Phase A] No snapshot found for ${prevMonthKey}. Generating...`);
       
-      const [sheetsResult, prevHours] = await Promise.all([
+      const [sheetsResult, prevSessions] = await Promise.all([
         getMonthlyAnalytics(prevDate.toISOString()),
-        fetchCurrentMonthHours(prevDate)
+        fetchSessionsForMonth(supabase, prevDate)
       ]);
+      const prevHours = prevSessions.reduce((acc, s) => acc + (s.duration || 0), 0) / 3600;
 
       if (sheetsResult.error || !sheetsResult.data) {
         throw new Error(`Failed to fetch Google Sheets data for previous month: ${sheetsResult.error}`);
@@ -74,14 +77,27 @@ export async function GET(request: Request) {
         inventory_cost: prevSheets.inventoryCost,
         return_on_cost: prevSheets.returnOnCost,
         expected_revenue: prevSheets.expectedRevenue,
-        expected_profit: prevSheets.expectedProfit
+        expected_profit: prevSheets.expectedProfit,
+        // Hours by task / person / week for the PDF's Time section and chart
+        time_breakdown: buildTimeBreakdown(prevSessions, prevDate)
       };
 
-      const { data: newSnapshot, error: insertError } = await supabase
+      let { data: newSnapshot, error: insertError } = await supabase
         .from("analytics_monthly_snapshots")
         .insert([payload])
         .select()
         .single();
+
+      // If the time_breakdown column hasn't been added yet, still close the
+      // month — just without the hours breakdown.
+      if (insertError && /time_breakdown/.test(insertError.message)) {
+        const { time_breakdown, ...withoutBreakdown } = payload;
+        ({ data: newSnapshot, error: insertError } = await supabase
+          .from("analytics_monthly_snapshots")
+          .insert([withoutBreakdown])
+          .select()
+          .single());
+      }
 
       if (insertError) throw insertError;
       finalSnapshot = newSnapshot;
@@ -91,7 +107,8 @@ export async function GET(request: Request) {
     if (finalSnapshot && !finalSnapshot.pdf_emailed_at) {
       console.log(`[Phase A] Generating and emailing PDF for ${finalSnapshot.month_label}...`);
       
-      const pdfBuffer = await generateMonthlyReportBuffer(finalSnapshot);
+      const history = await fetchReportHistory(supabase, finalSnapshot.month);
+      const pdfBuffer = await generateMonthlyReportBuffer(finalSnapshot, history);
       const emailResult = await sendMonthlyReportEmail(finalSnapshot.month_label, pdfBuffer);
       
       if (emailResult.error) {
@@ -161,22 +178,4 @@ export async function GET(request: Request) {
     status: "done",
     results
   });
-}
-
-// Helper function
-async function fetchCurrentMonthHours(date: Date): Promise<number> {
-  const start = startOfMonth(date).toISOString();
-  const end = endOfMonth(date).toISOString();
-
-  const { data: sessions, error } = await supabase
-    .from("work_sessions")
-    .select("duration")
-    .gte("started_at", start)
-    .lte("started_at", end)
-    .not("ended_at", "is", null);
-
-  if (error) return 0;
-  if (!sessions) return 0;
-  const totalSeconds = sessions.reduce((acc, curr) => acc + (curr.duration || 0), 0);
-  return totalSeconds / 3600;
 }
