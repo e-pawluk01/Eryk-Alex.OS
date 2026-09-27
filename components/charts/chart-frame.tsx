@@ -14,12 +14,14 @@ interface ChartFrameProps {
   legend?: { label: string; color: string }[];
   // Shown instead of the chart when there's nothing to plot.
   empty?: string;
+  // Taller than the usual chart, e.g. one row per category.
+  height?: number;
   children: (width: number) => React.ReactNode;
 }
 
 // Card-styled box for a section's chart: title, legend, then the drawing,
 // sized to the box's own width so it never squashes on a phone.
-export function ChartFrame({ title, sub, legend, empty, children }: ChartFrameProps) {
+export function ChartFrame({ title, sub, legend, empty, height = CHART_HEIGHT, children }: ChartFrameProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -48,7 +50,7 @@ export function ChartFrame({ title, sub, legend, empty, children }: ChartFramePr
           </div>
         )}
       </div>
-      <div ref={ref} style={{ height: CHART_HEIGHT }} className="relative">
+      <div ref={ref} style={{ height }} className="relative">
         {empty ? (
           <p className="absolute inset-0 grid place-items-center text-[13px] text-muted-foreground/60">{empty}</p>
         ) : (
