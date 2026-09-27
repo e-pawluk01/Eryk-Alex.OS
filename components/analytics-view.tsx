@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useMemo, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { getMonthlyAnalytics } from "@/lib/sheets";
 import { MetricCard } from "./metric-card";
 import { MetricSection } from "./metric-section";
 import { PastMonthsDialog } from "./past-months-dialog";
@@ -11,16 +10,16 @@ import { SessionsPanel } from "./sessions-panel";
 import { SessionFormDialog } from "./session-form-dialog";
 import { RevenueBreakdownPanel, TaskBreakdownPanel, SalesTablePanel } from "./analytics-details";
 import { PerformanceChart, HoursByWeekChart, ProfitBandsChart, StockChart } from "./charts/analytics-charts";
+import { CategoriesSection, CategoryCard } from "./categories-section";
 import { useGlobalContext } from "./global-context";
-import { WorkSession, SESSIONS_CHANGED_EVENT, formatMinutes } from "@/lib/work-sessions";
-import {
-  fetchMonthSessions, fetchHoursBetween, fetchFirstSessionAt, comparisonWindow,
-  hoursCoverLastMonth, makeComparison, hoursByTask, fetchRecentMonths, Tone,
-} from "@/lib/analytics-data";
+import { useAnalyticsData } from "./use-analytics-data";
+import { WorkSession, formatMinutes } from "@/lib/work-sessions";
+import { comparisonWindow, hoursCoverLastMonth, makeComparison, hoursByTask, Tone } from "@/lib/analytics-data";
+import { categoryStats } from "@/lib/categories";
 import { format } from "date-fns";
 
 type SessionDialog = { mode: "edit"; session: WorkSession } | { mode: "add" } | null;
-type OpenCard = "revenue" | "hours" | "tasks" | "sales" | null;
+type OpenCard = "revenue" | "hours" | "tasks" | "sales" | CategoryCard | null;
 
 const EMPTY_DATA = {
   revenue: 0, cogs: 0, sellingCosts: 0, sellingFees: 0, shippingCosts: 0,
@@ -34,66 +33,16 @@ const formatCurrency = (val: number) => val.toLocaleString("en-GB", { minimumFra
 const formatPercent = (val: number) => val.toFixed(1);
 
 export function AnalyticsView() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<any>(null);
-  const [sessions, setSessions] = useState<WorkSession[]>([]);
+  const { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales } = useAnalyticsData();
   const [openCard, setOpenCard] = useState<OpenCard>(null);
   const [sessionDialog, setSessionDialog] = useState<SessionDialog>(null);
+  const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
   const { userEmail } = useGlobalContext();
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
-  // Last month, cut off at the same day of the month as today.
-  const [prevSales, setPrevSales] = useState<any>(null);
-  const [prevHours, setPrevHours] = useState<number>(0);
-  const [firstSessionAt, setFirstSessionAt] = useState<string | null>(null);
-  const [recentMonths, setRecentMonths] = useState<{ label: string; revenue: number; grossProfit: number }[]>([]);
 
-  const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
-
-  const fetchLiveAndPreviousData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const now = new Date();
-      const span = comparisonWindow(now);
-
-      // This month live, plus the same stretch of last month for the arrows.
-      const [sheetsResult, sessionsResult, prevSalesResult, prevHoursResult, firstSessionResult, recentResult] = await Promise.all([
-        getMonthlyAnalytics(),
-        fetchMonthSessions(now),
-        getMonthlyAnalytics(span.cutoff.toISOString(), span.soldBy),
-        fetchHoursBetween(span.start, span.end),
-        fetchFirstSessionAt(),
-        fetchRecentMonths(5),
-      ]);
-
-      if (sheetsResult.error) {
-        setError(sheetsResult.error);
-      } else {
-        setData(sheetsResult.data);
-      }
-
-      setSessions(sessionsResult);
-      setPrevSales(prevSalesResult.error ? null : prevSalesResult.data);
-      setPrevHours(prevHoursResult);
-      setFirstSessionAt(firstSessionResult);
-      setRecentMonths(recentResult);
-    } catch (err: any) {
-      setError(err.message || "Failed to load analytics.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchLiveAndPreviousData();
-  }, [fetchLiveAndPreviousData]);
-
-  // Clocking out, editing or adding a session anywhere refreshes the hours.
-  useEffect(() => {
-    const refresh = () => { fetchMonthSessions(new Date()).then(setSessions); };
-    window.addEventListener(SESSIONS_CHANGED_EVENT, refresh);
-    return () => window.removeEventListener(SESSIONS_CHANGED_EVENT, refresh);
-  }, []);
+  // Categories look at the last 3 months: this month plus the two before.
+  const windowSales = useMemo(() => [...(data?.salesTable ?? []), ...earlierSales], [data, earlierSales]);
+  const catStats = useMemo(() => categoryStats(windowSales, data?.stockSkus ?? []), [windowSales, data]);
 
   if (selectedHistorical) {
     return <HistoricalSnapshotView snapshot={selectedHistorical} onBack={() => setSelectedHistorical(null)} />;
@@ -216,6 +165,9 @@ export function AnalyticsView() {
             value={safeData.returnOnCost !== null ? formatPercent(safeData.returnOnCost) : "—"}
             suffix={safeData.returnOnCost !== null ? "%" : undefined} />
         </MetricSection>
+
+        {/* CATEGORIES — which kinds of stock earn and sell best, last 3 months */}
+        <CategoriesSection loading={loading} stats={catStats} sales={windowSales} openCard={openCard} onToggle={toggle} />
 
         {/* INVENTORY — money tied up in unsold stock, as of now */}
         <MetricSection

@@ -103,6 +103,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
     let expectedRevenue = 0;
     let expectedProfit = 0;
     let espItemCount = 0;
+    const stockSkus: string[] = []; // SKUs still in stock, for per-category sell-through
     
     // Store raw sales details for PDF snapshot
     const salesTable: any[] = [];
@@ -155,6 +156,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
         // UNSOLD INVENTORY
         inventoryCost += spValue;
         itemsInStock++;
+        stockSkus.push((row[3] ?? "").toString().trim());
 
         if (espValue > 0) {
           expectedRevenue += espValue;
@@ -190,6 +192,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
         // Inventory metrics (null = no ESP data available, render as "—")
         inventoryCost,
         itemsInStock,
+        stockSkus,
         returnOnCost,
         expectedRevenue:    espItemCount > 0 ? expectedRevenue    : null,
         expectedProfit:     espItemCount > 0 ? expectedProfit     : null,
