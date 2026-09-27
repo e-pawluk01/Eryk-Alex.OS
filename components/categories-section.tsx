@@ -29,8 +29,10 @@ interface CategoriesSectionProps {
 
 // CATEGORIES — which kinds of stock earn and sell best, over the last 3 months.
 export function CategoriesSection({ loading, stats, sales, openCard, onToggle }: CategoriesSectionProps) {
+  // "Other" (items we can't place) shows in the table and chart but never
+  // wins a card — it can't tell you what to source.
   const top = (card: CategoryCard) => {
-    const best = rankCategories(stats, MEASURE[card])[0];
+    const best = rankCategories(stats, MEASURE[card]).find((c) => c.name !== "Other");
     return best && best.sold > 0 && (card !== "cat-fast" || best.avgDays !== null) ? best : null;
   };
   const margin = top("cat-margin");
@@ -112,7 +114,7 @@ function CategoryTable({ stats, sales, by }: { stats: CategoryStats[]; sales: Ca
                 {flips.map((f, i) => (
                   <tr key={`${f.sku}-${i}`}>
                     <td className="py-2.5 border-t border-white/5 pr-3 text-white">{f.sku}</td>
-                    <td className="py-2.5 border-t border-white/5 pr-3 text-foreground">{categoryOf(f.sku)}</td>
+                    <td className="py-2.5 border-t border-white/5 pr-3 text-foreground">{categoryOf(f.sku, f.note)}</td>
                     <td className={td}>£{money(f.buy)}</td>
                     <td className={td}>£{money(f.sold)}</td>
                     <td className={td}>£{money(f.profit)}</td>

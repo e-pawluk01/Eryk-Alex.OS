@@ -12,11 +12,36 @@ export const categoryColor = (name: string) => CATEGORY_COLORS[name] ?? CATEGORY
 
 const NAME_BY_CODE = new Map(SKU_CATEGORIES.map((c) => [c.code, c.name]));
 
-// "OU-0142" / "OU0142" -> "Outerwear". Anything without a known 2-letter
-// code at the start (older SKUs, blanks) counts as "Other".
-export function categoryOf(sku: string): string {
-  const letters = (sku ?? "").trim().match(/^[A-Za-z]+/)?.[0]?.toUpperCase() ?? "";
-  return (letters.length === 2 && NAME_BY_CODE.get(letters)) || "Other";
+// Old SKUs (before Aug 2026's new system) are one letter + digits, e.g. B002.
+// O and J were shared between categories, so those go through the exact
+// per-item list below instead.
+const OLD_LETTER: Record<string, string> = {
+  D: "Dresses", S: "Skirts", T: "Tops & t-shirts", R: "Shorts & Cropped Trousers",
+  L: "Lingerie & nightwear", C: "Activewear", H: "Shoes", B: "Bags", A: "Accessories",
+};
+
+// Every old O / J item, confirmed one by one (Sep 2026). O014 couldn't be
+// identified, so it stays "Other".
+const OLD_SKU_CATEGORY: Record<string, string> = {
+  O003: "Tops & t-shirts", O005: "Tops & t-shirts", O006: "Tops & t-shirts", O007: "Tops & t-shirts", O008: "Tops & t-shirts",
+  O010: "Jumpers & Sweaters", O011: "Jumpers & Sweaters", O012: "Suits & Blazers",
+  O002: "Outerwear", O009: "Outerwear", O004: "Accessories",
+  J001: "Jeans", J006: "Jeans", J007: "Jeans", J008: "Jeans", J010: "Jeans", J013: "Jeans", J015: "Jeans", J016: "Jeans",
+  J003: "Trousers & leggings", J009: "Trousers & leggings", J012: "Trousers & leggings",
+  J002: "Shorts & Cropped Trousers", J004: "Shorts & Cropped Trousers", J005: "Shorts & Cropped Trousers", J011: "Shorts & Cropped Trousers",
+};
+
+// "OU-0142" / "OU0142" -> "Outerwear"; "B002" -> "Bags". Anything else counts
+// as "Other". `note` is the sheet's Notes column, only needed for the two
+// August sales entered with "NULL" as their SKU (jean shorts and a top).
+export function categoryOf(sku: string, note = ""): string {
+  const code = (sku ?? "").trim().toUpperCase();
+  if (OLD_SKU_CATEGORY[code]) return OLD_SKU_CATEGORY[code];
+  if (code === "NULL") return /short/i.test(note) ? "Shorts & Cropped Trousers" : "Tops & t-shirts";
+  const letters = code.match(/^[A-Z]+/)?.[0] ?? "";
+  if (letters.length === 2) return NAME_BY_CODE.get(letters) ?? "Other";
+  if (letters.length === 1) return OLD_LETTER[letters] ?? "Other";
+  return "Other";
 }
 
 export interface CategorySale {
@@ -25,6 +50,7 @@ export interface CategorySale {
   sold: number;
   profit: number;
   tts: string | number;
+  note?: string;
 }
 
 export interface CategoryStats {
@@ -46,7 +72,7 @@ export function categoryStats(sales: CategorySale[], stockSkus: string[]): Categ
     return byName.get(name)!;
   };
   sales.forEach((s) => {
-    const e = entry(categoryOf(s.sku));
+    const e = entry(categoryOf(s.sku, s.note));
     e.sold++;
     e.revenue += Number(s.sold) || 0;
     e.profit += Number(s.profit) || 0;
