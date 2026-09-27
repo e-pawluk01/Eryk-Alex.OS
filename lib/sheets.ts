@@ -151,6 +151,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
           profit: sfValue - spValue - feeValue - shipValue,
           tts:    row[4] || "N/A",
           soldOn: soldOn,
+          note:   (row[0] ?? "").toString().trim(),
         });
       } else if (hasSP) {
         // UNSOLD INVENTORY
