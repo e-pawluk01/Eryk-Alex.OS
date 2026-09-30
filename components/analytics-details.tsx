@@ -21,6 +21,7 @@ interface RevenueSplit {
   cogs: number;
   sellingFees: number;
   shippingCosts: number;
+  writtenOff?: number;
   grossProfit: number;
 }
 
@@ -34,6 +35,7 @@ export function RevenueBreakdownPanel({ data }: { data: RevenueSplit }) {
           { label: "Cost of goods", value: data.cogs, color: "#199e70" },
           { label: "Selling fees", value: data.sellingFees, color: "#c98500" },
           { label: "Shipping", value: data.shippingCosts, color: "#d55181" },
+          { label: "Written off", value: data.writtenOff ?? 0, color: "#8a8f98" },
           { label: "Gross profit", value: data.grossProfit, color: "#d95926", strong: true },
         ]}
       />

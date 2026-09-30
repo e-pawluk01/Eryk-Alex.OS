@@ -94,6 +94,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
     let sellingCosts = 0; // Depop/marketplace fees + postage you paid, on sold items
     let sellingFees = 0;
     let shippingCosts = 0;
+    let writtenOff = 0; // buy price of items removed this month (donated, binned, kept)
     let itemsSold = 0;
     // True only if every sold row has a readable Exit Date.
     let soldDatesComplete = true;
@@ -158,7 +159,10 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
           soldOn: soldOn,
           note:   cell(row, cols, "notes"),
         });
-      } else if (hasSP && !isRemoved) {
+      } else if (isRemoved) {
+        // The money was spent, so it counts as a cost in the month it was removed.
+        if (!(soldBy && (!soldOn || soldOn > soldBy))) writtenOff += spValue;
+      } else if (hasSP) {
         // UNSOLD INVENTORY
         inventoryCost += spValue;
         itemsInStock++;
@@ -172,7 +176,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
       }
     }
 
-    const grossProfit        = revenue - cogs - sellingCosts;
+    const grossProfit        = revenue - cogs - sellingCosts - writtenOff;
     const grossMargin        = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
     const avgSalePrice       = itemsSold > 0 ? revenue / itemsSold : 0;
     const avgProfitPerItem   = itemsSold > 0 ? grossProfit / itemsSold : 0;
@@ -187,6 +191,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
         sellingCosts,
         sellingFees,
         shippingCosts,
+        writtenOff,
         grossProfit,
         grossMargin,
         itemsSold,
