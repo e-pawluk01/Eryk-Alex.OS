@@ -10,7 +10,7 @@ import {
 
 // Everything the analytics page loads: this month live, the same stretch of
 // last month for the arrows, recent closed months for the chart, and the
-// previous two months' sales for the Categories window.
+// previous two months' sales and removals for the Categories window.
 export function useAnalyticsData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +21,7 @@ export function useAnalyticsData() {
   const [firstSessionAt, setFirstSessionAt] = useState<string | null>(null);
   const [recentMonths, setRecentMonths] = useState<{ label: string; revenue: number; grossProfit: number }[]>([]);
   const [earlierSales, setEarlierSales] = useState<any[]>([]);
+  const [earlierRemoved, setEarlierRemoved] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +50,7 @@ export function useAnalyticsData() {
       setRecentMonths(recentResult);
       // A month with no sheet tab (e.g. before the app existed) just adds nothing.
       setEarlierSales([month1, month2].flatMap((m) => (m.error ? [] : m.data?.salesTable ?? [])));
+      setEarlierRemoved([month1, month2].flatMap((m) => (m.error ? [] : m.data?.removedItems ?? [])));
     } catch (err: any) {
       setError(err.message || "Failed to load analytics.");
     } finally {
@@ -67,5 +69,5 @@ export function useAnalyticsData() {
     return () => window.removeEventListener(SESSIONS_CHANGED_EVENT, refresh);
   }, []);
 
-  return { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales };
+  return { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales, earlierRemoved };
 }

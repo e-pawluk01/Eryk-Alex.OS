@@ -2,100 +2,110 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
-import { MetricCard } from "./metric-card";
+import { MetricCard, EarlyBadge } from "./metric-card";
 import { MetricSection } from "./metric-section";
 import { DetailPanel } from "./analytics-details";
 import { CategoryChart } from "./charts/category-chart";
-import {
-  CategorySale, CategoryStats, CategoryMeasure, categoryOf, categoryColor, rankCategories,
-} from "@/lib/categories";
+import { CategorySale, categoryOf, categoryColor, hasSku } from "@/lib/categories";
+import { Ranking, CategoryRank, RankKey, sortCategories, bestCategory } from "@/lib/category-ranking";
 
-export type CategoryCard = "cat-margin" | "cat-sell" | "cat-fast" | "cat-profit";
+export type CategoryCard = "cat-item" | "cat-sell" | "cat-sale" | "cat-fast";
 
-const MEASURE: Record<CategoryCard, CategoryMeasure> = {
-  "cat-margin": "margin", "cat-sell": "sellThrough", "cat-fast": "avgDays", "cat-profit": "profit",
+const KEY: Record<CategoryCard, RankKey> = {
+  "cat-item": "perItem", "cat-sell": "sellThrough", "cat-sale": "perSale", "cat-fast": "days",
 };
 
 const money = (v: number) => v.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const pct = (v: number) => `${Math.round(v)}%`;
+const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+// Half the category has sold: its median. Otherwise the longest it has waited.
+const daysText = (c: CategoryRank, ranking: Ranking) =>
+  c.daysReached && c.blendedDays !== null
+    ? `${Math.round(c.blendedDays)} days`
+    : `over ${Math.round(c.days ?? ranking.business.medianDays ?? 0)} days`;
 
 interface CategoriesSectionProps {
   loading: boolean;
-  stats: CategoryStats[];
-  sales: CategorySale[]; // every sale in the last 3 months
+  ranking: Ranking;
+  sales: CategorySale[]; // every sale in the window, for the top flips
   openCard: string | null;
   onToggle: (card: CategoryCard) => void;
 }
 
-// CATEGORIES — which kinds of stock earn and sell best, over the last 3 months.
-export function CategoriesSection({ loading, stats, sales, openCard, onToggle }: CategoriesSectionProps) {
-  // "Other" (items we can't place) shows in the table and chart but never
-  // wins a card — it can't tell you what to source.
-  const top = (card: CategoryCard) => {
-    const best = rankCategories(stats, MEASURE[card]).find((c) => c.name !== "Other");
-    return best && best.sold > 0 && (card !== "cat-fast" || best.avgDays !== null) ? best : null;
-  };
-  const margin = top("cat-margin");
-  const sell = top("cat-sell");
-  const fast = top("cat-fast");
-  const profit = top("cat-profit");
-  const open = (Object.keys(MEASURE) as CategoryCard[]).find((c) => c === openCard) ?? null;
+// CATEGORIES — which kinds of stock earn and sell best, ranked fairly so a
+// small category can't win on luck (see lib/category-ranking.ts).
+export function CategoriesSection({ loading, ranking, sales, openCard, onToggle }: CategoriesSectionProps) {
+  const open = (Object.keys(KEY) as CategoryCard[]).find((c) => c === openCard) ?? null;
 
-  const card = (id: CategoryCard, title: string, best: CategoryStats | null, sub: (c: CategoryStats) => string) => (
-    <MetricCard title={title} compact value={best ? best.name : "—"} sub={best ? sub(best) : undefined}
-      onClick={best ? () => onToggle(id) : undefined} expanded={open === id} />
-  );
+  const card = (id: CategoryCard, title: string, sub: (c: CategoryRank) => string) => {
+    const best = bestCategory(ranking.categories, KEY[id]);
+    return (
+      <MetricCard title={title} compact value={best ? best.name : "—"} sub={best ? sub(best) : undefined}
+        badge={best?.early ? "Early read" : undefined}
+        onClick={best ? () => onToggle(id) : undefined} expanded={open === id} />
+    );
+  };
 
   return (
     <MetricSection
       title="Categories"
       loading={loading}
-      chart={<CategoryChart stats={stats} />}
-      detail={open ? <CategoryTable stats={stats} sales={sales} by={MEASURE[open]} /> : null}
+      chart={<CategoryChart ranking={ranking} />}
+      detail={open ? <CategoryTable ranking={ranking} sales={sales} by={KEY[open]} /> : null}
     >
-      {card("cat-margin", "Best Margin", margin, (c) => `${pct(c.margin)} margin · ${c.sold} sold`)}
-      {card("cat-sell", "Best Sell-Through", sell, (c) => `${pct(c.sellThrough)} · ${c.sold} of ${c.stocked} sold`)}
-      {card("cat-fast", "Fastest Seller", fast, (c) => `${Math.round(c.avgDays ?? 0)} days · ${c.sold} sold`)}
-      {card("cat-profit", "Most Profit", profit, (c) => `£${Math.round(c.profit).toLocaleString("en-GB")} · ${c.sold} sold`)}
+      {card("cat-item", "Profit per Item Stocked", (c) => `£${money(c.perItem)} per item · ${c.sold} of ${c.stocked} sold`)}
+      {card("cat-sell", "Sell-Through", (c) => `${pct(c.sellThrough)} · ${c.sold} of ${c.stocked} sold`)}
+      {card("cat-sale", "Profit per Sale", (c) => `£${money(c.perSale)} per sale · ${c.sold} sold`)}
+      {card("cat-fast", "Fastest Seller", (c) => `${daysText(c, ranking)} · ${c.sold} sold`)}
     </MetricSection>
   );
 }
 
 // Every category, sorted by the tapped card's measure, then the top 5 flips.
-function CategoryTable({ stats, sales, by }: { stats: CategoryStats[]; sales: CategorySale[]; by: CategoryMeasure }) {
-  const rows = rankCategories(stats, by);
-  const flips = [...sales].sort((a, b) => b.profit - a.profit).slice(0, 5);
-  const th = (label: string, measure?: CategoryMeasure, right = true) => (
+function CategoryTable({ ranking, sales, by }: { ranking: Ranking; sales: CategorySale[]; by: RankKey }) {
+  const rows = sortCategories(ranking.categories, by);
+  const flips = sales.filter((s) => hasSku(s.sku)).sort((a, b) => b.profit - a.profit).slice(0, 5);
+  const th = (label: string, key?: RankKey, right = true) => (
     <th className={cn("pb-2.5 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap",
-      right ? "text-right pl-3" : "text-left pr-3", measure === by ? "text-white" : "text-muted-foreground")}>
+      right ? "text-right pl-3" : "text-left pr-3", key === by ? "text-white" : "text-muted-foreground")}>
       {label}
     </th>
   );
-  const td = "py-2.5 border-t border-white/5 tabular-nums text-right pl-3 text-foreground";
+  const td = "py-2.5 border-t border-white/5 tabular-nums text-right pl-3 text-foreground align-top";
+  const under = "block text-[11px] text-muted-foreground/60";
+  const signal: Record<CategoryRank["signal"], string> = {
+    More: "text-emerald-400/90", Less: "text-red-400/80", Watch: "text-muted-foreground",
+  };
 
   return (
     <DetailPanel>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[620px] text-[13px]">
+        <table className="w-full min-w-[860px] text-[13px]">
           <thead>
             <tr>
-              {th("Category", undefined, false)}{th("Sold / Stocked")}{th("Profit", "profit")}{th("Avg profit")}
-              {th("Margin", "margin")}{th("Days to sell", "avgDays")}{th("Sell-through", "sellThrough")}
+              {th("Category", undefined, false)}{th("Signal", undefined, false)}{th("Profit / item stocked", "perItem")}
+              {th("Sell-through", "sellThrough")}{th("Profit / sale", "perSale")}{th("Median days", "days")}
+              {th("Aged")}{th("Total profit")}{th("ABC")}
             </tr>
           </thead>
           <tbody>
             {rows.map((c) => (
               <tr key={c.name}>
-                <td className="py-2.5 border-t border-white/5 pr-3 text-white whitespace-nowrap">
+                <td className="py-2.5 border-t border-white/5 pr-3 text-white whitespace-nowrap align-top">
                   <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ background: categoryColor(c.name) }} />
                   {c.name}
+                  {c.early && <EarlyBadge label="Early read" className="ml-2 align-[1px]" />}
                 </td>
-                <td className={td}>{c.sold}/{c.stocked}</td>
+                <td className={cn("py-2.5 border-t border-white/5 pr-3 align-top font-semibold", signal[c.signal])}>{c.signal}</td>
+                <td className={td}>£{money(c.perItem)}</td>
+                <td className={td}>{pct(c.sellThrough)}<span className={under}>{c.sold} / {c.stocked}</span></td>
+                <td className={td}>
+                  £{money(c.perSale)}
+                  <span className={under}>{c.actualPerSale === null ? "no sales" : `£${money(c.actualPerSale)} actual`}</span>
+                </td>
+                <td className={td}>{daysText(c, ranking)}</td>
+                <td className={td}>{c.aged ?? "—"}</td>
                 <td className={td}>£{Math.round(c.profit).toLocaleString("en-GB")}</td>
-                <td className={td}>{c.sold > 0 ? `£${money(c.avgProfit)}` : "—"}</td>
-                <td className={td}>{c.sold > 0 ? pct(c.margin) : "—"}</td>
-                <td className={td}>{c.avgDays !== null ? Math.round(c.avgDays) : "—"}</td>
-                <td className={td}>{pct(c.sellThrough)}</td>
+                <td className={td}>{c.abc}</td>
               </tr>
             ))}
           </tbody>
@@ -118,7 +128,7 @@ function CategoryTable({ stats, sales, by }: { stats: CategoryStats[]; sales: Ca
                     <td className={td}>£{money(f.buy)}</td>
                     <td className={td}>£{money(f.sold)}</td>
                     <td className={td}>£{money(f.profit)}</td>
-                    <td className={td}>{f.sold > 0 ? pct((f.profit / f.sold) * 100) : "—"}</td>
+                    <td className={td}>{f.sold > 0 ? `${Math.round((f.profit / f.sold) * 100)}%` : "—"}</td>
                   </tr>
                 ))}
               </tbody>

@@ -24,9 +24,11 @@ interface MetricCardProps {
   // Makes the card tappable; its details open underneath the section.
   onClick?: () => void;
   expanded?: boolean;
+  // Small pill under the card's text, e.g. "Early read".
+  badge?: string;
 }
 
-export function MetricCard({ title, value, prefix, suffix, className, comparison, sub, compact, onClick, expanded }: MetricCardProps) {
+export function MetricCard({ title, value, prefix, suffix, className, comparison, sub, compact, onClick, expanded, badge }: MetricCardProps) {
   const Tag = onClick ? "button" : "div";
   return (
     <Tag
@@ -69,6 +71,16 @@ export function MetricCard({ title, value, prefix, suffix, className, comparison
       {!comparison && sub && (
         <div className="mt-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50 truncate">{sub}</div>
       )}
+      {badge && <EarlyBadge label={badge} className="self-start mt-1.5" />}
     </Tag>
+  );
+}
+
+// Marks a figure that's still based on too little data to trust fully.
+export function EarlyBadge({ label, className }: { label: string; className?: string }) {
+  return (
+    <span className={cn("text-[8.5px] font-bold uppercase tracking-widest text-muted-foreground border border-white/15 rounded-full px-[7px] py-[2px] whitespace-nowrap", className)}>
+      {label}
+    </span>
   );
 }

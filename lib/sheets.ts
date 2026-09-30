@@ -3,6 +3,7 @@
 import { unstable_cache } from "next/cache";
 import { getGoogleSheetsClient } from "./google-client";
 import { mapColumns, cell } from "./sheet-columns";
+import { daysListed, parseSheetDate } from "./listing-days";
 
 // 1. Heavy Cache: Resolve the actual tab name (e.g. "Aug 26") for the current month
 // Caches for 24 hours, but automatically invalidates on month rollover due to the dynamic key.
@@ -106,6 +107,10 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
     let expectedProfit = 0;
     let espItemCount = 0;
     const stockSkus: string[] = []; // SKUs still in stock, for per-category sell-through
+    // For Categories: how long each unsold / removed item has been listed.
+    const stockItems: { sku: string; days: number | null }[] = [];
+    const removedItems: { sku: string; days: number | null }[] = [];
+    const today = new Date();
     
     // Store raw sales details for PDF snapshot
     const salesTable: any[] = [];
@@ -162,11 +167,15 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
       } else if (isRemoved) {
         // The money was spent, so it counts as a cost in the month it was removed.
         if (!(soldBy && (!soldOn || soldOn > soldBy))) writtenOff += spValue;
+        // Its listing clock stops on the day it was removed.
+        const removedOn = parseSheetDate(cell(row, cols, "exitDate")) ?? today;
+        removedItems.push({ sku: cell(row, cols, "sku"), days: daysListed(row, cols, removedOn) });
       } else if (hasSP) {
         // UNSOLD INVENTORY
         inventoryCost += spValue;
         itemsInStock++;
         stockSkus.push(cell(row, cols, "sku"));
+        stockItems.push({ sku: cell(row, cols, "sku"), days: daysListed(row, cols, today) });
 
         if (espValue > 0) {
           expectedRevenue += espValue;
@@ -204,6 +213,8 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
         inventoryCost,
         itemsInStock,
         stockSkus,
+        stockItems,
+        removedItems,
         returnOnCost,
         expectedRevenue:    espItemCount > 0 ? expectedRevenue    : null,
         expectedProfit:     espItemCount > 0 ? expectedProfit     : null,
