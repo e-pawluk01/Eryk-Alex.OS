@@ -8,6 +8,7 @@ import { Breakdown } from "./breakdown";
 import { StockFlowChart } from "./charts/stock-flow-chart";
 import { categoryOf } from "@/lib/categories";
 import type { StockHealth } from "@/lib/stock-health";
+import { makeComparison } from "@/lib/analytics-data";
 
 export type HealthCard = "health-sell" | "health-days" | "health-aged" | "health-added";
 
@@ -29,6 +30,12 @@ export function StockHealthSection({ loading, health, openCard, onToggle }: Stoc
   const { sellThrough: st, daysToSell: dts, aged, added } = health;
   const tap = (card: HealthCard) => () => onToggle(card);
   const open = (["health-sell", "health-days", "health-aged", "health-added"] as HealthCard[]).find((c) => c === openCard) ?? null;
+  // Arrows vs the 30 days before, once both are fully dated (about late Nov).
+  const prev = health.previous;
+  const vs = "vs previous 30 days";
+  const stCmp = prev && st.value !== null ? makeComparison(st.value, prev.sellThrough, "more-is-good", true, vs) : null;
+  const daysCmp = prev && dts.status === "ready" && dts.reached ? makeComparison(dts.median, prev.daysToSell, "less-is-good", true, vs) : null;
+  const agedCmp = prev && aged.status === "ready" ? makeComparison(aged.count, prev.aged, "less-is-good", true, vs) : null;
 
   return (
     <MetricSection
@@ -39,15 +46,15 @@ export function StockHealthSection({ loading, health, openCard, onToggle }: Stoc
     >
       <MetricCard title="Sell-Through"
         value={st.value !== null ? (st.value * 100).toFixed(1) : "—"} suffix={st.value !== null ? "%" : undefined}
-        sub={`${st.sold} of ${st.sold + st.stock + st.removed}`}
+        sub={`${st.sold} of ${st.sold + st.stock + st.removed}`} comparison={stCmp}
         onClick={tap("health-sell")} expanded={open === "health-sell"} />
       {dts.status === "ready"
-        ? <MetricCard title="Days to Sell" value={dts.reached ? dts.median : `Over ${dts.median}`} suffix=" days"
+        ? <MetricCard title="Days to Sell" value={dts.reached ? dts.median : `Over ${dts.median}`} suffix=" days" comparison={daysCmp}
             onClick={tap("health-days")} expanded={open === "health-days"} />
         : <MetricCard title="Days to Sell" value="—" sub={COLLECTING} />}
       {aged.status === "ready"
         ? <MetricCard title="Aged Stock" value={aged.count} suffix=" items"
-            sub={`£${money(aged.cash)} tied up`}
+            sub={`£${money(aged.cash)} tied up`} comparison={agedCmp}
             onClick={tap("health-aged")} expanded={open === "health-aged"} />
         : <MetricCard title="Aged Stock" value="—" sub={COLLECTING} />}
       <MetricCard title="Items Added" value={added.added}

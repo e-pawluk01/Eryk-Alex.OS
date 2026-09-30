@@ -35,7 +35,7 @@ const formatCurrency = (val: number) => val.toLocaleString("en-GB", { minimumFra
 const formatPercent = (val: number) => val.toFixed(1);
 
 export function AnalyticsView() {
-  const { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales, earlierRemoved, previousItems } = useAnalyticsData();
+  const { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales, earlierRemoved, previousItems, earlierItems } = useAnalyticsData();
   const [openCard, setOpenCard] = useState<OpenCard>(null);
   const [sessionDialog, setSessionDialog] = useState<SessionDialog>(null);
   const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
@@ -49,7 +49,7 @@ export function AnalyticsView() {
     stock: data?.stockItems ?? [],
     removed: [...(data?.removedItems ?? []), ...earlierRemoved],
   }), [windowSales, data, earlierRemoved]);
-  const health = useMemo(() => stockHealth(data?.items ?? [], previousItems), [data, previousItems]);
+  const health = useMemo(() => stockHealth(data?.items ?? [], previousItems, new Date(), earlierItems), [data, previousItems, earlierItems]);
 
   if (selectedHistorical) {
     return <HistoricalSnapshotView snapshot={selectedHistorical} onBack={() => setSelectedHistorical(null)} />;
