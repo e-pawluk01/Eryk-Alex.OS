@@ -1,20 +1,17 @@
 import { getGoogleSheetsClient } from "./google-client";
+import { COLUMN_HEADERS, type ColumnKey, mapColumns, cell } from "./sheet-columns";
 
-// Columns A..M (0-indexed): A notes, B SP, C SF, D SKU, E TTS, F UP(V),
-// G listing-start, H accum-days, I ESP, J sourced-date, K fees, L ship
-// cost, M UP(D). Carrying F/M forward means "still listed" status follows
-// an unsold item into the new month instead of resetting.
-const COLS = 13;
-const IDX_SP = 1;
-const IDX_SF = 2;
-const IDX_SKU = 3;
+const KEYS = Object.keys(COLUMN_HEADERS) as ColumnKey[];
 
 /**
- * Copy every still-unsold row from `fromTab` into `toTab`.
+ * Copy every still-unsold row from `fromTab` into `toTab`, column by column
+ * matched on header name, so the two tabs can lay their columns out
+ * differently. Carrying the tickboxes, Stage and prices forward means an
+ * item's listing status and ladder position follow it into the new month.
  *
- * "Unsold" = SP cell has something in it and SF does not parse to a positive
- * number (matches the in-stock rule in lib/sheets.ts). Sold rows stay behind.
- * De-duplicates on SKU, so it is safe to run more than once.
+ * "Unsold" = the Sourced cell has something in it, Sold does not parse to a
+ * positive number, and Exit is empty (Sold / Bundled / Removed rows stay
+ * behind). De-duplicates on SKU, so it is safe to run more than once.
  */
 export async function carryForwardUnsold(fromTab: string, toTab: string) {
   if (!process.env.GOOGLE_OAUTH_REFRESH_TOKEN || !process.env.GOOGLE_SHEET_ID) {
@@ -25,17 +22,19 @@ export async function carryForwardUnsold(fromTab: string, toTab: string) {
   const sheets = getGoogleSheetsClient();
 
   const [srcResp, dstResp] = await Promise.all([
-    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${fromTab}'!A:M` }),
-    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${toTab}'!A:M` }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${fromTab}'!A:Z` }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: `'${toTab}'!A:Z` }),
   ]);
 
   const srcRows: any[][] = srcResp.data.values || [];
   const dstRows: any[][] = dstResp.data.values || [];
+  const src = mapColumns(srcRows[0]);
+  const dst = mapColumns(dstRows[0]);
+  if (dst.sku === undefined) return { error: `No "SKU" column in "${toTab}".` };
+  const width = Math.max(...Object.values(dst)) + 1;
 
   const existingSkus = new Set(
-    dstRows.slice(1)
-      .map((r) => (r[IDX_SKU] ?? "").toString().trim().toLowerCase())
-      .filter(Boolean)
+    dstRows.slice(1).map((r) => cell(r, dst, "sku").toLowerCase()).filter(Boolean)
   );
 
   const toCopy: any[][] = [];
@@ -43,12 +42,10 @@ export async function carryForwardUnsold(fromTab: string, toTab: string) {
 
   for (let i = 1; i < srcRows.length; i++) {
     const r = srcRows[i];
-    const sp = (r[IDX_SP] ?? "").toString().trim();
-    const sfStr = (r[IDX_SF] ?? "").toString().trim();
-    const sfNum = parseFloat(sfStr.replace(/[^0-9.-]+/g, "")) || 0;
-    const sku = (r[IDX_SKU] ?? "").toString().trim();
+    const sfNum = parseFloat(cell(r, src, "sold").replace(/[^0-9.-]+/g, "")) || 0;
+    const sku = cell(r, src, "sku");
 
-    const inStock = sp !== "" && !(sfNum > 0);
+    const inStock = cell(r, src, "buy") !== "" && !(sfNum > 0) && cell(r, src, "exit") === "";
     if (!inStock) continue;
 
     if (sku && existingSkus.has(sku.toLowerCase())) {
@@ -56,9 +53,12 @@ export async function carryForwardUnsold(fromTab: string, toTab: string) {
       continue;
     }
 
-    const out: any[] = [];
-    for (let c = 0; c < COLS; c++) out[c] = r[c] ?? "";
-    out[IDX_SF] = ""; // ensure sale price is blank in the new tab
+    const out: any[] = new Array(width).fill("");
+    for (const key of KEYS) {
+      const at = dst[key];
+      if (at !== undefined && src[key] !== undefined) out[at] = r[src[key]!] ?? "";
+    }
+    if (dst.sold !== undefined) out[dst.sold] = ""; // sale price always starts blank
     toCopy.push(out);
     if (sku) existingSkus.add(sku.toLowerCase());
   }
@@ -68,15 +68,13 @@ export async function carryForwardUnsold(fromTab: string, toTab: string) {
   }
 
   // Write directly after the last row with a real item on it. We can't trust
-  // dstRows.length or `append`: a column of empty checkboxes (col F reads
-  // "FALSE") makes the sheet look ~1000 rows long. Only a name (A) or SKU (D)
-  // marks a genuine row.
+  // dstRows.length or `append`: a column of empty tickboxes reads "FALSE" all
+  // the way down, making the sheet look ~1000 rows long. Only a note, a SKU or
+  // a buy price marks a genuine row.
   let lastItemRow = 1; // header
   for (let i = 1; i < dstRows.length; i++) {
-    const r = dstRows[i] || [];
-    const hasItem =
-      (r[0] ?? "").toString().trim() !== "" || (r[IDX_SKU] ?? "").toString().trim() !== "";
-    if (hasItem) lastItemRow = i + 1; // 0-indexed array -> 1-indexed sheet row
+    const r = dstRows[i];
+    if (cell(r, dst, "notes") || cell(r, dst, "sku") || cell(r, dst, "buy")) lastItemRow = i + 1;
   }
   const firstEmptyRow = lastItemRow + 1;
 
