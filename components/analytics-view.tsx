@@ -22,7 +22,7 @@ type SessionDialog = { mode: "edit"; session: WorkSession } | { mode: "add" } | 
 type OpenCard = "revenue" | "hours" | "tasks" | "sales" | CategoryCard | null;
 
 const EMPTY_DATA = {
-  revenue: 0, cogs: 0, sellingCosts: 0, sellingFees: 0, shippingCosts: 0,
+  revenue: 0, cogs: 0, sellingCosts: 0, sellingFees: 0, shippingCosts: 0, writtenOff: 0,
   grossProfit: 0, grossMargin: 0, itemsSold: 0, avgSalePrice: 0, avgProfitPerItem: 0,
   monthLabel: "Current Month", salesTable: [],
   inventoryCost: 0, itemsInStock: 0, returnOnCost: null,
