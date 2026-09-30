@@ -110,7 +110,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
     const stockSkus: string[] = []; // SKUs still in stock, for per-category sell-through
     // For Categories: how long each unsold / removed item has been listed.
     const stockItems: { sku: string; days: number | null }[] = [];
-    const removedItems: { sku: string; days: number | null }[] = [];
+    const removedItems: { sku: string; days: number | null; exitOn: string | null }[] = [];
     const items: SheetItem[] = []; // every stock row, for Stock Health
     const today = new Date();
     
@@ -187,7 +187,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
         if (!(soldBy && (!soldOn || soldOn > soldBy))) writtenOff += spValue;
         // Its listing clock stops on the day it was removed.
         const removedOn = parseSheetDate(cell(row, cols, "exitDate")) ?? today;
-        removedItems.push({ sku: cell(row, cols, "sku"), days: daysListed(row, cols, removedOn) });
+        removedItems.push({ sku: cell(row, cols, "sku"), days: daysListed(row, cols, removedOn), exitOn: soldOn });
       } else if (hasSP) {
         // UNSOLD INVENTORY
         inventoryCost += spValue;

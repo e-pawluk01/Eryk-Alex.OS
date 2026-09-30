@@ -15,7 +15,7 @@ import { useGlobalContext } from "./global-context";
 import { useAnalyticsData } from "./use-analytics-data";
 import { WorkSession, formatMinutes } from "@/lib/work-sessions";
 import { comparisonWindow, hoursCoverLastMonth, makeComparison, hoursByTask, Tone } from "@/lib/analytics-data";
-import { rankCategoriesFairly } from "@/lib/category-ranking";
+import { categoryWindow } from "@/lib/category-window";
 import { stockHealth } from "@/lib/stock-health";
 import { StockHealthSection, HealthCard } from "./stock-health-section";
 import { format } from "date-fns";
@@ -44,11 +44,11 @@ export function AnalyticsView() {
 
   // Categories look at the last 3 months: this month plus the two before.
   const windowSales = useMemo(() => [...(data?.salesTable ?? []), ...earlierSales], [data, earlierSales]);
-  const catRanking = useMemo(() => rankCategoriesFairly({
+  const catRanking = useMemo(() => categoryWindow({
     sales: windowSales,
     stock: data?.stockItems ?? [],
     removed: [...(data?.removedItems ?? []), ...earlierRemoved],
-  }), [windowSales, data, earlierRemoved]);
+  }).ranking, [windowSales, data, earlierRemoved]);
   const health = useMemo(() => stockHealth(data?.items ?? [], previousItems, new Date(), earlierItems), [data, previousItems, earlierItems]);
 
   if (selectedHistorical) {
