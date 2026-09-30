@@ -8,6 +8,7 @@ import { subMonths } from 'date-fns';
 import { generateMonthlyReportBuffer } from '@/lib/pdf';
 import { fetchSessionsForMonth, buildTimeBreakdown } from '@/lib/time-breakdown';
 import { fetchReportHistory } from '@/lib/report-history';
+import { buildReportExtras } from '@/lib/report-extras';
 import { sendMonthlyReportEmail, sendErrorAlertEmail } from '@/lib/email';
 
 export async function GET(request: Request) {
@@ -107,8 +108,13 @@ export async function GET(request: Request) {
     if (finalSnapshot && !finalSnapshot.pdf_emailed_at) {
       console.log(`[Phase A] Generating and emailing PDF for ${finalSnapshot.month_label}...`);
       
-      const history = await fetchReportHistory(supabase, finalSnapshot.month);
-      const pdfBuffer = await generateMonthlyReportBuffer(finalSnapshot, history);
+      // Stock Health / Categories pages come from the sheet; if that fails the
+      // report still goes out, just without them.
+      const [history, extras] = await Promise.all([
+        fetchReportHistory(supabase, finalSnapshot.month),
+        buildReportExtras(prevDate),
+      ]);
+      const pdfBuffer = await generateMonthlyReportBuffer(finalSnapshot, history, extras);
       const emailResult = await sendMonthlyReportEmail(finalSnapshot.month_label, pdfBuffer);
       
       if (emailResult.error) {

@@ -23,6 +23,7 @@ export function useAnalyticsData() {
   const [earlierSales, setEarlierSales] = useState<any[]>([]);
   const [earlierRemoved, setEarlierRemoved] = useState<any[]>([]);
   const [previousItems, setPreviousItems] = useState<any[]>([]);
+  const [earlierItems, setEarlierItems] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,6 +54,7 @@ export function useAnalyticsData() {
       setEarlierSales([month1, month2].flatMap((m) => (m.error ? [] : m.data?.salesTable ?? [])));
       setEarlierRemoved([month1, month2].flatMap((m) => (m.error ? [] : m.data?.removedItems ?? [])));
       setPreviousItems(month1.error ? [] : month1.data?.items ?? []);
+      setEarlierItems(month2.error ? [] : month2.data?.items ?? []);
     } catch (err: any) {
       setError(err.message || "Failed to load analytics.");
     } finally {
@@ -71,5 +73,5 @@ export function useAnalyticsData() {
     return () => window.removeEventListener(SESSIONS_CHANGED_EVENT, refresh);
   }, []);
 
-  return { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales, earlierRemoved, previousItems };
+  return { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales, earlierRemoved, previousItems, earlierItems };
 }

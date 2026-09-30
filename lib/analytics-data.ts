@@ -60,7 +60,7 @@ export function hoursCoverLastMonth(firstSessionAt: string | null, lastMonthStar
   return !!firstSessionAt && new Date(firstSessionAt) < addDays(lastMonthStart, 3);
 }
 
-export type Tone = "more-is-good" | "neutral";
+export type Tone = "more-is-good" | "less-is-good" | "neutral";
 
 export function makeComparison(
   current: number,
@@ -77,7 +77,8 @@ export function makeComparison(
     direction: up ? "up" : "down",
     // Costs and hours rising isn't good or bad on its own (more stock, more
     // sales, more work), so those arrows stay grey.
-    tone: tone === "neutral" ? "neutral" : up ? "good" : "bad",
+    // Fewer days to sell or less aged stock is the good direction.
+    tone: tone === "neutral" ? "neutral" : (up === (tone === "more-is-good")) ? "good" : "bad",
     label,
   };
 }

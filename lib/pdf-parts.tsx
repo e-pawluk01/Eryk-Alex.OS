@@ -27,6 +27,10 @@ export const styles = StyleSheet.create({
   cardLabel: { fontSize: 7, color: '#666666', textTransform: 'uppercase', letterSpacing: 0.9, marginBottom: 4 },
   cardValue: { fontSize: 14, fontWeight: 'bold' },
   cardSub: { fontSize: 6.75, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.75, marginTop: 3 },
+  badge: {
+    alignSelf: 'flex-start', marginTop: 4, fontSize: 5.75, color: '#666666', textTransform: 'uppercase', letterSpacing: 0.8,
+    borderWidth: 0.75, borderColor: '#cfc9bd', borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1,
+  },
   below: { marginTop: 9 },
   belowTwo: { marginTop: 9, flexDirection: 'row', justifyContent: 'space-between' },
 
@@ -59,11 +63,15 @@ export const fmtMinutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${St
 export const isNil = (v: any) => v === null || v === undefined;
 export const CHART_W = 515;
 
-export const Metric = ({ label, value, sub, muted }: { label: string; value: string; sub?: string; muted?: boolean }) => (
+// `small` fits a word value like a category name; `badge` e.g. "Early read".
+export const Metric = ({ label, value, sub, muted, small, badge }: {
+  label: string; value: string; sub?: string; muted?: boolean; small?: boolean; badge?: string;
+}) => (
   <View style={styles.card}>
     <Text style={styles.cardLabel}>{label}</Text>
-    <Text style={[styles.cardValue, muted ? { color: '#999999' } : {}]}>{value}</Text>
+    <Text style={[styles.cardValue, small ? { fontSize: 11.5 } : {}, muted ? { color: '#999999' } : {}]}>{value}</Text>
     {sub ? <Text style={styles.cardSub}>{sub}</Text> : null}
+    {badge ? <Text style={styles.badge}>{badge}</Text> : null}
   </View>
 );
 

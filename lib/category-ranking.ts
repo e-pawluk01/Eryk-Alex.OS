@@ -34,7 +34,8 @@ export interface CategoryRank {
 
 export interface Ranking {
   categories: CategoryRank[];
-  business: { sellThrough: number; perSale: number; perItem: number; medianDays: number | null; medianReached: boolean };
+  // trustK: the k in trust = n / (n + k) for sell-through.
+  business: { sellThrough: number; perSale: number; perItem: number; medianDays: number | null; medianReached: boolean; trustK: number };
 }
 
 type Life = { t: number | null; sold: boolean };
@@ -154,7 +155,7 @@ export function rankCategoriesFairly({ sales, stock, removed }: RankingInput): R
 
   return {
     categories: ranked,
-    business: { sellThrough: p, perSale: mu, perItem: bizPerItem, medianDays: biz.median, medianReached: biz.reached },
+    business: { sellThrough: p, perSale: mu, perItem: bizPerItem, medianDays: biz.median, medianReached: biz.reached, trustK: kST },
   };
 }
 
