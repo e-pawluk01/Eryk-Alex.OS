@@ -2,6 +2,7 @@
 
 import { unstable_cache } from "next/cache";
 import { getGoogleSheetsClient } from "./google-client";
+import { mapColumns, cell } from "./sheet-columns";
 
 // 1. Heavy Cache: Resolve the actual tab name (e.g. "Aug 26") for the current month
 // Caches for 24 hours, but automatically invalidates on month rollover due to the dynamic key.
@@ -30,7 +31,7 @@ const getTabData = unstable_cache(
     const sheets = getGoogleSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${tabName}'!A:N`, // N = Sold date, stamped by the sheet's script
+      range: `'${tabName}'!A:Z`, // every column; they are found by header name
     });
     return response.data.values || [];
   },
@@ -94,7 +95,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
     let sellingFees = 0;
     let shippingCosts = 0;
     let itemsSold = 0;
-    // True only if every sold row has a readable Sold date (column N).
+    // True only if every sold row has a readable Exit Date.
     let soldDatesComplete = true;
 
     // Inventory tracking
@@ -108,13 +109,15 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
     // Store raw sales details for PDF snapshot
     const salesTable: any[] = [];
 
+    const cols = mapColumns(rows[0]);
+
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      const spStr  = (row[1] ?? "").toString().trim();
-      const sfStr  = (row[2] ?? "").toString().trim();
-      const espStr = (row[8] ?? "").toString().trim();  // Column I = ESP
-      const feeStr = (row[10] ?? "").toString().trim(); // Column K = Fees
-      const shipStr = (row[11] ?? "").toString().trim(); // Column L = Ship Cost
+      const spStr   = cell(row, cols, "buy");
+      const sfStr   = cell(row, cols, "sold");
+      const espStr  = cell(row, cols, "esp");
+      const feeStr  = cell(row, cols, "fees");
+      const shipStr = cell(row, cols, "ship");
 
       const spValue  = parseFloat(spStr.replace(/[^0-9.-]+/g, ""))  || 0;
       const sfValue  = parseFloat(sfStr.replace(/[^0-9.-]+/g, ""))  || 0;
@@ -127,8 +130,10 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
       // as an item even when SP doesn't parse to a number; it just adds £0 to cost.
       const hasSP  = spStr !== "";
       const isSold = sfValue > 0;
+      // Taken off sale for good (donated, binned, kept): neither sold nor stock.
+      const isRemoved = cell(row, cols, "exit").toLowerCase() === "removed";
 
-      const soldOn = soldDateKey((row[13] ?? "").toString().trim());
+      const soldOn = soldDateKey(cell(row, cols, "exitDate"));
       if (isSold && !soldOn) soldDatesComplete = false;
 
       if (isSold && soldBy && (!soldOn || soldOn > soldBy)) {
@@ -143,21 +148,21 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
         itemsSold++;
 
         salesTable.push({
-          sku:    row[3] || "N/A",
+          sku:    cell(row, cols, "sku") || "N/A",
           buy:    spValue,
           sold:   sfValue,
           fees:   feeValue,
           ship:   shipValue,
           profit: sfValue - spValue - feeValue - shipValue,
-          tts:    row[4] || "N/A",
+          tts:    cell(row, cols, "timeToSell") || "N/A",
           soldOn: soldOn,
-          note:   (row[0] ?? "").toString().trim(),
+          note:   cell(row, cols, "notes"),
         });
-      } else if (hasSP) {
+      } else if (hasSP && !isRemoved) {
         // UNSOLD INVENTORY
         inventoryCost += spValue;
         itemsInStock++;
-        stockSkus.push((row[3] ?? "").toString().trim());
+        stockSkus.push(cell(row, cols, "sku"));
 
         if (espValue > 0) {
           expectedRevenue += espValue;
