@@ -3,6 +3,8 @@ import { Document, Page, Text, View, renderToBuffer } from '@react-pdf/renderer'
 import { format, getDaysInMonth } from 'date-fns';
 import { PRINT, taskPrint, SplitBar, ColumnChart, HorizontalBars } from './pdf-charts';
 import type { TimeBreakdown } from './time-breakdown';
+import type { ReportExtras } from './report-extras';
+import { StockCategoriesPage, CategoriesTablePage } from './pdf-extras';
 import {
   styles, Metric, Section, ChartHead, num, fmtCurrency, fmtPercent, fmtHours, fmtMinutes, isNil, CHART_W,
 } from './pdf-parts';
@@ -19,7 +21,7 @@ const PROFIT_BANDS = [
 
 export interface MonthPoint { label: string; revenue: number; grossProfit: number }
 
-const MonthlyReportPDF = ({ snapshot, history }: { snapshot: any; history: MonthPoint[] }) => {
+const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; history: MonthPoint[]; extras: ReportExtras | null }) => {
   const sales: any[] = Array.isArray(snapshot.sales_details) ? snapshot.sales_details : [];
   const time: TimeBreakdown | null = snapshot.time_breakdown ?? null;
   const generatedOn = format(new Date(), 'd MMM yyyy');
@@ -88,6 +90,7 @@ const MonthlyReportPDF = ({ snapshot, history }: { snapshot: any; history: Month
             <SplitBar label="Where the revenue went" format={fmtCurrency} items={[
               { label: 'Cost of goods', value: num(snapshot.cogs), color: PRINT.aqua },
               ...splitCosts,
+              { label: 'Written off', value: num(extras?.writtenOff), color: PRINT.other },
               { label: 'Gross profit', value: num(snapshot.gross_profit), color: PRINT.orange, strong: true },
             ]} />
           </View>
@@ -140,7 +143,13 @@ const MonthlyReportPDF = ({ snapshot, history }: { snapshot: any; history: Month
         <Footer />
       </Page>
 
-      {/* PAGE 2 — THE CHARTS */}
+      {/* PAGE 2 — STOCK HEALTH AND CATEGORIES (left out if the sheet couldn't be read) */}
+      {extras && (
+        <StockCategoriesPage extras={extras} monthLabel={String(snapshot.month_label ?? '')}
+          header={<Running right="Stock & Categories" />} footer={<Footer />} />
+      )}
+
+      {/* PAGE 3 — THE CHARTS */}
       <Page size="A4" style={styles.page}>
         <Running right="Charts" />
         <Section label="Performance">
@@ -182,7 +191,10 @@ const MonthlyReportPDF = ({ snapshot, history }: { snapshot: any; history: Month
         <Footer />
       </Page>
 
-      {/* PAGE 3+ — SALES DETAIL (flows onto more pages in a busy month) */}
+      {/* PAGE 4 — CATEGORIES IN FULL */}
+      {extras && <CategoriesTablePage extras={extras} header={<Running right="Categories" />} footer={<Footer />} />}
+
+      {/* PAGE 5+ — SALES DETAIL (flows onto more pages in a busy month) */}
       <Page size="A4" style={styles.page}>
         <Running right="Sales Detail" />
         <View style={styles.sectionHead}>
@@ -218,7 +230,7 @@ const MonthlyReportPDF = ({ snapshot, history }: { snapshot: any; history: Month
   );
 };
 
-export async function generateMonthlyReportBuffer(snapshot: any, history: MonthPoint[] = []): Promise<Buffer> {
-  const buffer = await renderToBuffer(<MonthlyReportPDF snapshot={snapshot} history={history} />);
+export async function generateMonthlyReportBuffer(snapshot: any, history: MonthPoint[] = [], extras: ReportExtras | null = null): Promise<Buffer> {
+  const buffer = await renderToBuffer(<MonthlyReportPDF snapshot={snapshot} history={history} extras={extras} />);
   return buffer;
 }

@@ -6,6 +6,7 @@ import { getMonthlyAnalytics } from '@/lib/sheets';
 import { generateMonthlyReportBuffer } from '@/lib/pdf';
 import { fetchSessionsForMonth, buildTimeBreakdown } from '@/lib/time-breakdown';
 import { fetchReportHistory } from '@/lib/report-history';
+import { buildReportExtras } from '@/lib/report-extras';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -92,8 +93,11 @@ export async function GET(request: Request) {
     }
 
     // Generate the PDF exactly as the cron job does
-    const history = await fetchReportHistory(supabase, monthKey);
-    const pdfBuffer = await generateMonthlyReportBuffer(payload, history);
+    const [history, extras] = await Promise.all([
+      fetchReportHistory(supabase, monthKey),
+      buildReportExtras(dateObj),
+    ]);
+    const pdfBuffer = await generateMonthlyReportBuffer(payload, history, extras);
 
     return new NextResponse(pdfBuffer as any, {
       headers: {
