@@ -15,7 +15,7 @@ import { useGlobalContext } from "./global-context";
 import { useAnalyticsData } from "./use-analytics-data";
 import { WorkSession, formatMinutes } from "@/lib/work-sessions";
 import { comparisonWindow, hoursCoverLastMonth, makeComparison, hoursByTask, Tone } from "@/lib/analytics-data";
-import { categoryStats } from "@/lib/categories";
+import { rankCategoriesFairly } from "@/lib/category-ranking";
 import { format } from "date-fns";
 
 type SessionDialog = { mode: "edit"; session: WorkSession } | { mode: "add" } | null;
@@ -33,7 +33,7 @@ const formatCurrency = (val: number) => val.toLocaleString("en-GB", { minimumFra
 const formatPercent = (val: number) => val.toFixed(1);
 
 export function AnalyticsView() {
-  const { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales } = useAnalyticsData();
+  const { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales, earlierRemoved } = useAnalyticsData();
   const [openCard, setOpenCard] = useState<OpenCard>(null);
   const [sessionDialog, setSessionDialog] = useState<SessionDialog>(null);
   const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
@@ -42,7 +42,11 @@ export function AnalyticsView() {
 
   // Categories look at the last 3 months: this month plus the two before.
   const windowSales = useMemo(() => [...(data?.salesTable ?? []), ...earlierSales], [data, earlierSales]);
-  const catStats = useMemo(() => categoryStats(windowSales, data?.stockSkus ?? []), [windowSales, data]);
+  const catRanking = useMemo(() => rankCategoriesFairly({
+    sales: windowSales,
+    stock: data?.stockItems ?? [],
+    removed: [...(data?.removedItems ?? []), ...earlierRemoved],
+  }), [windowSales, data, earlierRemoved]);
 
   if (selectedHistorical) {
     return <HistoricalSnapshotView snapshot={selectedHistorical} onBack={() => setSelectedHistorical(null)} />;
@@ -167,7 +171,7 @@ export function AnalyticsView() {
         </MetricSection>
 
         {/* CATEGORIES — which kinds of stock earn and sell best, last 3 months */}
-        <CategoriesSection loading={loading} stats={catStats} sales={windowSales} openCard={openCard} onToggle={toggle} />
+        <CategoriesSection loading={loading} ranking={catRanking} sales={windowSales} openCard={openCard} onToggle={toggle} />
 
         {/* INVENTORY — money tied up in unsold stock, as of now */}
         <MetricSection
