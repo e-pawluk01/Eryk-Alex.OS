@@ -16,10 +16,12 @@ import { useAnalyticsData } from "./use-analytics-data";
 import { WorkSession, formatMinutes } from "@/lib/work-sessions";
 import { comparisonWindow, hoursCoverLastMonth, makeComparison, hoursByTask, Tone } from "@/lib/analytics-data";
 import { rankCategoriesFairly } from "@/lib/category-ranking";
+import { stockHealth } from "@/lib/stock-health";
+import { StockHealthSection, HealthCard } from "./stock-health-section";
 import { format } from "date-fns";
 
 type SessionDialog = { mode: "edit"; session: WorkSession } | { mode: "add" } | null;
-type OpenCard = "revenue" | "hours" | "tasks" | "sales" | CategoryCard | null;
+type OpenCard = "revenue" | "hours" | "tasks" | "sales" | CategoryCard | HealthCard | null;
 
 const EMPTY_DATA = {
   revenue: 0, cogs: 0, sellingCosts: 0, sellingFees: 0, shippingCosts: 0, writtenOff: 0,
@@ -33,7 +35,7 @@ const formatCurrency = (val: number) => val.toLocaleString("en-GB", { minimumFra
 const formatPercent = (val: number) => val.toFixed(1);
 
 export function AnalyticsView() {
-  const { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales, earlierRemoved } = useAnalyticsData();
+  const { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales, earlierRemoved, previousItems } = useAnalyticsData();
   const [openCard, setOpenCard] = useState<OpenCard>(null);
   const [sessionDialog, setSessionDialog] = useState<SessionDialog>(null);
   const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
@@ -47,6 +49,7 @@ export function AnalyticsView() {
     stock: data?.stockItems ?? [],
     removed: [...(data?.removedItems ?? []), ...earlierRemoved],
   }), [windowSales, data, earlierRemoved]);
+  const health = useMemo(() => stockHealth(data?.items ?? [], previousItems), [data, previousItems]);
 
   if (selectedHistorical) {
     return <HistoricalSnapshotView snapshot={selectedHistorical} onBack={() => setSelectedHistorical(null)} />;
@@ -189,6 +192,9 @@ export function AnalyticsView() {
             value={safeData.expectedProfit !== null ? formatCurrency(safeData.expectedProfit) : "—"}
             prefix={safeData.expectedProfit !== null ? "£" : undefined} />
         </MetricSection>
+
+        {/* STOCK HEALTH — the stock as a whole: selling, speed, stale stock, growth */}
+        <StockHealthSection loading={loading} health={health} openCard={openCard} onToggle={toggle} />
       </div>
 
       {sessionDialog && (
