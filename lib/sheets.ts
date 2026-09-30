@@ -130,6 +130,8 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
       // as an item even when SP doesn't parse to a number; it just adds £0 to cost.
       const hasSP  = spStr !== "";
       const isSold = sfValue > 0;
+      // Taken off sale for good (donated, binned, kept): neither sold nor stock.
+      const isRemoved = cell(row, cols, "exit").toLowerCase() === "removed";
 
       const soldOn = soldDateKey(cell(row, cols, "exitDate"));
       if (isSold && !soldOn) soldDatesComplete = false;
@@ -156,7 +158,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
           soldOn: soldOn,
           note:   cell(row, cols, "notes"),
         });
-      } else if (hasSP) {
+      } else if (hasSP && !isRemoved) {
         // UNSOLD INVENTORY
         inventoryCost += spValue;
         itemsInStock++;
