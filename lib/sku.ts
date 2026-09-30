@@ -1,6 +1,7 @@
 import { getGoogleSheetsClient } from "./google-client";
 import { supabaseAdmin } from "./supabase-admin";
 import { SKU_CODE_BY_NAME } from "./sku-categories";
+import { mapColumns, cell, columnLetter } from "./sheet-columns";
 
 function currentMonthTabName(): string {
   const d = new Date();
@@ -49,16 +50,23 @@ async function appendSkuRow(sku: string): Promise<string> {
     ?.properties?.title;
   if (!tab) throw new Error(`No sheet tab found for "${currentMonthTabName()}".`);
 
-  // Reading only A:D keeps the row count honest — the phantom checkbox column
-  // (F) that inflated carry-forward's count isn't in range here.
-  const resp = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tab}'!A:D` });
-  const firstEmptyRow = (resp.data.values || []).length + 1;
+  const resp = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tab}'!A:Z` });
+  const rows: any[][] = resp.data.values || [];
+  const cols = mapColumns(rows[0]);
+  if (cols.sku === undefined) throw new Error(`No "SKU" column in "${tab}".`);
+
+  // The row count can't be trusted: a column of empty tickboxes reads "FALSE"
+  // all the way down. Only a note, a SKU or a buy price marks a genuine row.
+  let lastItemRow = 1; // header
+  rows.forEach((r, i) => {
+    if (i > 0 && (cell(r, cols, "notes") || cell(r, cols, "sku") || cell(r, cols, "buy"))) lastItemRow = i + 1;
+  });
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${tab}'!A${firstEmptyRow}`,
+    range: `'${tab}'!${columnLetter(cols.sku)}${lastItemRow + 1}`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [["", "", "", sku]] },
+    requestBody: { values: [[sku]] },
   });
 
   return tab;
