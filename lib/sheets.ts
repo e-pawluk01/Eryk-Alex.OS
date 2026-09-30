@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { getGoogleSheetsClient } from "./google-client";
 import { mapColumns, cell } from "./sheet-columns";
 import { daysListed, parseSheetDate } from "./listing-days";
+import type { SheetItem } from "./sheet-item";
 
 // 1. Heavy Cache: Resolve the actual tab name (e.g. "Aug 26") for the current month
 // Caches for 24 hours, but automatically invalidates on month rollover due to the dynamic key.
@@ -110,6 +111,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
     // For Categories: how long each unsold / removed item has been listed.
     const stockItems: { sku: string; days: number | null }[] = [];
     const removedItems: { sku: string; days: number | null }[] = [];
+    const items: SheetItem[] = []; // every stock row, for Stock Health
     const today = new Date();
     
     // Store raw sales details for PDF snapshot
@@ -141,6 +143,22 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
 
       const soldOn = soldDateKey(cell(row, cols, "exitDate"));
       if (isSold && !soldOn) soldDatesComplete = false;
+
+      // A SKU with nothing else (a stub the SKU button made) isn't stock yet.
+      if (hasSP || isSold || isRemoved) {
+        const tts = Number(cell(row, cols, "timeToSell"));
+        items.push({
+          sku: cell(row, cols, "sku"),
+          buy: spValue,
+          esp: espValue > 0 ? espValue : null,
+          status: isSold ? "sold" : isRemoved ? "removed" : "stock",
+          exitOn: soldOn,
+          sourcedOn: soldDateKey(cell(row, cols, "sourcedDate")),
+          days: isSold
+            ? (cell(row, cols, "timeToSell") !== "" && Number.isFinite(tts) ? tts : null)
+            : daysListed(row, cols, isRemoved ? parseSheetDate(cell(row, cols, "exitDate")) ?? today : today),
+        });
+      }
 
       if (isSold && soldBy && (!soldOn || soldOn > soldBy)) {
         // Sold after the cut-off day: outside a like-for-like window.
@@ -215,6 +233,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
         stockSkus,
         stockItems,
         removedItems,
+        items,
         returnOnCost,
         expectedRevenue:    espItemCount > 0 ? expectedRevenue    : null,
         expectedProfit:     espItemCount > 0 ? expectedProfit     : null,
