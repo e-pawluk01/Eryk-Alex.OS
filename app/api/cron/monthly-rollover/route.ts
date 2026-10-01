@@ -138,7 +138,7 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error("[Phase A Error]", error);
     results.phaseA = `failed: ${error.message}`;
-    await sendErrorAlertEmail("Phase A (Report Generation)", error.message || String(error));
+    await sendErrorAlertEmail("Monthly rollover: Phase A (Report Generation)", error.message || String(error));
   }
 
   // ==========================================
@@ -160,7 +160,7 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error("[Phase B Error]", error);
     results.phaseB = `failed: ${error.message}`;
-    await sendErrorAlertEmail("Phase B (Tab Creation)", error.message || String(error));
+    await sendErrorAlertEmail("Monthly rollover: Phase B (Tab Creation)", error.message || String(error));
   }
 
   // ==========================================
@@ -177,7 +177,7 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error("[Phase C Error]", error);
     results.phaseC = `failed: ${error.message}`;
-    await sendErrorAlertEmail("Phase C (Carry Forward)", error.message || String(error));
+    await sendErrorAlertEmail("Monthly rollover: Phase C (Carry Forward)", error.message || String(error));
   }
 
   return NextResponse.json({

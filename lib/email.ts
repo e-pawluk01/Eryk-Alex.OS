@@ -8,6 +8,7 @@ const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 
 const REPORT_RECIPIENTS = ['erykpawluk@gmail.com', 'alexandra.ap.archive@gmail.com'];
 const ALERT_RECIPIENTS = ['erykpawluk@gmail.com'];
+const LISTING_RECIPIENTS = ['erykpawluk@gmail.com'];
 
 function getTransport() {
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) return null;
@@ -56,10 +57,23 @@ export async function sendErrorAlertEmail(phase: string, errorMessage: string) {
     await transport.sendMail({
       from: `Task OS <${GMAIL_USER}>`,
       to: ALERT_RECIPIENTS,
-      subject: `🚨 SYSTEM ALERT: Monthly Rollover Failed (${phase})`,
-      text: `The automated monthly rollover cron job caught an error during ${phase}.\n\nError Details:\n${errorMessage}\n\nPlease check Vercel logs and Supabase.`,
+      subject: `🚨 SYSTEM ALERT: ${phase} failed`,
+      text: `An automated job caught an error during ${phase}.\n\nError Details:\n${errorMessage}\n\nPlease check Vercel logs and Supabase.`,
     });
   } catch (err) {
     console.error('Failed to send alert email:', err);
+  }
+}
+
+// The daily "listings to update" email (Eryk only).
+export async function sendListingEmail(subject: string, html: string) {
+  const transport = getTransport();
+  if (!transport) return { error: 'Gmail email not configured (missing GMAIL_USER / GMAIL_APP_PASSWORD).' };
+  try {
+    const info = await transport.sendMail({ from: `Task OS <${GMAIL_USER}>`, to: LISTING_RECIPIENTS, subject, html });
+    return { data: info };
+  } catch (error) {
+    console.error('Failed to send listing email:', error);
+    return { error };
   }
 }
