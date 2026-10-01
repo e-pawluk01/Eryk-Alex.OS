@@ -85,5 +85,35 @@ export async function carryForwardUnsold(fromTab: string, toTab: string) {
     requestBody: { values: toCopy },
   });
 
+  await addHoldTickboxes(spreadsheetId, toTab, dstRows[0] || [], dst, toCopy, firstEmptyRow);
+
   return { copied: toCopy.length, alreadyThere, startRow: firstEmptyRow, from: fromTab, to: toTab };
+}
+
+// Items on Hold get a tickbox in "Item Checked", ticked when Eryk keeps one on
+// Hold at a check-in. The Apps Script adds them as Stage changes, but it can't
+// see rows written by the app, so carried Hold items get theirs here.
+async function addHoldTickboxes(spreadsheetId: string, tab: string, header: unknown[], dst: ReturnType<typeof mapColumns>, rows: any[][], firstRow: number) {
+  const col = header.findIndex((h) => String(h ?? "").trim().toLowerCase() === "item checked");
+  if (col === -1 || dst.stage === undefined) return;
+  const holdRows = rows.map((r, i) => (String(r[dst.stage!]).trim().toLowerCase() === "hold" ? firstRow - 1 + i : -1)).filter((i) => i >= 0);
+  if (!holdRows.length) return;
+
+  const sheets = getGoogleSheetsClient();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" });
+  const sheetId = meta.data.sheets?.find((s) => s.properties?.title === tab)?.properties?.sheetId;
+  if (sheetId === undefined || sheetId === null) return;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: holdRows.map((row) => ({
+        repeatCell: {
+          range: { sheetId, startRowIndex: row, endRowIndex: row + 1, startColumnIndex: col, endColumnIndex: col + 1 },
+          cell: { dataValidation: { condition: { type: "BOOLEAN" } }, userEnteredValue: { boolValue: false } },
+          fields: "dataValidation,userEnteredValue",
+        },
+      })),
+    },
+  });
 }
