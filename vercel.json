@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/monthly-rollover",
       "schedule": "0 0 1 * *"
+    },
+    {
+      "path": "/api/cron/listing-email",
+      "schedule": "0 0 * * *"
     }
   ]
 }
