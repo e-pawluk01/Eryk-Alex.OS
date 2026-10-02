@@ -10,6 +10,10 @@ import { fetchSessionsForMonth, buildTimeBreakdown } from '@/lib/time-breakdown'
 import { fetchReportHistory } from '@/lib/report-history';
 import { buildReportExtras } from '@/lib/report-extras';
 import { sendMonthlyReportEmail, sendErrorAlertEmail } from '@/lib/email';
+import { runMonthlyTake } from '@/lib/monthly-take';
+
+// Claude can take a while to write, and may need a second go.
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
@@ -27,7 +31,8 @@ export async function GET(request: Request) {
   const results = {
     phaseA: "pending",
     phaseB: "pending",
-    phaseC: "pending"
+    phaseC: "pending",
+    phaseD: "pending"
   };
 
   // ==========================================
@@ -178,6 +183,22 @@ export async function GET(request: Request) {
     console.error("[Phase C Error]", error);
     results.phaseC = `failed: ${error.message}`;
     await sendErrorAlertEmail("Monthly rollover: Phase C (Carry Forward)", error.message || String(error));
+  }
+
+  // ==========================================
+  // PHASE D: CLAUDE'S MONTHLY TAKE (after the PDF)
+  // ==========================================
+  try {
+    if (results.phaseA.startsWith("failed")) throw new Error("Skipped: the report for last month didn't close.");
+    const take = await runMonthlyTake(prevMonthKey, { send: true });
+    results.phaseD = take.skipped ? "skipped" : take.failure ? "sent without the written parts" : "success";
+    if (!take.skipped && take.saveError) {
+      await sendErrorAlertEmail("Monthly rollover: Phase D (saving Claude's take)", take.saveError);
+    }
+  } catch (error: any) {
+    console.error("[Phase D Error]", error);
+    results.phaseD = `failed: ${error.message}`;
+    await sendErrorAlertEmail("Monthly rollover: Phase D (Claude's take)", error.message || String(error));
   }
 
   return NextResponse.json({
