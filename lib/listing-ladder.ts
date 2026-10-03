@@ -10,6 +10,10 @@ import { categoryOf } from "./categories";
 //   Stage 2     → Stage 3 refresh + bigger   ½x after Stage 2
 //   Stage 3     → Check-in                   1x after Stage 3
 //   Hold        → Check-in again             1x after the last check-in
+//   Floor       → Floor check (keep/remove)  2x after the last step
+//
+// Floor = at its lowest price: no cuts left, so it only needs a keep-or-remove
+// decision, after twice the days to sell (the same line as aged stock).
 //
 // Days to sell starts at 28 days (the starting timings 4 / 2 / 2 / 4 weeks)
 // and blends towards each category's own figure as its sales build up.
@@ -22,12 +26,12 @@ export interface LadderItem {
   costs: number;               // fees + shipping already on the row
   listedPrice: number | null;  // original asking price
   esp: number | null;          // lowest acceptable price
-  stage: "" | "1" | "2" | "3" | "Hold";
+  stage: "" | "1" | "2" | "3" | "Hold" | "Floor";
   stageDate: string | null;    // "yyyy-MM-dd", stamped when Stage last changed
   daysListed: number | null;
 }
 
-export type Step = "stage1" | "stage2" | "stage3" | "checkin";
+export type Step = "stage1" | "stage2" | "stage3" | "checkin" | "floor";
 
 export interface DueItem {
   item: LadderItem;
@@ -49,7 +53,7 @@ const dayNumber = (key: string) => Math.floor(Date.parse(`${key}T00:00:00Z`) / D
 /** Gaps for a category's days to sell (advisor's limits: 14–42 and 7–21 days). */
 export function timings(daysToSell: number) {
   const full = clamp(Math.round(daysToSell), 14, 42);
-  return { first: full, gap: clamp(Math.round(daysToSell / 2), 7, 21), final: full };
+  return { first: full, gap: clamp(Math.round(daysToSell / 2), 7, 21), final: full, floor: 2 * full };
 }
 
 // Never below the ESP, and never at a loss.
@@ -68,7 +72,7 @@ function pricesFor(i: LadderItem, step: Step, floor: number | null) {
   return step === "stage2" ? { interest: at(1 / 4), none: at(1 / 3) } : { interest: at(1 / 2), none: floor };
 }
 
-const NEXT: Record<LadderItem["stage"], Step> = { "": "stage1", "1": "stage2", "2": "stage3", "3": "checkin", "Hold": "checkin" };
+const NEXT: Record<LadderItem["stage"], Step> = { "": "stage1", "1": "stage2", "2": "stage3", "3": "checkin", "Hold": "checkin", "Floor": "floor" };
 
 /**
  * Every live listing's next step and when it's due (in days from today).
@@ -78,9 +82,9 @@ export function schedule(items: LadderItem[], daysToSellOf: (category: string) =
   const today = dayNumber(todayKey);
   const out: DueItem[] = [];
 
-  // Older stock: Stage 3 / Hold with no Stage Date, oldest first, spread
-  // evenly over what's left of one check-in gap from the ladder's start.
-  const older = items.filter((i) => (i.stage === "3" || i.stage === "Hold") && !i.stageDate)
+  // Older stock: Stage 3 / Hold / Floor with no Stage Date, oldest first,
+  // spread evenly over what's left of one wait from the ladder's start.
+  const older = items.filter((i) => (i.stage === "3" || i.stage === "Hold" || i.stage === "Floor") && !i.stageDate)
     .sort((a, b) => (b.daysListed ?? 0) - (a.daysListed ?? 0));
 
   for (const i of items) {
@@ -93,11 +97,11 @@ export function schedule(items: LadderItem[], daysToSellOf: (category: string) =
       wait = t.first;
       due = t.first - i.daysListed;
     } else if (i.stageDate) {
-      wait = step === "checkin" ? t.final : t.gap;
+      wait = step === "floor" ? t.floor : step === "checkin" ? t.final : t.gap;
       due = dayNumber(i.stageDate) + wait - today;
-    } else if (step === "checkin") {
-      wait = t.final;
-      const left = dayNumber(LADDER_START) + t.final - today;
+    } else if (step === "checkin" || step === "floor") {
+      wait = step === "floor" ? t.floor : t.final;
+      const left = dayNumber(LADDER_START) + wait - today;
       due = left <= 0 ? 0 : Math.floor((older.indexOf(i) * left) / older.length);
     } else {
       // Stage 1 or 2 with no date (set before Stage Date existed): place it by
@@ -133,9 +137,12 @@ function pickToday(pool: DueItem[]): DueItem[] {
     .slice(0, Math.max(dueNow, need));
 }
 
+// Check-ins and floor checks are both quick decisions, picked together.
+const isDecision = (d: DueItem) => d.step === "checkin" || d.step === "floor";
+
 export function todaysList(all: DueItem[]) {
-  const refreshes = pickToday(all.filter((d) => d.step !== "checkin"));
-  const checkins = pickToday(all.filter((d) => d.step === "checkin"));
+  const refreshes = pickToday(all.filter((d) => !isDecision(d)));
+  const checkins = pickToday(all.filter(isDecision));
   const shown = new Set([...refreshes, ...checkins]);
   return {
     refreshes,
