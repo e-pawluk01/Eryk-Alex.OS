@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { X, Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useGlobalContext } from "./global-context";
-import { WORK_TASKS } from "@/lib/work-sessions";
+import { WORK_TASKS, partnerOf, openSessionOf } from "@/lib/work-sessions";
 
 const TASKS = WORK_TASKS;
 
@@ -17,9 +17,19 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
   const [isOpen, setIsOpen] = useState(false);
   const [task, setTask] = useState<string>(TASKS[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [together, setTogether] = useState(false);
+  // What the other person is clocked in on, if anything: Together is off then.
+  const [partnerBusy, setPartnerBusy] = useState<string | null>(null);
   const { userEmail } = useGlobalContext();
 
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
+  const partner = partnerOf(userContextName);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setTogether(false);
+    openSessionOf(partner).then((s) => setPartnerBusy(s ? s.task : null));
+  }, [isOpen, partner]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,13 +37,13 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.from("work_sessions").insert([
-        {
-          person: userContextName,
-          task: task,
-          // started_at defaults to NOW() in DB
-        }
-      ]);
+      // Together: one session each with the exact same start, so clocking
+      // out either of them ends both.
+      const startedAt = new Date().toISOString();
+      const people = together && !partnerBusy ? [userContextName, partner] : [userContextName];
+      const { error } = await supabase.from("work_sessions").insert(
+        people.map((person) => ({ person, task, started_at: startedAt }))
+      );
       if (error) throw error;
       
       onSessionStarted();
@@ -93,6 +103,22 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
                   ))}
                 </select>
               </div>
+
+              <label className={`flex items-start gap-3 ${partnerBusy ? "opacity-45" : "cursor-pointer"}`}>
+                <input
+                  type="checkbox"
+                  checked={together && !partnerBusy}
+                  onChange={(e) => setTogether(e.target.checked)}
+                  disabled={isSubmitting || !!partnerBusy}
+                  className="mt-0.5 w-4 h-4 accent-white"
+                />
+                <span className="text-sm text-white/90">
+                  Together
+                  <span className="block text-[11.5px] text-white/40 mt-0.5">
+                    {partnerBusy ? `${partner} is clocked in on ${partnerBusy}` : `${partner} gets this session too`}
+                  </span>
+                </span>
+              </label>
 
               <div className="flex justify-end pt-2">
                 <button

@@ -1,13 +1,19 @@
 import { supabase } from "./supabase";
 
+// In the order the work happens: getting stock, preparing it, making it,
+// selling it, then running the business.
 export const WORK_TASKS = [
-  "Development",
-  "Content",
   "Sourcing",
+  "Research",
   "Cleaning / Restoration",
   "Photography",
+  "Sewing",
   "Listing",
+  "Relisting",
   "Packing / Shipping",
+  "Content",
+  "Operations",
+  "Development",
   "Admin",
   "Other",
 ] as const;
@@ -15,11 +21,15 @@ export const WORK_TASKS = [
 // One fixed colour per task, used everywhere the task appears.
 export const TASK_COLORS: Record<string, string> = {
   "Listing": "#3987e5",
+  "Relisting": "#8fbdf2",
   "Photography": "#d95926",
   "Sourcing": "#199e70",
+  "Research": "#2bb3c0",
   "Cleaning / Restoration": "#c98500",
+  "Sewing": "#a3c13d",
   "Packing / Shipping": "#d55181",
   "Admin": "#008300",
+  "Operations": "#a87b4f",
   "Content": "#9085e9",
   "Development": "#e66767",
   "Other": "#555553",
@@ -32,6 +42,41 @@ export const PERSON_COLORS: Record<string, string> = {
 
 export function taskColor(task: string) {
   return TASK_COLORS[task] ?? TASK_COLORS.Other;
+}
+
+// "Together": a joint task is logged as one session each, with the exact same
+// start time, which is how the two are recognised as a pair at clock-out.
+export const partnerOf = (person: string) => (person === "Alex" ? "Eryk" : "Alex");
+
+/** The other person's running session, if they're clocked in. */
+export async function openSessionOf(person: string): Promise<WorkSession | null> {
+  const { data } = await supabase
+    .from("work_sessions")
+    .select("*")
+    .eq("person", person)
+    .is("ended_at", null)
+    .order("started_at", { ascending: false })
+    .limit(1);
+  return (data?.[0] as WorkSession) ?? null;
+}
+
+/** The partner's half of a joint session that is still running, if any. */
+export async function togetherSessionOf(session: WorkSession): Promise<WorkSession | null> {
+  const { data } = await supabase
+    .from("work_sessions")
+    .select("*")
+    .eq("person", partnerOf(session.person))
+    .eq("task", session.task)
+    .eq("started_at", session.started_at)
+    .is("ended_at", null)
+    .limit(1);
+  return (data?.[0] as WorkSession) ?? null;
+}
+
+/** False if the session has already been ended (e.g. by the partner). */
+export async function isStillRunning(id: string): Promise<boolean> {
+  const { data } = await supabase.from("work_sessions").select("ended_at").eq("id", id).maybeSingle();
+  return !!data && data.ended_at === null;
 }
 
 export interface WorkSession {
@@ -64,19 +109,23 @@ export interface SessionPiece {
 export async function saveSessionPieces(
   person: string,
   pieces: SessionPiece[],
-  replaceId?: string
+  replaceId?: string,
+  together = false
 ): Promise<{ error?: string }> {
-  const rows = pieces.map((p) => ({
-    person,
+  const rowsFor = (who: string) => pieces.map((p) => ({
+    person: who,
     task: p.task,
     started_at: p.startedAt.toISOString(),
     ended_at: p.endedAt.toISOString(),
     duration: Math.round((p.endedAt.getTime() - p.startedAt.getTime()) / 1000),
   }));
+  const rows = rowsFor(person);
 
   if (!replaceId) {
-    // One multi-row insert: either every piece is saved or none is.
-    const { error } = await supabase.from("work_sessions").insert(rows);
+    // One multi-row insert: either every piece (for both people, when
+    // together) is saved or none is.
+    const all = together ? [...rows, ...rowsFor(partnerOf(person))] : rows;
+    const { error } = await supabase.from("work_sessions").insert(all);
     if (error) return { error: friendlyError(error.message) };
     notifySessionsChanged();
     return {};

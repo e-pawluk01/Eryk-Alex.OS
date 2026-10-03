@@ -9,7 +9,7 @@ import { TimeField } from "./ui/time-field";
 import { DatePills } from "./ui/date-pills";
 import {
   WORK_TASKS, WorkSession, SessionPiece, taskColor, formatMinutes,
-  saveSessionPieces, deleteSession,
+  saveSessionPieces, deleteSession, partnerOf, togetherSessionOf, isStillRunning,
 } from "@/lib/work-sessions";
 
 type Mode = "clockout" | "edit" | "add";
@@ -65,6 +65,15 @@ export function SessionFormDialog({ mode, session, person, onClose, onSaved }: S
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [together, setTogether] = useState(false);
+  // Clocking out a joint session: the partner's half, ended alongside.
+  const [partnerSession, setPartnerSession] = useState<WorkSession | null>(null);
+  const owner = session?.person ?? person;
+  const partner = partnerOf(owner);
+
+  useEffect(() => {
+    if (mode === "clockout" && session) togetherSessionOf(session).then(setPartnerSession);
+  }, [mode, session]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -117,10 +126,25 @@ export function SessionFormDialog({ mode, session, person, onClose, onSaved }: S
       cursor = pieceEnd;
     });
 
-    const owner = session?.person ?? person;
-    const result = await saveSessionPieces(owner, pieces, mode === "add" ? undefined : session?.id);
+    // The partner may already have ended this joint session from their side.
+    if (mode === "clockout" && session && !(await isStillRunning(session.id))) {
+      setSaving(false);
+      onSaved();
+      return;
+    }
+
+    const result = await saveSessionPieces(owner, pieces, mode === "add" ? undefined : session?.id, mode === "add" && together);
+    if (result.error) { setSaving(false); setSaveError(result.error); return; }
+
+    if (partnerSession && (await isStillRunning(partnerSession.id))) {
+      const theirs = await saveSessionPieces(partner, pieces, partnerSession.id);
+      if (theirs.error) {
+        setSaving(false);
+        setSaveError(`Your session was saved, but ${partner}'s couldn't be ended: ${theirs.error}`);
+        return;
+      }
+    }
     setSaving(false);
-    if (result.error) { setSaveError(result.error); return; }
     onSaved();
   };
 
@@ -294,6 +318,25 @@ export function SessionFormDialog({ mode, session, person, onClose, onSaved }: S
                 + Add another task
               </button>
             </div>
+
+            {mode === "add" && (
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={together}
+                  onChange={(e) => setTogether(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-white"
+                />
+                <span className="text-sm text-white/90">
+                  Together
+                  <span className="block text-[11.5px] text-white/40 mt-0.5">{partner} gets this session too</span>
+                </span>
+              </label>
+            )}
+
+            {partnerSession && (
+              <p className="text-[11.5px] text-white/45 -mt-1">Together with {partner}: this ends {partner}&apos;s session too.</p>
+            )}
 
             {(error || saveError) && (
               <p className="text-xs text-red-400/80 -mt-1">{saveError ?? error}</p>
