@@ -22,6 +22,8 @@ export const COLUMN_HEADERS = {
   listedPrice: "Listed Price",
   stageDate: "Stage Date",
   currentPrice: "Current Price",
+  platform: "Platform",          // where it sold
+  sourcedFrom: "Sourced From",   // where it was bought
 } as const;
 
 export type ColumnKey = keyof typeof COLUMN_HEADERS;

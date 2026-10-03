@@ -157,6 +157,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
           days: isSold
             ? (cell(row, cols, "timeToSell") !== "" && Number.isFinite(tts) ? tts : null)
             : daysListed(row, cols, isRemoved ? parseSheetDate(cell(row, cols, "exitDate")) ?? today : today),
+          sourcedFrom: cell(row, cols, "sourcedFrom"),
         });
       }
 
@@ -181,6 +182,7 @@ export async function getMonthlyAnalytics(dateIso?: string, soldBy?: string) {
           tts:    cell(row, cols, "timeToSell") || "N/A",
           soldOn: soldOn,
           note:   cell(row, cols, "notes"),
+          platform: cell(row, cols, "platform"),
         });
       } else if (isRemoved) {
         // The money was spent, so it counts as a cost in the month it was removed.

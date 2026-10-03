@@ -77,3 +77,16 @@ export async function sendListingEmail(subject: string, html: string) {
     return { error };
   }
 }
+
+// Claude's monthly take, to the same people as the report.
+export async function sendTakeEmail(subject: string, html: string) {
+  const transport = getTransport();
+  if (!transport) return { error: 'Gmail email not configured (missing GMAIL_USER / GMAIL_APP_PASSWORD).' };
+  try {
+    const info = await transport.sendMail({ from: `Task OS <${GMAIL_USER}>`, to: REPORT_RECIPIENTS, subject, html });
+    return { data: info };
+  } catch (error) {
+    console.error('Failed to send monthly take email:', error);
+    return { error };
+  }
+}
