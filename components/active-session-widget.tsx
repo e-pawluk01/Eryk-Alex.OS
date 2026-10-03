@@ -6,7 +6,7 @@ import { useGlobalContext } from "./global-context";
 import { ClockInDialog } from "./clock-in-dialog";
 import { SessionFormDialog } from "./session-form-dialog";
 import { Square, Clock } from "lucide-react";
-import { WorkSession } from "@/lib/work-sessions";
+import { WorkSession, SESSIONS_CHANGED_EVENT } from "@/lib/work-sessions";
 
 export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () => void }) {
   const [activeSession, setActiveSession] = useState<WorkSession | null>(null);
@@ -16,8 +16,8 @@ export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () =>
   const { userEmail } = useGlobalContext();
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
 
+  // Starts out loading; later re-checks keep the widget on screen.
   const fetchActiveSession = useCallback(async () => {
-    setLoading(true);
     try {
       const { data, error } = await supabase
         .from("work_sessions")
@@ -40,8 +40,17 @@ export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () =>
     }
   }, [userContextName]);
 
+  // Re-check when the app comes back into view or a session is saved: the
+  // other person may have started or ended a joint session meanwhile.
   useEffect(() => {
     fetchActiveSession();
+    const onVisible = () => { if (document.visibilityState === "visible") fetchActiveSession(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener(SESSIONS_CHANGED_EVENT, fetchActiveSession);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener(SESSIONS_CHANGED_EVENT, fetchActiveSession);
+    };
   }, [fetchActiveSession]);
 
   useEffect(() => {
