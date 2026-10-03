@@ -11,6 +11,7 @@ const GROUPS: { step: Step; title: string; what: string; color: string }[] = [
   { step: "stage2", title: "Stage 2", what: "Refresh + reprice", color: "#a78bfa" },
   { step: "stage3", title: "Stage 3", what: "Refresh + bigger reprice", color: "#f59e0b" },
   { step: "checkin", title: "Check-in", what: "Refresh again, floor price, leave it (Hold) or remove", color: "#f87171" },
+  { step: "floor", title: "Floor", what: "Refresh, or remove / bundle", color: "#9ca3af" },
 ];
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -21,7 +22,8 @@ function row(d: DueItem, n: number) {
   const days = d.item.daysListed !== null ? `${d.item.daysListed} days` : "";
   const pills = [
     ...(d.prices ? [pill("Had interest", `£${d.prices.interest}`), pill("No interest", `£${d.prices.none}`)] : []),
-    ...(d.floor !== null ? [pill("Floor", `£${d.floor}`, true)] : []),
+    // A floor item is already at its floor: nothing to suggest.
+    ...(d.floor !== null && d.step !== "floor" ? [pill("Floor", `£${d.floor}`, true)] : []),
   ].join("");
   return `<tr><td style="padding:12px 14px;${n ? `border-top:1px solid ${C.line}` : ""}">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
@@ -75,7 +77,7 @@ export function listingEmailHtml({ refreshes, checkins, waiting, pastLimit, timi
   </tr></table>
   ${status}
   ${section("Refreshes", refreshes, ["stage1", "stage2", "stage3"])}
-  ${section("Quick decisions", checkins, ["checkin"])}
+  ${section("Quick decisions", checkins, ["checkin", "floor"])}
   <div style="margin-top:26px;border-top:1px solid ${C.line};padding-top:14px;font-size:12.5px;color:${C.muted}">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
       <td>More due, waiting</td>

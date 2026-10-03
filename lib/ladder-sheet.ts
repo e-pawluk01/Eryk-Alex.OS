@@ -38,7 +38,8 @@ export async function readLadderItems(today: Date): Promise<LadderItem[]> {
     if (!sku || money(cell(r, cols, "sold")) > 0 || cell(r, cols, "exit") !== "") return [];
     if (!listed(cell(r, cols, "upV")) && !listed(cell(r, cols, "upD"))) return [];
     const stageText = cell(r, cols, "stage");
-    const stage = stageText.toLowerCase() === "hold" ? "Hold" : STAGES.has(stageText) ? (stageText as "1" | "2" | "3") : "";
+    const word = stageText.toLowerCase();
+    const stage = word === "hold" ? "Hold" : word === "floor" ? "Floor" : STAGES.has(stageText) ? (stageText as "1" | "2" | "3") : "";
     const stageDate = parseSheetDate(cell(r, cols, "stageDate"));
     const listedText = cell(r, cols, "listedPrice"), espText = cell(r, cols, "esp");
     return [{
