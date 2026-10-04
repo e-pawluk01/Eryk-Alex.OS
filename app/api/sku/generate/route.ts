@@ -3,12 +3,12 @@ import { generateSku } from '@/lib/sku';
 
 export async function POST(request: Request) {
   try {
-    const { category } = await request.json();
+    const { category, custom } = await request.json();
     if (!category) {
       return NextResponse.json({ error: 'Missing category' }, { status: 400 });
     }
 
-    const result = await generateSku(category);
+    const result = await generateSku(category, !!custom);
     if ('error' in result && result.error) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

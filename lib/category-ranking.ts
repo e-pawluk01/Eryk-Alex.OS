@@ -1,4 +1,4 @@
-import { categoryOf, hasSku } from "./categories";
+import { categoryOf, hasSku, isCustomSku } from "./categories";
 
 // Ranks categories fairly even when some are small (the advisor's method,
 // Sep 2026). Each category's own figures are blended towards the business
@@ -76,7 +76,9 @@ export function rankCategoriesFairly({ sales, stock, removed }: RankingInput): R
     return groups.get(name)!;
   };
 
-  const soldSales = sales.filter((s) => hasSku(s.sku));
+  // Bought stock only: custom pieces would skew which stock is worth sourcing.
+  const bought = (sku: string) => hasSku(sku) && !isCustomSku(sku);
+  const soldSales = sales.filter((s) => bought(s.sku));
   const profits = soldSales.map((s) => Number(s.profit) || 0).sort((a, b) => a - b);
   const [p5, p95] = profits.length ? [percentile(profits, 0.05), percentile(profits, 0.95)] : [0, 0];
 
@@ -86,12 +88,12 @@ export function rankCategoriesFairly({ sales, stock, removed }: RankingInput): R
     const t = s.tts !== "" && s.tts !== "N/A" && Number.isFinite(days) ? days : null;
     group(categoryOf(s.sku, s.note)).sold.push({ profit, capped: Math.min(p95, Math.max(p5, profit)), life: { t, sold: true } });
   });
-  stock.filter((i) => hasSku(i.sku)).forEach((i) => {
+  stock.filter((i) => bought(i.sku)).forEach((i) => {
     const g = group(categoryOf(i.sku));
     g.open.push({ t: i.days, sold: false });
     g.inStock.push(i.days);
   });
-  removed.filter((i) => hasSku(i.sku)).forEach((i) => group(categoryOf(i.sku)).open.push({ t: i.days, sold: false }));
+  removed.filter((i) => bought(i.sku)).forEach((i) => group(categoryOf(i.sku)).open.push({ t: i.days, sold: false }));
 
   const cats = [...groups.entries()].map(([name, g]) => ({ name, g, sold: g.sold.length, stocked: g.sold.length + g.open.length }));
   const N = cats.reduce((a, c) => a + c.stocked, 0);
