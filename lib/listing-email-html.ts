@@ -72,7 +72,7 @@ function labSection(lab: LabDecision[]) {
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:14px;border:1px solid ${C.line};border-radius:10px;border-collapse:separate">
       ${lab.map((d, n) => `<tr><td style="padding:12px 14px;${n ? `border-top:1px solid ${C.line}` : ""}">
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-          <td style="font-size:14px;color:${C.fg}"><span style="font-family:${MONO};font-weight:600">${esc(d.sku || "No SKU")}</span>${d.name ? `<span style="color:${C.muted};margin-left:8px">${esc(d.name)}</span>` : ""}</td>
+          <td style="font-family:${MONO};font-size:14px;font-weight:600;color:${C.fg}">${esc(d.sku || d.name || "No SKU")}</td>
           <td style="text-align:right;font-family:${MONO};font-size:12px;color:${C.muted}">Test ended ${day(d.end)}</td>
         </tr></table></td></tr>`).join("")}
     </table>
