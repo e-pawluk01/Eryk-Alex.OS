@@ -20,6 +20,9 @@ interface SessionFormDialogProps {
   session?: WorkSession;
   // Who a newly added session belongs to.
   person: string;
+  // Starting choices for a new session, carried over from Start Work Session.
+  initialTask?: string;
+  initialTogether?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -45,7 +48,7 @@ const atTime = (day: Date, time: string) => {
 };
 const partMinutes = (p: Part) => (Number(p.hours) || 0) * 60 + (Number(p.minutes) || 0);
 
-export function SessionFormDialog({ mode, session, person, onClose, onSaved }: SessionFormDialogProps) {
+export function SessionFormDialog({ mode, session, person, initialTask, initialTogether = false, onClose, onSaved }: SessionFormDialogProps) {
   // Original timestamps, so an untouched time keeps its exact seconds.
   const [origStart, origEnd] = useMemo(() => {
     if (mode === "add" || !session) {
@@ -61,11 +64,11 @@ export function SessionFormDialog({ mode, session, person, onClose, onSaved }: S
   const [day, setDay] = useState(startOfDay(origStart));
   const [start, setStart] = useState(hhmm(origStart));
   const [end, setEnd] = useState(hhmm(origEnd));
-  const [parts, setParts] = useState<Part[]>([{ task: session?.task ?? "Sourcing", hours: "", minutes: "" }]);
+  const [parts, setParts] = useState<Part[]>([{ task: session?.task ?? initialTask ?? "Sourcing", hours: "", minutes: "" }]);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [together, setTogether] = useState(false);
+  const [together, setTogether] = useState(initialTogether);
   // Clocking out a joint session: the partner's half, ended alongside.
   const [partnerSession, setPartnerSession] = useState<WorkSession | null>(null);
   const owner = session?.person ?? person;
