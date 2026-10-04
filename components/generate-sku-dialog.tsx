@@ -18,6 +18,8 @@ interface GenerateSkuDialogProps {
 
 export function GenerateSkuDialog({ isOpen, onClose, onGenerated }: GenerateSkuDialogProps) {
   const [category, setCategory] = useState(SKU_CATEGORIES[0].name);
+  // Custom = made by us: CM- prefix, its own numbering, stub row in the Lab sheet.
+  const [custom, setCustom] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SkuResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export function GenerateSkuDialog({ isOpen, onClose, onGenerated }: GenerateSkuD
       const res = await fetch("/api/sku/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category }),
+        body: JSON.stringify({ category, custom }),
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || "Failed to generate SKU.");
@@ -84,6 +86,20 @@ export function GenerateSkuDialog({ isOpen, onClose, onGenerated }: GenerateSkuD
               ))}
             </select>
           </div>
+
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={custom}
+              onChange={(e) => setCustom(e.target.checked)}
+              disabled={loading}
+              className="mt-0.5 w-4 h-4 accent-white"
+            />
+            <span className="text-sm text-white/90">
+              Custom piece
+              <span className="block text-[11.5px] text-white/40 mt-0.5">CM- SKU, added to the Lab sheet</span>
+            </span>
+          </label>
 
           <button
             onClick={generate}

@@ -12,14 +12,15 @@ function currentMonthTabName(): string {
 
 /**
  * Atomically reserve the next SKU for a category, then drop a stub row
- * (SKU only) into the current month's sheet tab. The SKU is always returned
- * even if the sheet write fails — the number is reserved regardless.
+ * (SKU only) into the current month's sheet tab, or into the Lab sheet for a
+ * custom piece (CM- prefix, its own numbering per category). The SKU is always
+ * returned even if the sheet write fails — the number is reserved regardless.
  */
-export async function generateSku(category: string) {
+export async function generateSku(category: string, custom = false) {
   const code = SKU_CODE_BY_NAME.get(category);
   if (!code) return { error: `Unknown category: ${category}` };
 
-  const { data: sku, error } = await supabaseAdmin.rpc("generate_next_sku", { sku_prefix: code });
+  const { data: sku, error } = await supabaseAdmin.rpc("generate_next_sku", { sku_prefix: custom ? `CM-${code}` : code });
   if (error || !sku) {
     return { error: error?.message || "Failed to reserve a SKU number." };
   }
@@ -27,7 +28,7 @@ export async function generateSku(category: string) {
   let sheetTab: string | null = null;
   let sheetError: string | null = null;
   try {
-    sheetTab = await appendSkuRow(sku as string);
+    sheetTab = custom ? await appendLabSkuRow(sku as string) : await appendSkuRow(sku as string);
   } catch (e: any) {
     sheetError = e?.message || "Could not write to the sheet.";
   }
@@ -70,4 +71,37 @@ async function appendSkuRow(sku: string): Promise<string> {
   });
 
   return tab;
+}
+
+// A custom piece starts life as a design in the Lab sheet (its own
+// spreadsheet, one running tab), so its stub row goes there.
+async function appendLabSkuRow(sku: string): Promise<string> {
+  const spreadsheetId = process.env.LAB_SHEET_ID;
+  if (!spreadsheetId || !process.env.GOOGLE_OAUTH_REFRESH_TOKEN) throw new Error("No Lab sheet set up (LAB_SHEET_ID).");
+  const sheets = getGoogleSheetsClient();
+
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties.title" });
+  const tab = meta.data.sheets?.map((s) => s.properties?.title ?? "").find((t) => t && t.toLowerCase() !== "log");
+  if (!tab) throw new Error("The Lab sheet has no tab.");
+
+  const resp = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${tab}'!A:Z` });
+  const rows: any[][] = resp.data.values || [];
+  const header = (rows[0] ?? []).map((h) => String(h ?? "").trim().toLowerCase());
+  const skuCol = header.indexOf("sku");
+  const nameCol = header.indexOf("name");
+  if (skuCol === -1) throw new Error(`No "SKU" column in the Lab sheet.`);
+
+  // A real row has a name or a SKU; empty tickboxes don't count.
+  let lastItemRow = 1;
+  rows.forEach((r, i) => {
+    if (i > 0 && (String(r[skuCol] ?? "").trim() || (nameCol !== -1 && String(r[nameCol] ?? "").trim()))) lastItemRow = i + 1;
+  });
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `'${tab}'!${columnLetter(skuCol)}${lastItemRow + 1}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[sku]] },
+  });
+  return `Lab sheet`;
 }

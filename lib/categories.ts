@@ -33,11 +33,17 @@ const OLD_SKU_CATEGORY: Record<string, string> = {
   J002: "Trousers", J003: "Trousers", J009: "Trousers", J012: "Trousers", R012: "Trousers",
 };
 
-// "OU-0142" / "OU0142" -> "Outerwear"; "B002" -> "Bags". Anything else counts
-// as "Other". `note` is the sheet's Notes column, only needed for the two
-// August sales entered with "NULL" as their SKU (jean shorts and a top).
+// Custom pieces (made by us, from the Lab) use the same codes behind a CM-
+// prefix: CM-BA001 is our first custom bag. Same categories, own numbering.
+const CUSTOM_PREFIX = /^CM-/;
+export const isCustomSku = (sku: string) => CUSTOM_PREFIX.test((sku ?? "").trim().toUpperCase());
+
+// "OU-0142" / "OU0142" -> "Outerwear"; "B002" -> "Bags"; "CM-BA001" -> "Bags".
+// Anything else counts as "Other". `note` is the sheet's Notes column, only
+// needed for the two August sales entered with "NULL" as their SKU (jean
+// shorts and a top).
 export function categoryOf(sku: string, note = ""): string {
-  const code = (sku ?? "").trim().toUpperCase();
+  const code = (sku ?? "").trim().toUpperCase().replace(CUSTOM_PREFIX, "");
   if (OLD_SKU_CATEGORY[code]) return OLD_SKU_CATEGORY[code];
   if (code === "NULL") return /short/i.test(note) ? "Shorts" : "Tops & t-shirts";
   const letters = code.match(/^[A-Z]+/)?.[0] ?? "";
