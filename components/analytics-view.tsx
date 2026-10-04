@@ -20,7 +20,6 @@ import { stockHealth } from "@/lib/stock-health";
 import { StockHealthSection, HealthCard } from "./stock-health-section";
 import { format } from "date-fns";
 
-type SessionDialog = { mode: "edit"; session: WorkSession } | { mode: "add" } | null;
 type OpenCard = "revenue" | "hours" | "tasks" | "sales" | CategoryCard | HealthCard | null;
 
 const EMPTY_DATA = {
@@ -37,7 +36,7 @@ const formatPercent = (val: number) => val.toFixed(1);
 export function AnalyticsView() {
   const { loading, error, data, sessions, prevSales, prevHours, firstSessionAt, recentMonths, earlierSales, earlierRemoved, previousItems, earlierItems } = useAnalyticsData();
   const [openCard, setOpenCard] = useState<OpenCard>(null);
-  const [sessionDialog, setSessionDialog] = useState<SessionDialog>(null);
+  const [editing, setEditing] = useState<WorkSession | null>(null);
   const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
   const { userEmail } = useGlobalContext();
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
@@ -132,8 +131,7 @@ export function AnalyticsView() {
             openCard === "hours" ? (
               <SessionsPanel
                 sessions={sessions}
-                onEdit={(session) => setSessionDialog({ mode: "edit", session })}
-                onAdd={() => setSessionDialog({ mode: "add" })}
+                onEdit={setEditing}
               />
             ) : openCard === "tasks" ? <TaskBreakdownPanel tasks={tasks} /> : null
           }
@@ -197,13 +195,13 @@ export function AnalyticsView() {
         <StockHealthSection loading={loading} health={health} openCard={openCard} onToggle={toggle} />
       </div>
 
-      {sessionDialog && (
+      {editing && (
         <SessionFormDialog
-          mode={sessionDialog.mode}
-          session={sessionDialog.mode === "edit" ? sessionDialog.session : undefined}
+          mode="edit"
+          session={editing}
           person={userContextName}
-          onClose={() => setSessionDialog(null)}
-          onSaved={() => setSessionDialog(null)}
+          onClose={() => setEditing(null)}
+          onSaved={() => setEditing(null)}
         />
       )}
     </div>

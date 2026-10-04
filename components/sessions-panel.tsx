@@ -9,15 +9,14 @@ import { WorkSession, PERSON_COLORS, taskColor, formatMinutes } from "@/lib/work
 interface SessionsPanelProps {
   sessions: WorkSession[]; // this month's finished sessions, newest first
   onEdit: (session: WorkSession) => void;
-  onAdd: () => void;
 }
 
 const INITIAL_ROWS = 8;
 const labelClass = "text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3.5";
 
 // What opens under the Total Hours card: who worked it, and the sessions
-// themselves with edit and add-missed.
-export function SessionsPanel({ sessions, onEdit, onAdd }: SessionsPanelProps) {
+// themselves with edit. Missed sessions are added from Start Work Session.
+export function SessionsPanel({ sessions, onEdit }: SessionsPanelProps) {
   const [showAll, setShowAll] = useState(false);
 
   const hoursBy = (person: string) =>
@@ -71,24 +70,15 @@ export function SessionsPanel({ sessions, onEdit, onAdd }: SessionsPanelProps) {
               );
             })}
           </div>
-          <div className="flex gap-5">
-            {sessions.length > INITIAL_ROWS && (
-              <button
-                type="button"
-                onClick={() => setShowAll(!showAll)}
-                className="pt-2.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-white transition-colors"
-              >
-                {showAll ? "Show less" : `Show all ${sessions.length}`}
-              </button>
-            )}
+          {sessions.length > INITIAL_ROWS && (
             <button
               type="button"
-              onClick={onAdd}
-              className="pt-2.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-white transition-colors"
+              onClick={() => setShowAll(!showAll)}
+              className="self-start pt-2.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-white transition-colors"
             >
-              + Add missed session
+              {showAll ? "Show less" : `Show all ${sessions.length}`}
             </button>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, Play } from "lucide-react";
+import { X, Play, History } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useGlobalContext } from "./global-context";
 import { WORK_TASKS, partnerOf, openSessionOf } from "@/lib/work-sessions";
+import { SessionFormDialog } from "./session-form-dialog";
 
 const TASKS = WORK_TASKS;
 
@@ -20,6 +21,8 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
   const [together, setTogether] = useState(false);
   // What the other person is clocked in on, if anything: Together is off then.
   const [partnerBusy, setPartnerBusy] = useState<string | null>(null);
+  // Logging forgotten time instead, starting from the task and Together picked here.
+  const [addingMissed, setAddingMissed] = useState(false);
   const { userEmail } = useGlobalContext();
 
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
@@ -120,7 +123,7 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
                 </span>
               </label>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col gap-2 pt-2">
                 <button
                   type="submit"
                   disabled={isSubmitting}
@@ -128,10 +131,30 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
                 >
                   {isSubmitting ? "Starting..." : "Begin Session"}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsOpen(false); setAddingMissed(true); }}
+                  disabled={isSubmitting}
+                  className="w-full py-3 flex items-center justify-center gap-2 bg-white/[0.03] hover:bg-white/10 text-white/75 hover:text-white border border-white/10 font-bold uppercase tracking-widest text-[10px] rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  Add Missed Session
+                </button>
               </div>
             </form>
           </div>
         </div>
+      )}
+
+      {addingMissed && (
+        <SessionFormDialog
+          mode="add"
+          person={userContextName}
+          initialTask={task}
+          initialTogether={together && !partnerBusy}
+          onClose={() => setAddingMissed(false)}
+          onSaved={() => setAddingMissed(false)}
+        />
       )}
     </>
   );
