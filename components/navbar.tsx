@@ -3,7 +3,7 @@
 import React from "react";
 import { useGlobalContext, DomainType } from "./global-context";
 import { cn } from "@/lib/utils";
-import { Briefcase, BookOpen, MonitorPlay } from "lucide-react";
+import { Briefcase, BookOpen } from "lucide-react";
 
 export function Navbar() {
   const { currentDomain, setCurrentDomain } = useGlobalContext();
@@ -11,7 +11,6 @@ export function Navbar() {
   const domains: { id: DomainType; icon: React.ReactNode }[] = [
     { id: "WORK", icon: <Briefcase className="w-4 h-4" /> },
     { id: "STUDY", icon: <BookOpen className="w-4 h-4" /> },
-    { id: "CONTENT", icon: <MonitorPlay className="w-4 h-4" /> },
   ];
 
   return (

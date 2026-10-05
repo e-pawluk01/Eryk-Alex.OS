@@ -22,13 +22,11 @@ const contextDotColors: Record<ContextType, string> = {
 const domainPillColors: Record<DomainType, string> = {
   WORK: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   STUDY: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  CONTENT: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
 };
 
 const domainDotColors: Record<DomainType, string> = {
   WORK: "bg-blue-400",
   STUDY: "bg-purple-400",
-  CONTENT: "bg-emerald-400",
 };
 
 interface CalendarPanelProps {
@@ -181,7 +179,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
           
           {/* Domain Filter */}
           <div className="flex gap-2 mb-2 bg-[#111] p-1 rounded-xl border border-white/5">
-            {(["ALL", "WORK", "STUDY", "CONTENT"] as const).map(domain => (
+            {(["ALL", "WORK", "STUDY"] as const).map(domain => (
               <button
                 key={domain}
                 onClick={() => setFilterDomain(domain)}
