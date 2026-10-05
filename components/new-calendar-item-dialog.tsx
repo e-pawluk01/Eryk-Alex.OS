@@ -12,7 +12,7 @@ interface NewCalendarItemDialogProps {
   isOpen: boolean;
   onClose: () => void;
   contextName: ContextType;
-  domainName: "WORK" | "STUDY" | "CONTENT";
+  domainName: "WORK" | "STUDY";
   selectedDateString: string; // "yyyy-MM-dd"
   onTaskAdded: (task: Task) => void;
   onEventAdded: (event: Event) => void;

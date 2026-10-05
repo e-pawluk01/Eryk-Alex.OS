@@ -21,7 +21,7 @@ interface NewTaskDialogProps {
   contextName: ContextType;
   selectedDateString: string; // "yyyy-MM-dd"
   onTaskAdded: (task: Task) => void;
-  domain?: "WORK" | "STUDY" | "CONTENT" | null;
+  domain?: "WORK" | "STUDY" | null;
   trigger?: React.ReactNode;
 }
 

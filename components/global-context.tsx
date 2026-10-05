@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
-export type DomainType = "WORK" | "STUDY" | "CONTENT";
+export type DomainType = "WORK" | "STUDY";
 
 interface GlobalContextProps {
   currentDomain: DomainType;

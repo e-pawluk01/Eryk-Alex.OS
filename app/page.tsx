@@ -21,35 +21,23 @@ import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO, differenceInDays } from "date-fns";
 import { Clock, Trophy, Pencil, X, Plus } from "lucide-react";
-import { KanbanBoard } from "@/components/kanban-board";
-import { VideoItem } from "@/components/video-item";
-import { NewVideoDialog } from "@/components/new-video-dialog";
-import { Video } from "@/lib/types";
 
 export default function Home() {
   const { currentDomain, userEmail } = useGlobalContext();
-
-  const handleAddVideo = (video: Video) => {
-    setVideos(prev => [video, ...prev]);
-  };
 
   const userContextName = (userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk") as ContextType;
   const DOMAIN_MAP: Record<DomainType, ContextType[]> = useMemo(() => ({
     WORK: ["Eryk", "Alex"],
     STUDY: [userContextName as ContextType],
-    CONTENT: [] 
   }), [userContextName]);
 
   const [goals, setGoals] = useState<Goal[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   
-  const [videoFilter, setVideoFilter] = useState<"All" | "Eryk" | "Alex">("All");
-  const [contentTab, setContentTab] = useState<"videos" | "uploading">("videos");
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showListings, setShowListings] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -64,25 +52,22 @@ export default function Home() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [goalsRes, tasksRes, eventsRes, topicsRes, videosRes] = await Promise.all([
+        const [goalsRes, tasksRes, eventsRes, topicsRes] = await Promise.all([
           supabase.from("goals").select("*").order("year", { ascending: false }),
           supabase.from("tasks").select("*").order("created_at", { ascending: false }),
           supabase.from("events").select("*").order("event_date", { ascending: true }),
           supabase.from("study_topics").select("*").order("next_review_date", { ascending: true }),
-          supabase.from("videos").select("*").order("created_at", { ascending: false }),
         ]);
 
         if (goalsRes.error) throw goalsRes.error;
         if (tasksRes.error) throw tasksRes.error;
         if (eventsRes.error) throw eventsRes.error;
         if (topicsRes.error) throw topicsRes.error;
-        if (videosRes.error) throw videosRes.error;
 
         setGoals(goalsRes.data as Goal[]);
         setTasks(tasksRes.data as Task[]);
         setEvents(eventsRes.data as Event[]);
         setTopics(topicsRes.data as Topic[]);
-        setVideos(videosRes.data as Video[]);
       } catch (err) {
         console.error("Error fetching data:", err);
       } finally {
@@ -148,19 +133,6 @@ export default function Home() {
             setTopics(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...(payload.new as Partial<Topic>) } : t));
           } else if (payload.eventType === 'DELETE') {
             setTopics(prev => prev.filter(t => t.id !== payload.old.id));
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'videos' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setVideos(prev => prev.some(v => v.id === payload.new.id) ? prev : [payload.new as Video, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setVideos(prev => prev.map(v => v.id === payload.new.id ? { ...v, ...(payload.new as Partial<Video>) } : v));
-          } else if (payload.eventType === 'DELETE') {
-            setVideos(prev => prev.filter(v => v.id !== payload.old.id));
           }
         }
       )
@@ -235,17 +207,6 @@ export default function Home() {
     return topics.filter(t => valid.includes(t.context));
   }, [topics]);
 
-  const filteredVideos = useMemo(() => {
-    let result = videos;
-    if (videoFilter !== "All") {
-      result = result.filter(v => v.context === videoFilter);
-    } else {
-      const valid = ["Eryk", "Alex"];
-      result = result.filter(v => valid.includes(v.context));
-    }
-    return result;
-  }, [videos, videoFilter]);
-
   const handleUpdateTopic = (id: string, updates: Partial<Topic>) => {
     setTopics(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t).sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
   };
@@ -256,72 +217,6 @@ export default function Home() {
 
   const handleAddTopic = (newTopic: Topic) => {
     setTopics(prev => [...prev, newTopic].sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
-  };
-
-  const handleUpdateVideo = (id: string, updates: Partial<Video>) => {
-    setVideos(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v));
-  };
-
-  const handleDeleteVideo = (id: string) => {
-    setVideos(prev => prev.filter(v => v.id !== id));
-  };
-
-  const handleGenerateShortsTasks = async (video: Video) => {
-    const newTasks = [];
-    
-    // Check if main upload task already exists
-    const mainTaskExists = tasks.some(t => t.domain === "CONTENT" && t.title === `Upload Video: ${video.title}`);
-    if (!mainTaskExists) {
-      newTasks.push({
-        title: `Upload Video: ${video.title}`,
-        context: video.context, 
-        domain: "CONTENT" as DomainType,
-        status: "todo" as const,
-        scheduled_date: video.scheduled_date || format(new Date(), "yyyy-MM-dd"),
-      });
-    }
-
-    if (video.shorts_target && video.shorts_target > 0) {
-      const alreadyGenerated = tasks.some(t => t.domain === "CONTENT" && t.title.includes(`for ${video.title}`));
-      if (!alreadyGenerated) {
-        const existingUploadTasks = tasks.filter(t => t.domain === "CONTENT" && t.context === video.context && t.title.toLowerCase().includes("upload"));
-        const takenDates = new Set(existingUploadTasks.map(t => t.scheduled_date));
-        
-        let currentDate = addDays(parseISO(video.scheduled_date || format(new Date(), "yyyy-MM-dd")), 1);
-        
-        for (let i = 0; i < video.shorts_target; i++) {
-          let dateString = format(currentDate, "yyyy-MM-dd");
-          while (takenDates.has(dateString)) {
-            currentDate = addDays(currentDate, 1);
-            dateString = format(currentDate, "yyyy-MM-dd");
-          }
-          
-          takenDates.add(dateString);
-          
-          newTasks.push({
-            title: `Upload Short ${i + 1} for ${video.title}`,
-            context: video.context, 
-            domain: "CONTENT" as DomainType,
-            status: "todo" as const,
-            scheduled_date: dateString,
-          });
-          
-          currentDate = addDays(currentDate, 1);
-        }
-      }
-    }
-
-    if (newTasks.length === 0) return;
-
-    try {
-      const { data, error } = await supabase.from("tasks").insert(newTasks).select();
-      if (error) throw error;
-      if (data) {
-        setTasks(prev => [...data, ...prev]);
-      }
-    } catch (error) {
-      console.error("Failed to generate shorts tasks:", error);
-    }
   };
 
   const handleUpdateEvent = async (id: string, updates: Partial<Event>) => {
@@ -348,7 +243,7 @@ export default function Home() {
 
   const filteredTasks = useMemo(() => {
     const valid = DOMAIN_MAP[currentDomain];
-    return tasks.filter(t => (currentDomain === "CONTENT" || valid.includes(t.context)) && (t.domain || "WORK") === currentDomain);
+    return tasks.filter(t => valid.includes(t.context) && (t.domain || "WORK") === currentDomain);
   }, [tasks, currentDomain]);
 
   const filteredEvents = useMemo(() => {
@@ -574,85 +469,6 @@ export default function Home() {
           </h2>
         </div>
         
-        {currentDomain === "CONTENT" ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
-            
-            {/* LEFT COLUMN: Content Tasks */}
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">
-                  Content Tasks
-                </h2>
-              </div>
-              <div className="flex flex-col gap-2">
-                {selectedDayTasks.length === 0 ? (
-                  <p className="text-xs text-white/30 italic mt-2">No content tasks for this date.</p>
-                ) : (
-                  selectedDayTasks.map(task => (
-                    <TaskItem 
-                      key={task.id} 
-                      task={task} 
-                      onToggleStatus={(id, status) => handleToggleStatus(id, status)}
-                      onSelect={setSelectedTask}
-                      onUpdate={handleUpdateTask}
-                    />
-                  ))
-                )}
-                <NewTaskDialog 
-                  onTaskAdded={handleAddTask} 
-                  domain={currentDomain}
-                  contextName={userContextName}
-                  selectedDateString={format(selectedDate, "yyyy-MM-dd")}
-                />
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN: All Videos */}
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">Videos</h2>
-                
-                <div className="flex items-center gap-1.5 opacity-30 hover:opacity-100 transition-opacity duration-300">
-                  <button
-                    onClick={() => setVideoFilter(videoFilter === "Eryk" ? "All" : "Eryk")}
-                    className={cn(
-                      "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full backdrop-blur-md transition-all duration-300",
-                      videoFilter === "Eryk"
-                        ? "bg-white/20 text-white shadow-[0_0_10px_rgba(255,255,255,0.2)] border border-white/30"
-                        : "bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white"
-                    )}
-                  >
-                    Eryk
-                  </button>
-                  <button
-                    onClick={() => setVideoFilter(videoFilter === "Alex" ? "All" : "Alex")}
-                    className={cn(
-                      "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full backdrop-blur-md transition-all duration-300",
-                      videoFilter === "Alex"
-                        ? "bg-white/20 text-white shadow-[0_0_10px_rgba(255,255,255,0.2)] border border-white/30"
-                        : "bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white"
-                    )}
-                  >
-                    Alex
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-col gap-3">
-                {filteredVideos.map(video => (
-                  <VideoItem 
-                    key={video.id} 
-                    video={video} 
-                    onUpdate={handleUpdateVideo}
-                    onDelete={handleDeleteVideo}
-                    onGenerateTasks={handleGenerateShortsTasks}
-                  />
-                ))}
-                <NewVideoDialog onVideoAdded={handleAddVideo} contextName={userContextName} />
-              </div>
-            </div>
-
-          </div>
-        ) : currentDomain === "WORK" || currentDomain === "STUDY" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {currentDomain === "WORK" ? (
               DOMAIN_MAP[currentDomain].map(contextName => {
@@ -758,13 +574,6 @@ export default function Home() {
               </>
             )}
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-border rounded-lg bg-card/20">
-            <p className="text-muted-foreground uppercase tracking-widest text-xs">
-              Custom layout for {currentDomain} domain coming in next phase.
-            </p>
-          </div>
-        )}
       </section>
       </>
       )}

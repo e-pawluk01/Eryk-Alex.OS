@@ -24,10 +24,9 @@ export interface Task {
   folder_id: string | null;
   project?: string | null;
   color?: string | null;
-  domain?: "WORK" | "STUDY" | "CONTENT" | null;
+  domain?: "WORK" | "STUDY" | null;
   track_progress?: boolean;
   progress?: number;
-  kanban_column?: "idea" | "scripting" | "filming" | "editing" | null;
   created_at: string;
   subTasks?: Task[];
   is_joint?: boolean;
@@ -47,19 +46,6 @@ export interface Topic {
   created_at: string;
 }
 
-export interface Video {
-  id: string;
-  title: string;
-  context: ContextType;
-  tag: string;
-  color: string;
-  stage: "idea" | "scripting" | "filming" | "editing" | "subtitles" | "uploaded";
-  scheduled_date: string; // "yyyy-MM-dd"
-  shorts_target: number;
-  type?: "long" | "short";
-  created_at: string;
-}
-
 export interface Event {
   id: string;
   title: string;
@@ -67,7 +53,7 @@ export interface Event {
   event_date: string; // ISO Date string (YYYY-MM-DD)
   event_time: string | null; // e.g. "14:30"
   context: ContextType;
-  domain?: "WORK" | "STUDY" | "CONTENT" | null;
+  domain?: "WORK" | "STUDY" | null;
   created_at: string;
 }
 
