@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { Goal, Task, Event, ContextType } from "@/lib/types";
+import { Goal, Task, Event, Topic, ContextType } from "@/lib/types";
 import { useGlobalContext, DomainType } from "@/components/global-context";
 import { cn } from "@/lib/utils";
 import { ContextTag } from "@/components/ui/context-tag";
@@ -19,8 +19,9 @@ import { NewTopicDialog } from "@/components/new-topic-dialog";
 import { TopicItem } from "@/components/topic-item";
 import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO, differenceInDays } from "date-fns";
-import { Clock, Trophy, Pencil, X, Plus } from "lucide-react";
+import { Clock, Trophy, Pencil, X, Plus, Trash2 } from "lucide-react";
 
 export default function Home() {
   const { currentDomain, userEmail } = useGlobalContext();
@@ -48,15 +49,26 @@ export default function Home() {
   const [canScrollGoalsRight, setCanScrollGoalsRight] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [editingGoalTitle, setEditingGoalTitle] = useState("");
+  const [isDeleteGoalOpen, setIsDeleteGoalOpen] = useState(false);
+
+  // Work is shared; Study belongs to whoever is logged in. Only that person's
+  // Study rows are downloaded or kept from live updates.
+  const me = userEmail ? userContextName : null;
+  const isMine = (row: { domain?: string | null; context: string }) =>
+    (row.domain || "WORK") === "WORK" || row.context === me;
+  const isMyGoal = (g: { context: string }) =>
+    ["WORK", "Reselling", "Drink idea"].includes(g.context) || g.context === me;
 
   useEffect(() => {
+    if (!me) return;
+    const workOrMine = `domain.is.null,domain.eq.WORK,and(domain.eq.STUDY,context.eq.${me})`;
     async function fetchData() {
       try {
         const [goalsRes, tasksRes, eventsRes, topicsRes] = await Promise.all([
-          supabase.from("goals").select("*").order("year", { ascending: false }),
-          supabase.from("tasks").select("*").order("created_at", { ascending: false }),
-          supabase.from("events").select("*").order("event_date", { ascending: true }),
-          supabase.from("study_topics").select("*").order("next_review_date", { ascending: true }),
+          supabase.from("goals").select("*").or(`context.in.(WORK,Reselling,"Drink idea"),context.eq.${me}`).order("year", { ascending: false }),
+          supabase.from("tasks").select("*").or(workOrMine).order("created_at", { ascending: false }),
+          supabase.from("events").select("*").or(workOrMine).order("event_date", { ascending: true }),
+          supabase.from("study_topics").select("*").eq("context", me).order("next_review_date", { ascending: true }),
         ]);
 
         if (goalsRes.error) throw goalsRes.error;
@@ -75,9 +87,10 @@ export default function Home() {
       }
     }
     fetchData();
-  }, []);
+  }, [me]);
 
   useEffect(() => {
+    if (!me) return;
     const channel = supabase
       .channel('schema-db-changes')
       .on(
@@ -85,6 +98,7 @@ export default function Home() {
         { event: '*', schema: 'public', table: 'tasks' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
+            if (!isMine(payload.new as Task)) return;
             setTasks(prev => prev.some(t => t.id === payload.new.id) ? prev : [payload.new as Task, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
             setTasks(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...(payload.new as Partial<Task>) } : t));
@@ -100,6 +114,7 @@ export default function Home() {
         { event: '*', schema: 'public', table: 'events' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
+            if (!isMine(payload.new as Event)) return;
             setEvents(prev => prev.some(e => e.id === payload.new.id) ? prev : [...prev, payload.new as Event].sort((a, b) => parseISO(a.event_date).getTime() - parseISO(b.event_date).getTime()));
           } else if (payload.eventType === 'UPDATE') {
             setEvents(prev => prev.map(e => e.id === payload.new.id ? { ...e, ...(payload.new as Partial<Event>) } : e));
@@ -115,6 +130,7 @@ export default function Home() {
         { event: '*', schema: 'public', table: 'goals' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
+            if (!isMyGoal(payload.new as Goal)) return;
             setGoals(prev => prev.some(g => g.id === payload.new.id) ? prev : [payload.new as Goal, ...prev].sort((a, b) => b.year - a.year));
           } else if (payload.eventType === 'UPDATE') {
             setGoals(prev => prev.map(g => g.id === payload.new.id ? { ...g, ...(payload.new as Partial<Goal>) } : g));
@@ -128,6 +144,7 @@ export default function Home() {
         { event: '*', schema: 'public', table: 'study_topics' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
+            if ((payload.new as Topic).context !== me) return;
             setTopics(prev => prev.some(t => t.id === payload.new.id) ? prev : [...prev, payload.new as Topic].sort((a, b) => parseISO(a.next_review_date).getTime() - parseISO(b.next_review_date).getTime()));
           } else if (payload.eventType === 'UPDATE') {
             setTopics(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...(payload.new as Partial<Topic>) } : t));
@@ -147,7 +164,7 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [me]);
 
   const handleToggleStatus = async (id: string, newStatus: "todo" | "done") => {
     setTasks(prev => 
@@ -198,6 +215,13 @@ export default function Home() {
     setEditingGoalId(null);
   };
 
+  const handleDeleteGoal = async (id: string) => {
+    setGoals(prev => prev.filter(g => g.id !== id));
+    setEditingGoalId(null);
+    setEditingGoalTitle("");
+    await supabase.from("goals").delete().eq("id", id);
+  };
+
   const handleAddGoal = (newGoal: Goal) => {
     setGoals(prev => [newGoal, ...prev].sort((a, b) => b.year - a.year));
   };
@@ -237,9 +261,9 @@ export default function Home() {
     return goals.filter(g => 
       g.context === currentDomain || 
       (currentDomain === "WORK" && ["Reselling", "Drink idea"].includes(g.context)) ||
-      (currentDomain === "STUDY" && ["Eryk", "Alex"].includes(g.context))
+      (currentDomain === "STUDY" && g.context === userContextName)
     );
-  }, [goals, currentDomain]);
+  }, [goals, currentDomain, userContextName]);
 
   const filteredTasks = useMemo(() => {
     const valid = DOMAIN_MAP[currentDomain];
@@ -387,7 +411,7 @@ export default function Home() {
               </div>
             ))}
             <div className="snap-start shrink-0">
-              <NewGoalDialog onGoalAdded={handleAddGoal} currentDomain={currentDomain} />
+              <NewGoalDialog onGoalAdded={handleAddGoal} context={currentDomain === "STUDY" ? userContextName : currentDomain} />
             </div>
           </div>
         </div>
@@ -654,17 +678,38 @@ export default function Home() {
                 className="w-full bg-transparent text-lg font-medium tracking-wide outline-none text-white placeholder:text-white/20 resize-none hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
               />
 
+              <div className="flex items-center gap-3">
+              <button 
+                type="button"
+                onClick={() => setIsDeleteGoalOpen(true)}
+                className="p-3 hover:bg-red-500/20 rounded-lg transition-colors text-red-500/50 hover:text-red-500 shrink-0"
+                title="Delete Goal"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
               <button 
                 type="submit"
                 disabled={!editingGoalTitle.trim()}
-                className="w-full py-3 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
+                className="flex-1 py-3 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
               >
                 Save Changes
               </button>
+              </div>
             </form>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={isDeleteGoalOpen && !!editingGoalId}
+        onClose={() => setIsDeleteGoalOpen(false)}
+        onConfirm={() => {
+          if (editingGoalId) handleDeleteGoal(editingGoalId);
+          setIsDeleteGoalOpen(false);
+        }}
+        title="Delete Goal?"
+        description="Are you sure you want to delete this goal? This action cannot be undone."
+      />
     </div>
   );
 }

@@ -8,10 +8,10 @@ import { cn } from "@/lib/utils";
 
 interface NewGoalDialogProps {
   onGoalAdded: (goal: Goal) => void;
-  currentDomain: string;
+  context: string;
 }
 
-export function NewGoalDialog({ onGoalAdded, currentDomain }: NewGoalDialogProps) {
+export function NewGoalDialog({ onGoalAdded, context }: NewGoalDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -25,7 +25,7 @@ export function NewGoalDialog({ onGoalAdded, currentDomain }: NewGoalDialogProps
     try {
       const newGoal = {
         title: title.trim(),
-        context: currentDomain,
+        context,
         year,
         status: "active"
       };
