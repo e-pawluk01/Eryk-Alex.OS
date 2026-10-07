@@ -84,9 +84,9 @@ export function TaskItem({ task, onToggleStatus, onSelect, onUpdate }: TaskItemP
               <Users className="w-3 h-3 text-blue-400 ml-1" />
             )}
           </div>
-          {task.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-              {task.description}
+          {task.description?.trim() && (
+            <p className="text-xs text-muted-foreground/60 mt-0.5">
+              Open for notes
             </p>
           )}
           {task.track_progress && (

@@ -20,6 +20,7 @@ import { TopicItem } from "@/components/topic-item";
 import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { rolloverTasks } from "@/lib/task-rollover";
 import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO, differenceInDays } from "date-fns";
 import { Clock, Trophy, Pencil, X, Plus, Trash2 } from "lucide-react";
 
@@ -64,6 +65,8 @@ export default function Home() {
     const workOrMine = `domain.is.null,domain.eq.WORK,and(domain.eq.STUDY,context.eq.${me})`;
     async function fetchData() {
       try {
+        // Tidy up past days first so the list loads already rolled over.
+        await rolloverTasks(supabase).catch(err => console.error("Task rollover failed:", err));
         const [goalsRes, tasksRes, eventsRes, topicsRes] = await Promise.all([
           supabase.from("goals").select("*").or(`context.in.(WORK,Reselling,"Drink idea"),context.eq.${me}`).order("year", { ascending: false }),
           supabase.from("tasks").select("*").or(workOrMine).order("created_at", { ascending: false }),
@@ -87,6 +90,34 @@ export default function Home() {
       }
     }
     fetchData();
+  }, [me]);
+
+  // If the app is left open overnight, roll tasks over at midnight and move
+  // the day view on to the new today.
+  useEffect(() => {
+    if (!me) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const scheduleMidnight = () => {
+      const now = new Date();
+      const nextMidnight = startOfDay(addDays(now, 1));
+      timer = setTimeout(async () => {
+        try {
+          await rolloverTasks(supabase);
+          const { data, error } = await supabase.from("tasks").select("*")
+            .or(`domain.is.null,domain.eq.WORK,and(domain.eq.STUDY,context.eq.${me})`)
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          setTasks(data as Task[]);
+        } catch (err) {
+          console.error("Task rollover failed:", err);
+        }
+        const yesterday = startOfDay(now);
+        setSelectedDate(prev => isSameDay(prev, yesterday) ? startOfDay(new Date()) : prev);
+        scheduleMidnight();
+      }, nextMidnight.getTime() - now.getTime() + 1000);
+    };
+    scheduleMidnight();
+    return () => clearTimeout(timer);
   }, [me]);
 
   useEffect(() => {
