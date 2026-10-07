@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Task, Event } from "@/lib/types";
 import { DomainType } from "./global-context";
-import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Tag } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Tag, Flag } from "lucide-react";
 import { 
   startOfMonth, endOfMonth, eachDayOfInterval, format, 
   isSameDay, isToday, addMonths, subMonths, parseISO, startOfDay
@@ -42,9 +42,11 @@ interface CalendarPanelProps {
   showAnalytics?: boolean;
   onListingsToggle?: () => void;
   showListings?: boolean;
+  onDeadlinesToggle?: () => void;
+  showDeadlines?: boolean;
 }
 
-export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics, onListingsToggle, showListings }: CalendarPanelProps) {
+export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics, onListingsToggle, showListings, onDeadlinesToggle, showDeadlines }: CalendarPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
@@ -103,6 +105,15 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
             className="p-3 py-4 hover:bg-white/10 transition-colors"
           >
             {showListings ? <X className="w-5 h-5 text-white/80" /> : <Tag className="w-5 h-5 text-white/80" />}
+          </button>
+        )}
+        {currentDomain === "STUDY" && onDeadlinesToggle && (
+          <button
+            onClick={onDeadlinesToggle}
+            className="p-3 py-4 hover:bg-white/10 transition-colors"
+            title="Deadlines"
+          >
+            {showDeadlines ? <X className="w-5 h-5 text-white/80" /> : <Flag className="w-5 h-5 text-white/80" />}
           </button>
         )}
       </div>

@@ -62,3 +62,28 @@ export interface Folder {
   name: string;
   context: ContextType;
 }
+
+// Study: each person's own modules and deadlines (Work stays shared).
+export interface StudyModule {
+  id: string;
+  person: ContextType;
+  name: string;
+  color: string; // hex
+  kind: "course" | "self";
+  created_at: string;
+}
+
+export interface StudyDeadline {
+  id: string;
+  person: ContextType;
+  module_id: string;
+  title: string;
+  type: string;
+  opens_on: string | null; // "yyyy-MM-dd": when work can start, if it has a window
+  cutoff_on: string; // "yyyy-MM-dd"
+  cutoff_time: string | null; // "HH:mm[:ss]"
+  done: boolean;
+  score: string | null;
+  note: string | null;
+  created_at: string;
+}

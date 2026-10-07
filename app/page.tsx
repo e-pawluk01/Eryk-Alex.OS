@@ -18,6 +18,10 @@ import { NewGoalDialog } from "@/components/new-goal-dialog";
 import { NewTopicDialog } from "@/components/new-topic-dialog";
 import { TopicItem } from "@/components/topic-item";
 import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
+import { useStudy } from "@/components/study/use-study";
+import { UpcomingStrip } from "@/components/study/upcoming-strip";
+import { DeadlinesView } from "@/components/study/deadlines-view";
+import { ModuleDot } from "@/components/study/bits";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { rolloverTasks } from "@/lib/task-rollover";
@@ -42,6 +46,7 @@ export default function Home() {
   
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showListings, setShowListings] = useState(false);
+  const [showDeadlines, setShowDeadlines] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [isHallOfFameOpen, setIsHallOfFameOpen] = useState(false);
@@ -57,6 +62,7 @@ export default function Home() {
   const me = userEmail ? userContextName : null;
   const isMine = (row: { domain?: string | null; context: string }) =>
     (row.domain || "WORK") === "WORK" || row.context === me;
+  const study = useStudy(me);
   const isMyGoal = (g: { context: string }) =>
     ["WORK", "Reselling", "Drink idea"].includes(g.context) || g.context === me;
 
@@ -375,9 +381,14 @@ export default function Home() {
         <ListingsView />
       ) : currentDomain === "WORK" && showAnalytics ? (
         <AnalyticsView />
+      ) : currentDomain === "STUDY" && showDeadlines ? (
+        <DeadlinesView study={study} />
       ) : (
         <>
-      {/* GOALS SECTION */}
+      {currentDomain === "STUDY" ? (
+        <UpcomingStrip study={study} />
+      ) : (
+      /* GOALS SECTION */
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between border-b border-border pb-2">
           <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Goals</h2>
@@ -442,11 +453,12 @@ export default function Home() {
               </div>
             ))}
             <div className="snap-start shrink-0">
-              <NewGoalDialog onGoalAdded={handleAddGoal} context={currentDomain === "STUDY" ? userContextName : currentDomain} />
+              <NewGoalDialog onGoalAdded={handleAddGoal} context={currentDomain} />
             </div>
           </div>
         </div>
       </section>
+      )}
 
       {/* WEEK SECTION */}
       <section className="flex flex-col gap-4">
@@ -477,6 +489,13 @@ export default function Home() {
                 
                 {/* Text Indicator */}
                 <div className="mt-3 flex flex-col gap-1 w-full items-center justify-end h-8">
+                  {currentDomain === "STUDY" && (
+                    <span className="flex gap-1 h-2">
+                      {study.deadlines.filter(d => !d.done && isSameDay(parseISO(d.cutoff_on), date)).map(d => (
+                        <ModuleDot key={d.id} module={study.modules.find(m => m.id === d.module_id)} />
+                      ))}
+                    </span>
+                  )}
                   {taskCount > 0 ? (
                     <span className={`text-[10px] font-medium ${isSelected ? "text-white" : "text-primary/70"}`}>{taskCount} task{taskCount > 1 ? 's' : ''}</span>
                   ) : (
@@ -662,6 +681,8 @@ export default function Home() {
         showAnalytics={showAnalytics}
         onListingsToggle={() => { setShowListings(!showListings); setShowAnalytics(false); }}
         showListings={showListings}
+        onDeadlinesToggle={() => setShowDeadlines(!showDeadlines)}
+        showDeadlines={showDeadlines}
       />
 
       <HallOfFamePanel 
