@@ -53,7 +53,7 @@ export function ModulesDialog({ study, onClose, startAdding }: { study: StudyDat
         onClose={() => setToDelete(null)}
         onConfirm={() => { if (toDelete) study.deleteModule(toDelete.id); setToDelete(null); }}
         title="Delete Module?"
-        description={`This also deletes every deadline in ${toDelete?.name ?? "this module"}. This action cannot be undone.`}
+        description={`This also deletes every deadline and material in ${toDelete?.name ?? "this module"}. This action cannot be undone.`}
       />
     </StudyModal>
   );

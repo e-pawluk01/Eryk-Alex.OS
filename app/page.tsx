@@ -21,6 +21,7 @@ import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
 import { useStudy } from "@/components/study/use-study";
 import { UpcomingStrip } from "@/components/study/upcoming-strip";
 import { DeadlinesView } from "@/components/study/deadlines-view";
+import { MaterialsView, WorkingThrough } from "@/components/study/materials-view";
 import { ModuleDot } from "@/components/study/bits";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -46,7 +47,8 @@ export default function Home() {
   
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showListings, setShowListings] = useState(false);
-  const [showDeadlines, setShowDeadlines] = useState(false);
+  // Which Study page is open from the side tabs (null = Study home).
+  const [studyPage, setStudyPage] = useState<"deadlines" | "materials" | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [isHallOfFameOpen, setIsHallOfFameOpen] = useState(false);
@@ -381,8 +383,10 @@ export default function Home() {
         <ListingsView />
       ) : currentDomain === "WORK" && showAnalytics ? (
         <AnalyticsView />
-      ) : currentDomain === "STUDY" && showDeadlines ? (
+      ) : currentDomain === "STUDY" && studyPage === "deadlines" ? (
         <DeadlinesView study={study} />
+      ) : currentDomain === "STUDY" && studyPage === "materials" ? (
+        <MaterialsView study={study} />
       ) : (
         <>
       {currentDomain === "STUDY" ? (
@@ -649,6 +653,7 @@ export default function Home() {
             )}
           </div>
       </section>
+      {currentDomain === "STUDY" && <WorkingThrough study={study} />}
       </>
       )}
       {/* Slide-over panel */}
@@ -681,8 +686,8 @@ export default function Home() {
         showAnalytics={showAnalytics}
         onListingsToggle={() => { setShowListings(!showListings); setShowAnalytics(false); }}
         showListings={showListings}
-        onDeadlinesToggle={() => setShowDeadlines(!showDeadlines)}
-        showDeadlines={showDeadlines}
+        studyPage={studyPage}
+        onStudyPageToggle={page => setStudyPage(studyPage === page ? null : page)}
       />
 
       <HallOfFamePanel 
