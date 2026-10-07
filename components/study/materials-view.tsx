@@ -24,13 +24,19 @@ export function MaterialCard({ study, material, full, onUpdate, onEdit }: {
   const pace = full ? paceLine(material) : null;
 
   return (
-    <div className={cn("group bg-card border border-border rounded-lg p-3.5 flex flex-col gap-2.5 hover:border-white/20 transition-colors", finished && "opacity-60")}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onUpdate}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onUpdate(); } }}
+      className={cn("group bg-card border border-border rounded-lg p-3.5 flex flex-col gap-2.5 hover:border-white/20 transition-colors cursor-pointer text-left", finished && "opacity-60")}
+    >
       <div className="flex items-center justify-between gap-3">
-        <button type="button" onClick={onUpdate} className="flex items-center gap-2 min-w-0 text-left text-sm">
+        <span className="flex items-center gap-2 min-w-0 text-sm">
           {full && <ModuleDot module={module} />}
           <span className="truncate">{material.title}</span>
-        </button>
-        <span className="flex items-center gap-2 shrink-0">
+        </span>
+        <span className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
           <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{finished ? "finished" : progressText(material)}</span>
           {full && material.total && (
             <button
@@ -53,9 +59,9 @@ export function MaterialCard({ study, material, full, onUpdate, onEdit }: {
         </span>
       </div>
       {material.total && (
-        <button type="button" onClick={onUpdate} className="block w-full h-1 rounded-full bg-white/[0.08] overflow-hidden" aria-label="Update progress">
+        <span className="block w-full h-1 rounded-full bg-white/[0.08] overflow-hidden">
           <span className="block h-full rounded-full transition-all" style={{ width: `${pct}%`, background: module?.color }} />
-        </button>
+        </span>
       )}
       {pace && <span className="text-[10.5px] text-muted-foreground tabular-nums">{pace}</span>}
     </div>
