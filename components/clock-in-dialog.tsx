@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { useGlobalContext } from "./global-context";
 import { WORK_TASKS, partnerOf, openSessionOf } from "@/lib/work-sessions";
 import { SessionFormDialog } from "./session-form-dialog";
+import { openStudySessionOf, StudySession } from "@/lib/study-sessions";
+import { PromptDialog, StudyClockOutDialog } from "./study/study-clock-dialogs";
 
 const TASKS = WORK_TASKS;
 
@@ -23,6 +25,9 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
   const [partnerBusy, setPartnerBusy] = useState<string | null>(null);
   // Logging forgotten time instead, starting from the task and Together picked here.
   const [addingMissed, setAddingMissed] = useState(false);
+  // Clocked into Study: ask, then clock out of Study before Work starts.
+  const [studyClash, setStudyClash] = useState<StudySession | null>(null);
+  const [studyCheckout, setStudyCheckout] = useState<StudySession | null>(null);
   const { userEmail } = useGlobalContext();
 
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
@@ -37,6 +42,12 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    const studying = await openStudySessionOf(userContextName);
+    if (studying) { setStudyClash(studying); return; }
+    startWork();
+  };
+
+  const startWork = async () => {
     setIsSubmitting(true);
 
     try {
@@ -144,6 +155,27 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
             </form>
           </div>
         </div>
+      )}
+
+      {studyClash && (
+        <PromptDialog
+          icon="clock"
+          stacked
+          title="You're clocked into Study"
+          detail="Clock out of Study and start Work?"
+          confirmLabel="Clock out of Study"
+          cancelLabel="Cancel"
+          onConfirm={() => { setStudyCheckout(studyClash); setStudyClash(null); }}
+          onCancel={() => setStudyClash(null)}
+        />
+      )}
+
+      {studyCheckout && (
+        <StudyClockOutDialog
+          session={studyCheckout}
+          onClose={() => setStudyCheckout(null)}
+          onSaved={() => { setStudyCheckout(null); startWork(); }}
+        />
       )}
 
       {addingMissed && (
