@@ -2,24 +2,28 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { StudyDeadline, StudyModule } from "@/lib/types";
+import { StudyDeadline, StudyMaterial, StudyModule } from "@/lib/types";
 
 /** The logged-in person's study modules and deadlines, with save helpers. */
 export function useStudy(person: string | null) {
   const [modules, setModules] = useState<StudyModule[]>([]);
   const [deadlines, setDeadlines] = useState<StudyDeadline[]>([]);
+  const [materials, setMaterials] = useState<StudyMaterial[]>([]);
 
   useEffect(() => {
     if (!person) return;
     (async () => {
-      const [mods, dls] = await Promise.all([
+      const [mods, dls, mats] = await Promise.all([
         supabase.from("study_modules").select("*").eq("person", person).order("created_at"),
         supabase.from("study_deadlines").select("*").eq("person", person).order("cutoff_on"),
+        supabase.from("study_materials").select("*").eq("person", person).order("created_at"),
       ]);
       if (mods.error) console.error("Failed to load study modules:", mods.error);
       else setModules(mods.data as StudyModule[]);
       if (dls.error) console.error("Failed to load deadlines:", dls.error);
       else setDeadlines(dls.data as StudyDeadline[]);
+      if (mats.error) console.error("Failed to load materials:", mats.error);
+      else setMaterials(mats.data as StudyMaterial[]);
     })();
   }, [person]);
 
@@ -40,6 +44,7 @@ export function useStudy(person: string | null) {
   const deleteModule = useCallback(async (id: string) => {
     setModules(prev => prev.filter(m => m.id !== id));
     setDeadlines(prev => prev.filter(d => d.module_id !== id));
+    setMaterials(prev => prev.filter(m => m.module_id !== id));
     const { error } = await supabase.from("study_modules").delete().eq("id", id);
     if (error) console.error("Failed to delete module:", error);
   }, []);
@@ -63,7 +68,25 @@ export function useStudy(person: string | null) {
     if (error) console.error("Failed to delete deadline:", error);
   }, []);
 
-  return { person, modules, deadlines, addModule, updateModule, deleteModule, addDeadline, updateDeadline, deleteDeadline };
+  const addMaterial = useCallback(async (m: Omit<StudyMaterial, "id" | "person" | "created_at" | "current">) => {
+    const { data, error } = await supabase.from("study_materials").insert({ ...m, person }).select().single();
+    if (error) throw error;
+    setMaterials(prev => [...prev, data as StudyMaterial]);
+  }, [person]);
+
+  const updateMaterial = useCallback(async (id: string, updates: Partial<StudyMaterial>) => {
+    setMaterials(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    const { error } = await supabase.from("study_materials").update(updates).eq("id", id);
+    if (error) console.error("Failed to save material:", error);
+  }, []);
+
+  const deleteMaterial = useCallback(async (id: string) => {
+    setMaterials(prev => prev.filter(m => m.id !== id));
+    const { error } = await supabase.from("study_materials").delete().eq("id", id);
+    if (error) console.error("Failed to delete material:", error);
+  }, []);
+
+  return { person, modules, deadlines, materials, addMaterial, updateMaterial, deleteMaterial, addModule, updateModule, deleteModule, addDeadline, updateDeadline, deleteDeadline };
 }
 
 export type StudyData = ReturnType<typeof useStudy>;

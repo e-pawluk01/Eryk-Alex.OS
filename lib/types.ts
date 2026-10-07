@@ -87,3 +87,16 @@ export interface StudyDeadline {
   note: string | null;
   created_at: string;
 }
+
+export interface StudyMaterial {
+  id: string;
+  person: ContextType;
+  module_id: string;
+  title: string;
+  unit: string | null; // "pages" | "chapters" | "lectures" | … ; null when there's no total
+  total: number | null;
+  current: number; // where you're up to
+  pinned: boolean; // show its bar on Study home
+  finish_by: string | null; // "yyyy-MM-dd"
+  created_at: string;
+}

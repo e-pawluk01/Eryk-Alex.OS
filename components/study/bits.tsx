@@ -38,14 +38,13 @@ export function Countdown({ deadline, className }: { deadline: StudyDeadline; cl
   return <span className={cn("font-mono tabular-nums", URGENCY_TEXT[urgency(days)], className)}>{countdown(days)}</span>;
 }
 
-/** Thin bar of how much of the open window is gone, with a marker for today. */
+/** Thin bar of how much of the open window is gone (fill grows towards the cut-off). */
 export function WindowBar({ deadline, module }: { deadline: StudyDeadline; module?: StudyModule }) {
   const pct = windowGone(deadline);
   if (pct === null) return null;
   return (
-    <div className="relative h-1 rounded bg-white/[0.08]">
-      <div className="absolute inset-y-0 left-0 rounded" style={{ width: `${pct}%`, background: `${module?.color ?? "#888"}88` }} />
-      {pct > 0 && pct < 100 && <div className="absolute -top-[3px] w-0.5 h-2.5 rounded-sm bg-white" style={{ left: `calc(${pct}% - 1px)` }} />}
+    <div className="h-1 rounded-full bg-white/[0.12] overflow-hidden" title={`${Math.round(pct)}% of the window gone`}>
+      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: module?.color ?? "#888" }} />
     </div>
   );
 }

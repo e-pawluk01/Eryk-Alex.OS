@@ -1,5 +1,6 @@
 import { differenceInCalendarDays, format, parseISO, startOfDay } from "date-fns";
 import { StudyDeadline } from "./types";
+import { TASK_COLORS } from "./work-sessions";
 
 // Each person's usual deadline types. Any other type they type in is kept
 // and offered again next time.
@@ -13,8 +14,8 @@ export function typesFor(person: string, deadlines: StudyDeadline[]) {
   return Array.from(new Set([...(DEFAULT_TYPES[person] ?? []), ...used]));
 }
 
-// Module colours. Red, amber and green are left out: they mean urgency.
-export const MODULE_COLORS = ["#2bb3c0", "#9085e9", "#a3c13d", "#3987e5", "#d55181", "#8fbdf2", "#a87b4f", "#9ca3af"];
+// Module colours: the same set the Work charts use.
+export const MODULE_COLORS = Object.values(TASK_COLORS);
 
 export function daysUntil(date: string) {
   return differenceInCalendarDays(parseISO(date), startOfDay(new Date()));
@@ -57,4 +58,20 @@ export function windowGone(d: StudyDeadline) {
 
 export function byCutoff(a: StudyDeadline, b: StudyDeadline) {
   return a.cutoff_on.localeCompare(b.cutoff_on) || (a.cutoff_time ?? "").localeCompare(b.cutoff_time ?? "");
+}
+
+export const MATERIAL_UNITS = ["pages", "chapters", "lectures"];
+
+/** "12 pages a day to finish by 20 Oct", or null when there's no target. */
+export function paceLine(m: { total: number | null; current: number; unit: string | null; finish_by: string | null }) {
+  if (!m.total || !m.finish_by || m.current >= m.total) return null;
+  const days = daysUntil(m.finish_by);
+  const left = m.total - m.current;
+  if (days <= 0) return `${left} ${m.unit ?? ""} left, finish date passed`;
+  return `${Math.ceil(left / days)} ${m.unit ?? ""} a day to finish by ${format(parseISO(m.finish_by), "d MMM")}`;
+}
+
+export function progressText(m: { total: number | null; current: number; unit: string | null }) {
+  if (!m.total) return "no total";
+  return m.unit === "pages" ? `p.${m.current} / ${m.total}` : `${m.current} / ${m.total} ${m.unit ?? ""}`.trim();
 }

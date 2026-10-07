@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Task, Event } from "@/lib/types";
 import { DomainType } from "./global-context";
-import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Tag, Flag } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Tag, Flag, BookMarked } from "lucide-react";
 import { 
   startOfMonth, endOfMonth, eachDayOfInterval, format, 
   isSameDay, isToday, addMonths, subMonths, parseISO, startOfDay
@@ -42,11 +42,11 @@ interface CalendarPanelProps {
   showAnalytics?: boolean;
   onListingsToggle?: () => void;
   showListings?: boolean;
-  onDeadlinesToggle?: () => void;
-  showDeadlines?: boolean;
+  studyPage?: "deadlines" | "materials" | null;
+  onStudyPageToggle?: (page: "deadlines" | "materials") => void;
 }
 
-export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics, onListingsToggle, showListings, onDeadlinesToggle, showDeadlines }: CalendarPanelProps) {
+export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics, onListingsToggle, showListings, studyPage, onStudyPageToggle }: CalendarPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
@@ -107,14 +107,20 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
             {showListings ? <X className="w-5 h-5 text-white/80" /> : <Tag className="w-5 h-5 text-white/80" />}
           </button>
         )}
-        {currentDomain === "STUDY" && onDeadlinesToggle && (
-          <button
-            onClick={onDeadlinesToggle}
-            className="p-3 py-4 hover:bg-white/10 transition-colors"
-            title="Deadlines"
-          >
-            {showDeadlines ? <X className="w-5 h-5 text-white/80" /> : <Flag className="w-5 h-5 text-white/80" />}
-          </button>
+        {currentDomain === "STUDY" && onStudyPageToggle && (
+          [
+            { page: "deadlines" as const, icon: Flag, label: "Deadlines" },
+            { page: "materials" as const, icon: BookMarked, label: "Materials" },
+          ].map(({ page, icon: Icon, label }) => (
+            <button
+              key={page}
+              onClick={() => onStudyPageToggle(page)}
+              className="p-3 py-4 hover:bg-white/10 transition-colors"
+              title={label}
+            >
+              {studyPage === page ? <X className="w-5 h-5 text-white/80" /> : <Icon className="w-5 h-5 text-white/80" />}
+            </button>
+          ))
         )}
       </div>
 
