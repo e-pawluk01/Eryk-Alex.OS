@@ -22,6 +22,7 @@ import { useStudy } from "@/components/study/use-study";
 import { UpcomingStrip } from "@/components/study/upcoming-strip";
 import { DeadlinesView } from "@/components/study/deadlines-view";
 import { MaterialsView, WorkingThrough } from "@/components/study/materials-view";
+import { StudyClock } from "@/components/study/study-clock";
 import { ModuleDot } from "@/components/study/bits";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -379,6 +380,7 @@ export default function Home() {
       {currentDomain === "WORK" && (
         <ActiveSessionWidget />
       )}
+      <StudyClock study={study} visible={currentDomain === "STUDY"} />
       {currentDomain === "WORK" && showListings ? (
         <ListingsView />
       ) : currentDomain === "WORK" && showAnalytics ? (

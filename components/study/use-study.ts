@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { StudyDeadline, StudyMaterial, StudyModule } from "@/lib/types";
+import { STUDY_CHANGED_EVENT } from "@/lib/study-sessions";
 
 /** The logged-in person's study modules and deadlines, with save helpers. */
 export function useStudy(person: string | null) {
@@ -12,7 +13,7 @@ export function useStudy(person: string | null) {
 
   useEffect(() => {
     if (!person) return;
-    (async () => {
+    const load = async () => {
       const [mods, dls, mats] = await Promise.all([
         supabase.from("study_modules").select("*").eq("person", person).order("created_at"),
         supabase.from("study_deadlines").select("*").eq("person", person).order("cutoff_on"),
@@ -24,7 +25,10 @@ export function useStudy(person: string | null) {
       else setDeadlines(dls.data as StudyDeadline[]);
       if (mats.error) console.error("Failed to load materials:", mats.error);
       else setMaterials(mats.data as StudyMaterial[]);
-    })();
+    };
+    load();
+    window.addEventListener(STUDY_CHANGED_EVENT, load);
+    return () => window.removeEventListener(STUDY_CHANGED_EVENT, load);
   }, [person]);
 
   const addModule = useCallback(async (m: Pick<StudyModule, "name" | "color" | "kind">) => {
