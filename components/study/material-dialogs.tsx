@@ -72,19 +72,26 @@ export function MaterialDialog({ study, material, onClose }: { study: StudyData;
           <FieldLabel>Total · optional</FieldLabel>
           <div className="flex flex-wrap items-center gap-3">
             <input
-              type="number"
-              min={1}
+              type="text"
               inputMode="numeric"
               placeholder="e.g. 280"
               value={total}
-              onChange={e => setTotal(e.target.value)}
+              onChange={e => setTotal(e.target.value.replace(/\D/g, ""))}
               className="w-24 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-white/30 font-mono"
             />
             {MATERIAL_UNITS.map(u => (
               <OptionPill key={u} active={unit === u} onClick={() => setUnit(u)}>{u}</OptionPill>
             ))}
           </div>
-          {!totalNum && <span className="text-[11px] text-white/30">Without a total it has no progress bar.</span>}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Show its bar on Study home?</FieldLabel>
+          <div className="flex gap-2">
+            <OptionPill active={!!totalNum && pinned} onClick={() => totalNum && setPinned(true)}>Yes, pin it</OptionPill>
+            <OptionPill active={!totalNum || !pinned} onClick={() => setPinned(false)}>No</OptionPill>
+          </div>
+          {!totalNum && <span className="text-[11px] text-white/30">Needs a total to show a bar.</span>}
         </div>
 
         {totalNum && (
@@ -94,17 +101,6 @@ export function MaterialDialog({ study, material, onClose }: { study: StudyData;
               <div className="text-xs">
                 <DatePicker value={finishBy} onChange={setFinishBy} placeholder="No target date" icon={<CalendarClock className="w-3.5 h-3.5 text-muted-foreground" />} />
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Show bar on Study home</span>
-              <button
-                type="button"
-                onClick={() => setPinned(!pinned)}
-                className={`w-8 h-4 rounded-full relative transition-colors ${pinned ? "bg-white" : "bg-white/10"}`}
-                aria-pressed={pinned}
-              >
-                <span className={`absolute top-0.5 w-3 h-3 rounded-full transition-all ${pinned ? "left-[18px] bg-black" : "left-0.5 bg-white/40"}`} />
-              </button>
             </div>
           </>
         )}
@@ -151,19 +147,17 @@ export function ProgressDialog({ study, material, onClose }: { study: StudyData;
     <StudyModal title="Where are you up to?" onClose={onClose}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <span className="flex items-center gap-2 text-sm text-muted-foreground"><ModuleDot module={module} />{material.title}</span>
-        <div className="flex items-baseline gap-3">
+        <div className="flex items-center gap-3">
           <input
-            type="number"
-            min={0}
-            max={material.total ?? undefined}
+            type="text"
             inputMode="numeric"
             value={value}
-            onChange={e => setValue(e.target.value)}
+            onChange={e => setValue(e.target.value.replace(/\D/g, ""))}
             onFocus={e => e.target.select()}
             autoFocus
-            className="w-28 bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-2xl text-white outline-none focus:border-white/30 font-mono tabular-nums"
+            className="w-20 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-white/30 font-mono tabular-nums"
           />
-          <span className="font-mono text-sm text-muted-foreground">/ {material.total} {material.unit}</span>
+          <span className="font-mono text-xs text-muted-foreground">/ {material.total} {material.unit}</span>
         </div>
         <div className="h-1 rounded-full bg-white/[0.08] overflow-hidden">
           <div className="h-full rounded-full transition-all" style={{ width: `${material.total ? (num / material.total) * 100 : 0}%`, background: module?.color }} />
