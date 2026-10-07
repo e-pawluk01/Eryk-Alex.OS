@@ -6,7 +6,7 @@ import { Clock, History, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { openSessionOf, notifySessionsChanged, WorkSession } from "@/lib/work-sessions";
 import {
-  StudySession, STUDY_CHANGED_EVENT, OTHER, moduleName, openStudySessionOf, sessionFields, startRinging, whatLabel,
+  StudySession, STUDY_CHANGED_EVENT, OTHER, missingText, moduleName, openStudySessionOf, sessionFields, startRinging, whatLabel,
 } from "@/lib/study-sessions";
 import { SessionFormDialog } from "@/components/session-form-dialog";
 import { StudyData } from "./use-study";
@@ -242,7 +242,7 @@ function StartStudyDialog({ study, initialModule, onClose, onBegin, onAddMissed 
 
   const handleBegin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (starting || (moduleId === OTHER && !otherText.trim())) return;
+    if (starting || missingText(moduleId, what, otherText)) return;
     setStarting(true);
     // Ask for notification permission now, while it's a direct click.
     if (timer > 0 && "Notification" in window && Notification.permission === "default") {
@@ -270,7 +270,7 @@ function StartStudyDialog({ study, initialModule, onClose, onBegin, onAddMissed 
           </div>
         </details>
         <div className="flex flex-col gap-2 pt-2">
-          <button type="submit" disabled={starting || (moduleId === OTHER && !otherText.trim())} className={primaryButton}>{starting ? "Starting..." : "Begin Session"}</button>
+          <button type="submit" disabled={starting || missingText(moduleId, what, otherText)} className={primaryButton}>{starting ? "Starting..." : "Begin Session"}</button>
           <button
             type="button"
             onClick={() => onAddMissed(moduleId, what, otherText)}

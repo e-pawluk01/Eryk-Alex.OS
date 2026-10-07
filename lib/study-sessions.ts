@@ -7,8 +7,8 @@ export interface StudySession {
   id: string;
   person: string;
   module_id: string | null; // null for "Other"
-  kind: "general" | "material" | "deadline" | "revision" | "other"; // "general" only on early sessions
-  note: string | null; // what you were doing, for "Other"
+  kind: "general" | "material" | "deadline" | "revision" | "practice" | "other"; // "general" only on early sessions
+  note: string | null; // what you were doing, typed (for "Other", or "Something else" in a module)
   material_id: string | null;
   deadline_id: string | null;
   started_at: string;
@@ -37,8 +37,10 @@ export async function openStudySessionOf(person: string): Promise<StudySession |
 
 // The "Other" choice in the module pills (sessions with no module).
 export const OTHER = "other";
+// "Something else" in a module's dropdown: you type what it is.
+export const CUSTOM = "custom";
 
-/** "What" choices for a module, as select values: material:<id>, deadline:<id>, revision. */
+/** "What" choices for a module, as select values: material:<id>, deadline:<id>, revision, practice, custom. */
 export function whatOptions(moduleId: string, materials: StudyMaterial[], deadlines: StudyDeadline[], todayIso: string) {
   return {
     materials: materials.filter(m => m.module_id === moduleId && !(m.total && m.current >= m.total)),
@@ -61,12 +63,20 @@ export function sessionFields(moduleId: string, what: string, otherText: string)
   if (moduleId === OTHER) return { module_id: null, kind: "other", material_id: null, deadline_id: null, note: otherText.trim() };
   if (what.startsWith("material:")) return { module_id: moduleId, kind: "material", material_id: what.slice(9), deadline_id: null, note: null };
   if (what.startsWith("deadline:")) return { module_id: moduleId, kind: "deadline", material_id: null, deadline_id: what.slice(9), note: null };
+  if (what === CUSTOM) return { module_id: moduleId, kind: "other", material_id: null, deadline_id: null, note: otherText.trim() };
+  if (what === "practice") return { module_id: moduleId, kind: "practice", material_id: null, deadline_id: null, note: null };
   return { module_id: moduleId, kind: "revision", material_id: null, deadline_id: null, note: null };
+}
+
+/** True when the choice needs a typed description and none was given. */
+export function missingText(moduleId: string, what: string, otherText: string) {
+  return (moduleId === OTHER || what === CUSTOM) && !otherText.trim();
 }
 
 /** Short label for a session: "Book A", "TMA 01", "Revision" or "General". */
 export function whatLabel(s: Pick<StudySession, "kind" | "material_id" | "deadline_id" | "note">, materials: StudyMaterial[], deadlines: StudyDeadline[]) {
   if (s.kind === "other") return s.note || "Other";
+  if (s.kind === "practice") return "Practice questions";
   if (s.kind === "material") return materials.find(m => m.id === s.material_id)?.title ?? "Material";
   if (s.kind === "deadline") return deadlines.find(d => d.id === s.deadline_id)?.title ?? "Deadline";
   return s.kind === "revision" ? "Revision" : "General";

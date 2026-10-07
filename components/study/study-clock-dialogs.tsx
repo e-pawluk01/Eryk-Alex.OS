@@ -9,7 +9,7 @@ import { TimeField } from "@/components/ui/time-field";
 import { DatePills } from "@/components/ui/date-pills";
 import { StudyMaterial } from "@/lib/types";
 import {
-  StudySession, OTHER, firstWhat, formatDuration, notifyStudyChanged, sessionFields, whatOptions,
+  StudySession, OTHER, CUSTOM, firstWhat, missingText, formatDuration, notifyStudyChanged, sessionFields, whatOptions,
 } from "@/lib/study-sessions";
 import { StudyData } from "./use-study";
 import { FieldLabel, ModuleDot, OptionPill, primaryButton, StudyModal } from "./bits";
@@ -63,7 +63,8 @@ export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWh
       </div>
       <div className="flex flex-col gap-2">
         <FieldLabel>On what</FieldLabel>
-        {moduleId === OTHER ? (
+        {moduleId !== OTHER && <WhatSelect study={study} moduleId={moduleId} value={what} onChange={onWhat} />}
+        {(moduleId === OTHER || what === CUSTOM) && (
           <input
             type="text"
             value={otherText}
@@ -72,8 +73,6 @@ export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWh
             autoFocus
             className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 placeholder:text-white/25"
           />
-        ) : (
-          <WhatSelect study={study} moduleId={moduleId} value={what} onChange={onWhat} />
         )}
       </div>
     </>
@@ -102,6 +101,8 @@ export function WhatSelect({ study, moduleId, value, onChange }: { study: StudyD
         </optgroup>
       )}
       <option value="revision" className="bg-zinc-900">Revision</option>
+      <option value="practice" className="bg-zinc-900">Practice questions</option>
+      <option value={CUSTOM} className="bg-zinc-900">Something else…</option>
     </select>
   );
 }
@@ -178,7 +179,7 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
       ]);
       const m = mat.data as StudyMaterial | null;
       const what = m?.title ?? (dl.data as { title: string } | null)?.title
-        ?? (session.kind === "revision" ? "Revision" : session.kind === "other" ? session.note || "Other" : "General");
+        ?? (session.kind === "revision" ? "Revision" : session.kind === "practice" ? "Practice questions" : session.kind === "other" ? session.note || "Other" : "General");
       setLabel(`${(mod as { name: string } | null)?.name ?? "Study"} · ${what}`);
       if (m?.total) { setMaterial(m); setPage(String(m.current)); }
     })();
@@ -264,7 +265,7 @@ export function StudyMissedDialog({ study, initialModule, initialWhat, initialOt
   const endDate = atTime(end < start ? addDays(day, 1) : day, end);
   const seconds = Math.round((endDate.getTime() - startDate.getTime()) / 1000);
   const inFuture = endDate.getTime() > Date.now() && isSameDay(day, new Date());
-  const missingOther = moduleId === OTHER && !otherText.trim();
+  const missingOther = missingText(moduleId, what, otherText);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
