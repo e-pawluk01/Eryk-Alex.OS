@@ -1,13 +1,14 @@
 import { supabase } from "./supabase";
 import { StudyDeadline, StudyMaterial, StudyModule } from "./types";
 
-// One stretch of studying. "What" is one of: general study, a material,
-// a deadline, or revision.
+// One stretch of studying: on a module (a material, a deadline or revision),
+// or "Other" with a typed description and no module.
 export interface StudySession {
   id: string;
   person: string;
-  module_id: string;
-  kind: "general" | "material" | "deadline" | "revision";
+  module_id: string | null; // null for "Other"
+  kind: "general" | "material" | "deadline" | "revision" | "other"; // "general" only on early sessions
+  note: string | null; // what you were doing, for "Other"
   material_id: string | null;
   deadline_id: string | null;
   started_at: string;
@@ -34,7 +35,10 @@ export async function openStudySessionOf(person: string): Promise<StudySession |
   return (data?.[0] as StudySession) ?? null;
 }
 
-/** "What" choices for a module, as select values: general, revision, material:<id>, deadline:<id>. */
+// The "Other" choice in the module pills (sessions with no module).
+export const OTHER = "other";
+
+/** "What" choices for a module, as select values: material:<id>, deadline:<id>, revision. */
 export function whatOptions(moduleId: string, materials: StudyMaterial[], deadlines: StudyDeadline[], todayIso: string) {
   return {
     materials: materials.filter(m => m.module_id === moduleId && !(m.total && m.current >= m.total)),
@@ -44,20 +48,32 @@ export function whatOptions(moduleId: string, materials: StudyMaterial[], deadli
   };
 }
 
-export function parseWhat(value: string): Pick<StudySession, "kind" | "material_id" | "deadline_id"> {
-  if (value.startsWith("material:")) return { kind: "material", material_id: value.slice(9), deadline_id: null };
-  if (value.startsWith("deadline:")) return { kind: "deadline", material_id: null, deadline_id: value.slice(9) };
-  return { kind: value === "revision" ? "revision" : "general", material_id: null, deadline_id: null };
+/** The first "what" choice for a module: its first material, else its next open deadline, else revision. */
+export function firstWhat(moduleId: string, materials: StudyMaterial[], deadlines: StudyDeadline[], todayIso: string) {
+  const o = whatOptions(moduleId, materials, deadlines, todayIso);
+  if (o.materials[0]) return `material:${o.materials[0].id}`;
+  if (o.deadlines[0]) return `deadline:${o.deadlines[0].id}`;
+  return "revision";
+}
+
+/** The session columns for a module + "what" choice, or for "Other" + typed text. */
+export function sessionFields(moduleId: string, what: string, otherText: string): Pick<StudySession, "module_id" | "kind" | "material_id" | "deadline_id" | "note"> {
+  if (moduleId === OTHER) return { module_id: null, kind: "other", material_id: null, deadline_id: null, note: otherText.trim() };
+  if (what.startsWith("material:")) return { module_id: moduleId, kind: "material", material_id: what.slice(9), deadline_id: null, note: null };
+  if (what.startsWith("deadline:")) return { module_id: moduleId, kind: "deadline", material_id: null, deadline_id: what.slice(9), note: null };
+  return { module_id: moduleId, kind: "revision", material_id: null, deadline_id: null, note: null };
 }
 
 /** Short label for a session: "Book A", "TMA 01", "Revision" or "General". */
-export function whatLabel(s: Pick<StudySession, "kind" | "material_id" | "deadline_id">, materials: StudyMaterial[], deadlines: StudyDeadline[]) {
+export function whatLabel(s: Pick<StudySession, "kind" | "material_id" | "deadline_id" | "note">, materials: StudyMaterial[], deadlines: StudyDeadline[]) {
+  if (s.kind === "other") return s.note || "Other";
   if (s.kind === "material") return materials.find(m => m.id === s.material_id)?.title ?? "Material";
   if (s.kind === "deadline") return deadlines.find(d => d.id === s.deadline_id)?.title ?? "Deadline";
   return s.kind === "revision" ? "Revision" : "General";
 }
 
-export function moduleName(id: string, modules: StudyModule[]) {
+export function moduleName(id: string | null, modules: StudyModule[]) {
+  if (!id) return "Other";
   return modules.find(m => m.id === id)?.name ?? "Study";
 }
 
@@ -68,18 +84,29 @@ export function formatDuration(seconds: number) {
   return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
 }
 
-/** A short three-note chime. Silently does nothing if sound isn't allowed. */
+/**
+ * Ring until stopped: a bell pattern every 2 seconds, for up to 30 seconds.
+ * Returns the function that stops it.
+ */
+export function startRinging(): () => void {
+  playChime();
+  const loop = setInterval(playChime, 2000);
+  const cap = setTimeout(() => clearInterval(loop), 30000);
+  return () => { clearInterval(loop); clearTimeout(cap); };
+}
+
+/** One bell pattern: two quick high notes and a lower one. Does nothing if sound isn't allowed. */
 export function playChime() {
   try {
     const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new AC();
-    [0, 0.35, 0.7].forEach(t => {
+    ([[0, 988], [0.18, 988], [0.42, 784]] as const).forEach(([t, freq]) => {
       const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = "sine";
-      o.frequency.value = 880;
+      o.type = "triangle";
+      o.frequency.value = freq;
       g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
-      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.3);
+      g.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.32);
       o.connect(g);
       g.connect(ctx.destination);
       o.start(ctx.currentTime + t);

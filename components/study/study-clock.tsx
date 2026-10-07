@@ -6,12 +6,12 @@ import { Clock, History, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { openSessionOf, notifySessionsChanged, WorkSession } from "@/lib/work-sessions";
 import {
-  StudySession, STUDY_CHANGED_EVENT, moduleName, openStudySessionOf, parseWhat, playChime, whatLabel,
+  StudySession, STUDY_CHANGED_EVENT, OTHER, moduleName, openStudySessionOf, sessionFields, startRinging, whatLabel,
 } from "@/lib/study-sessions";
 import { SessionFormDialog } from "@/components/session-form-dialog";
 import { StudyData } from "./use-study";
-import { FieldLabel, ModuleDot, OptionPill, primaryButton, StudyModal } from "./bits";
-import { PromptDialog, StudyClockOutDialog, StudyMissedDialog, WhatSelect } from "./study-clock-dialogs";
+import { ModuleDot, primaryButton, StudyModal } from "./bits";
+import { ModuleAndWhat, PromptDialog, StudyClockOutDialog, StudyMissedDialog, initialChoice } from "./study-clock-dialogs";
 
 const formatTime = (total: number) => {
   const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
@@ -41,7 +41,8 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
   const [workCheckout, setWorkCheckout] = useState<{ session: WorkSession; then: () => void } | null>(null);
   const [ringing, setRinging] = useState(false);
   const [checkingOut, setCheckingOut] = useState<null | "stop" | "switch">(null);
-  const [missed, setMissed] = useState<{ module: string; what: string } | null>(null);
+  const [missed, setMissed] = useState<{ module: string; what: string; other: string } | null>(null);
+  const stopRinging = useRef<() => void>(() => {});
 
   const refresh = useCallback(async () => {
     if (!person) return;
@@ -65,12 +66,13 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
   ringRef.current = () => {
     if (!active || hasRung(active.id)) return;
     markRung(active.id);
-    playChime();
+    stopRinging.current = startRinging();
     const what = whatLabel(active, study.materials, study.deadlines);
     const time = durTxt(active.timer_minutes ?? 0);
     try {
       if ("Notification" in window && Notification.permission === "granted") {
-        new Notification("Time to switch", { body: `${time} on ${what} is up.` });
+        const n = new Notification("Time to switch", { body: `${time} on ${what} is up.`, tag: `study-timer-${active.id}`, requireInteraction: true });
+        n.onclick = () => { window.focus(); n.close(); };
       }
     } catch { /* notifications are optional */ }
     setRinging(true);
@@ -88,14 +90,25 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
     return () => clearInterval(interval);
   }, [active]);
 
+  // While ringing, the tab title flashes too, in case the app is in the background.
+  useEffect(() => {
+    if (!ringing) return;
+    const original = document.title;
+    let flip = false;
+    const t = setInterval(() => { flip = !flip; document.title = flip ? "Time to switch" : original; }, 1000);
+    return () => { clearInterval(t); document.title = original; };
+  }, [ringing]);
+
+  const dismissRing = () => { stopRinging.current(); setRinging(false); };
+  useEffect(() => () => stopRinging.current(), []);
+
   // Starting: if Work is running, ask first; clocking out of Work then starts Study.
-  const begin = async (moduleId: string, what: string, timerMinutes: number | null) => {
+  const begin = async (moduleId: string, what: string, otherText: string, timerMinutes: number | null) => {
     if (!person) return;
     const run = async () => {
       const { error } = await supabase.from("study_sessions").insert({
         person,
-        module_id: moduleId,
-        ...parseWhat(what),
+        ...sessionFields(moduleId, what, otherText),
         started_at: new Date().toISOString(),
         timer_minutes: timerMinutes,
       });
@@ -110,7 +123,7 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
 
   const afterClockOut = () => {
     const mode = checkingOut;
-    const mod = active?.module_id ?? null;
+    const mod = active ? active.module_id ?? OTHER : null;
     setCheckingOut(null);
     setActive(null);
     if (mode === "switch") { setStartModule(mod); setStarting(true); }
@@ -162,7 +175,7 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
           initialModule={startModule}
           onClose={() => setStarting(false)}
           onBegin={begin}
-          onAddMissed={(mod, what) => { setStarting(false); setMissed({ module: mod, what }); }}
+          onAddMissed={(mod, what, other) => { setStarting(false); setMissed({ module: mod, what, other }); }}
         />
       )}
 
@@ -192,12 +205,13 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
       {ringing && active && (
         <PromptDialog
           icon="bell"
+          mustChoose
           title={`${durTxt(active.timer_minutes ?? 0)} on ${whatLabel(active, study.materials, study.deadlines)} is up`}
           detail="Time to switch to something else."
           confirmLabel="Switch"
           cancelLabel="Keep going"
-          onConfirm={() => { setRinging(false); setCheckingOut("switch"); }}
-          onCancel={() => setRinging(false)}
+          onConfirm={() => { dismissRing(); setCheckingOut("switch"); }}
+          onCancel={dismissRing}
         />
       )}
 
@@ -205,7 +219,7 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
         <StudyClockOutDialog session={active} onClose={() => setCheckingOut(null)} onSaved={afterClockOut} />
       )}
 
-      {missed && <StudyMissedDialog study={study} initialModule={missed.module} initialWhat={missed.what} onClose={() => setMissed(null)} />}
+      {missed && <StudyMissedDialog study={study} initialModule={missed.module} initialWhat={missed.what} initialOther={missed.other} onClose={() => setMissed(null)} />}
     </>
   );
 }
@@ -214,11 +228,13 @@ function StartStudyDialog({ study, initialModule, onClose, onBegin, onAddMissed 
   study: StudyData;
   initialModule: string | null;
   onClose: () => void;
-  onBegin: (moduleId: string, what: string, timerMinutes: number | null) => Promise<void>;
-  onAddMissed: (moduleId: string, what: string) => void;
+  onBegin: (moduleId: string, what: string, otherText: string, timerMinutes: number | null) => Promise<void>;
+  onAddMissed: (moduleId: string, what: string, otherText: string) => void;
 }) {
-  const [moduleId, setModuleId] = useState(initialModule ?? study.modules[0]?.id ?? "");
-  const [what, setWhat] = useState("general");
+  const start = initialChoice(study, initialModule);
+  const [moduleId, setModuleId] = useState(start.moduleId);
+  const [what, setWhat] = useState(start.what);
+  const [otherText, setOtherText] = useState("");
   const [hours, setHours] = useState("");
   const [minutes, setMinutes] = useState("");
   const [starting, setStarting] = useState(false);
@@ -226,44 +242,22 @@ function StartStudyDialog({ study, initialModule, onClose, onBegin, onAddMissed 
 
   const handleBegin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!moduleId || starting) return;
+    if (starting || (moduleId === OTHER && !otherText.trim())) return;
     setStarting(true);
     // Ask for notification permission now, while it's a direct click.
     if (timer > 0 && "Notification" in window && Notification.permission === "default") {
       try { await Notification.requestPermission(); } catch { /* optional */ }
     }
-    await onBegin(moduleId, what, timer > 0 ? timer : null);
+    await onBegin(moduleId, what, otherText, timer > 0 ? timer : null);
     setStarting(false);
   };
 
   const numberBox = "w-16 text-center bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-white/30 font-mono tabular-nums";
 
-  if (!study.modules.length) {
-    return createPortal(
-      <StudyModal title="Start Study Session" onClose={onClose}>
-        <p className="text-sm text-muted-foreground">Add a module first, from the Deadlines or Materials page.</p>
-      </StudyModal>,
-      document.body
-    );
-  }
-
   return createPortal(
     <StudyModal title="Start Study Session" onClose={onClose}>
       <form onSubmit={handleBegin} className="flex flex-col gap-6">
-        <div className="flex flex-col gap-2">
-          <FieldLabel>Module</FieldLabel>
-          <div className="flex flex-wrap gap-2">
-            {study.modules.map(m => (
-              <OptionPill key={m.id} active={moduleId === m.id} onClick={() => { setModuleId(m.id); setWhat("general"); }}>
-                <ModuleDot module={m} />{m.name}
-              </OptionPill>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-col gap-2">
-          <FieldLabel>On what</FieldLabel>
-          <WhatSelect study={study} moduleId={moduleId} value={what} onChange={setWhat} />
-        </div>
+        <ModuleAndWhat study={study} moduleId={moduleId} what={what} otherText={otherText} onModule={setModuleId} onWhat={setWhat} onOtherText={setOtherText} />
         <details className="border-t border-white/[0.06] pt-4 group">
           <summary className="flex justify-between text-[12.5px] text-muted-foreground group-open:text-white group-open:mb-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
             Timer <span className="font-medium text-white/40">{timer ? durTxt(timer) : "Off"}</span>
@@ -276,10 +270,10 @@ function StartStudyDialog({ study, initialModule, onClose, onBegin, onAddMissed 
           </div>
         </details>
         <div className="flex flex-col gap-2 pt-2">
-          <button type="submit" disabled={starting} className={primaryButton}>{starting ? "Starting..." : "Begin Session"}</button>
+          <button type="submit" disabled={starting || (moduleId === OTHER && !otherText.trim())} className={primaryButton}>{starting ? "Starting..." : "Begin Session"}</button>
           <button
             type="button"
-            onClick={() => onAddMissed(moduleId, what)}
+            onClick={() => onAddMissed(moduleId, what, otherText)}
             className="w-full py-3 flex items-center justify-center gap-2 bg-white/[0.03] hover:bg-white/10 text-white/75 hover:text-white border border-white/10 font-bold uppercase tracking-widest text-[10px] rounded-lg transition-colors"
           >
             <History className="w-3.5 h-3.5" />
