@@ -9,7 +9,7 @@ import { TimeField } from "@/components/ui/time-field";
 import { DatePills } from "@/components/ui/date-pills";
 import { StudyMaterial } from "@/lib/types";
 import {
-  StudySession, formatDuration, notifyStudyChanged, parseWhat, whatOptions,
+  StudySession, OTHER, CUSTOM, firstWhat, missingText, formatDuration, notifyStudyChanged, sessionFields, whatOptions,
 } from "@/lib/study-sessions";
 import { StudyData } from "./use-study";
 import { FieldLabel, ModuleDot, OptionPill, primaryButton, StudyModal } from "./bits";
@@ -32,13 +32,64 @@ function Portal({ children }: { children: React.ReactNode }) {
   return mounted ? createPortal(children, document.body) : null;
 }
 
-/** The module's "what" dropdown: general, its materials, its open deadlines, revision. */
+const todayIso = () => format(new Date(), "yyyy-MM-dd");
+
+/** Module pills plus "Other", then "On what": the module's dropdown, or a text box for Other. */
+export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWhat, onOtherText }: {
+  study: StudyData;
+  moduleId: string;
+  what: string;
+  otherText: string;
+  onModule: (id: string) => void;
+  onWhat: (v: string) => void;
+  onOtherText: (v: string) => void;
+}) {
+  const pick = (id: string) => {
+    onModule(id);
+    if (id !== OTHER) onWhat(firstWhat(id, study.materials, study.deadlines, todayIso()));
+  };
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <FieldLabel>Module</FieldLabel>
+        <div className="flex flex-wrap gap-2">
+          {study.modules.map(m => (
+            <OptionPill key={m.id} active={moduleId === m.id} onClick={() => pick(m.id)}>
+              <ModuleDot module={m} />{m.name}
+            </OptionPill>
+          ))}
+          <OptionPill active={moduleId === OTHER} onClick={() => pick(OTHER)}>Other</OptionPill>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <FieldLabel>On what</FieldLabel>
+        {moduleId !== OTHER && <WhatSelect study={study} moduleId={moduleId} value={what} onChange={onWhat} />}
+        {(moduleId === OTHER || what === CUSTOM) && (
+          <input
+            type="text"
+            value={otherText}
+            onChange={e => onOtherText(e.target.value)}
+            placeholder="What are you doing?"
+            autoFocus
+            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 placeholder:text-white/25"
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
+/** The first module (or Other when there are none) and its first "what". */
+export function initialChoice(study: StudyData, preferModule?: string | null) {
+  const moduleId = preferModule ?? study.modules[0]?.id ?? OTHER;
+  return { moduleId, what: moduleId === OTHER ? "" : firstWhat(moduleId, study.materials, study.deadlines, todayIso()) };
+}
+
+/** The module's "what" dropdown: its materials, its open deadlines, revision. */
 export function WhatSelect({ study, moduleId, value, onChange }: { study: StudyData; moduleId: string; value: string; onChange: (v: string) => void }) {
-  const today = format(new Date(), "yyyy-MM-dd");
-  const { materials, deadlines } = whatOptions(moduleId, study.materials, study.deadlines, today);
+  const { materials, deadlines } = whatOptions(moduleId, study.materials, study.deadlines, todayIso());
   return (
     <select value={value} onChange={e => onChange(e.target.value)} className={selectClass} aria-label="On what">
-      <option value="general" className="bg-zinc-900">General study</option>
       {materials.length > 0 && (
         <optgroup label="Materials" className="bg-zinc-900">
           {materials.map(m => <option key={m.id} value={`material:${m.id}`}>{m.title}</option>)}
@@ -50,12 +101,14 @@ export function WhatSelect({ study, moduleId, value, onChange }: { study: StudyD
         </optgroup>
       )}
       <option value="revision" className="bg-zinc-900">Revision</option>
+      <option value="practice" className="bg-zinc-900">Practice questions</option>
+      <option value={CUSTOM} className="bg-zinc-900">Something else…</option>
     </select>
   );
 }
 
 /** Centred question with an icon and two buttons (Work clash, timer ring). */
-export function PromptDialog({ icon, title, detail, confirmLabel, cancelLabel, onConfirm, onCancel, stacked }: {
+export function PromptDialog({ icon, title, detail, confirmLabel, cancelLabel, onConfirm, onCancel, stacked, mustChoose }: {
   icon: "clock" | "bell";
   title: string;
   detail: string;
@@ -64,11 +117,13 @@ export function PromptDialog({ icon, title, detail, confirmLabel, cancelLabel, o
   onConfirm: () => void;
   onCancel: () => void;
   stacked?: boolean;
+  // Clicking outside does nothing: one of the buttons has to be pressed.
+  mustChoose?: boolean;
 }) {
   return (
     <Portal>
       <div className="fixed inset-0 z-[300] flex items-center justify-center">
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-300" onClick={onCancel} />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-300" onClick={mustChoose ? undefined : onCancel} />
         <div className="relative bg-zinc-950/90 backdrop-blur-3xl border border-white/5 rounded-2xl w-[90%] max-w-sm shadow-2xl shadow-black/50 animate-in fade-in zoom-in-[0.98] duration-300 flex flex-col items-center p-8 text-center">
           {icon === "clock" ? (
             <div className="w-12 h-12 rounded-full flex items-center justify-center mb-6 border bg-yellow-500/10 border-yellow-500/20 text-yellow-500">
@@ -118,12 +173,13 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
   useEffect(() => {
     (async () => {
       const [{ data: mod }, mat, dl] = await Promise.all([
-        supabase.from("study_modules").select("name").eq("id", session.module_id).maybeSingle(),
+        session.module_id ? supabase.from("study_modules").select("name").eq("id", session.module_id).maybeSingle() : Promise.resolve({ data: { name: "Other" } }),
         session.material_id ? supabase.from("study_materials").select("*").eq("id", session.material_id).maybeSingle() : Promise.resolve({ data: null }),
         session.deadline_id ? supabase.from("study_deadlines").select("title").eq("id", session.deadline_id).maybeSingle() : Promise.resolve({ data: null }),
       ]);
       const m = mat.data as StudyMaterial | null;
-      const what = m?.title ?? (dl.data as { title: string } | null)?.title ?? (session.kind === "revision" ? "Revision" : "General");
+      const what = m?.title ?? (dl.data as { title: string } | null)?.title
+        ?? (session.kind === "revision" ? "Revision" : session.kind === "practice" ? "Practice questions" : session.kind === "other" ? session.note || "Other" : "General");
       setLabel(`${(mod as { name: string } | null)?.name ?? "Study"} · ${what}`);
       if (m?.total) { setMaterial(m); setPage(String(m.current)); }
     })();
@@ -189,12 +245,19 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
 }
 
 /** Log study time you forgot to clock. */
-export function StudyMissedDialog({ study, initialModule, initialWhat, onClose }: { study: StudyData; initialModule: string; initialWhat: string; onClose: () => void }) {
+export function StudyMissedDialog({ study, initialModule, initialWhat, initialOther, onClose }: {
+  study: StudyData;
+  initialModule: string;
+  initialWhat: string;
+  initialOther: string;
+  onClose: () => void;
+}) {
   const [day, setDay] = useState(startOfDay(new Date()));
   const [start, setStart] = useState("10:00");
   const [end, setEnd] = useState("12:00");
   const [moduleId, setModuleId] = useState(initialModule);
   const [what, setWhat] = useState(initialWhat);
+  const [otherText, setOtherText] = useState(initialOther);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -202,15 +265,15 @@ export function StudyMissedDialog({ study, initialModule, initialWhat, onClose }
   const endDate = atTime(end < start ? addDays(day, 1) : day, end);
   const seconds = Math.round((endDate.getTime() - startDate.getTime()) / 1000);
   const inFuture = endDate.getTime() > Date.now() && isSameDay(day, new Date());
+  const missingOther = missingText(moduleId, what, otherText);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (seconds <= 0 || inFuture || saving) return;
+    if (seconds <= 0 || inFuture || missingOther || saving) return;
     setSaving(true);
     const { error: err } = await supabase.from("study_sessions").insert({
       person: study.person,
-      module_id: moduleId,
-      ...parseWhat(what),
+      ...sessionFields(moduleId, what, otherText),
       started_at: startDate.toISOString(),
       ended_at: endDate.toISOString(),
     });
@@ -232,21 +295,11 @@ export function StudyMissedDialog({ study, initialModule, initialWhat, onClose }
             <div className="flex flex-col gap-2"><FieldLabel>Start</FieldLabel><TimeField id="study-missed-start" value={start} onChange={setStart} /></div>
             <div className="flex flex-col gap-2"><FieldLabel>End</FieldLabel><TimeField id="study-missed-end" value={end} onChange={setEnd} /></div>
           </div>
-          <div className="flex flex-col gap-2">
-            <FieldLabel>Module</FieldLabel>
-            <div className="flex flex-wrap gap-2">
-              {study.modules.map(m => (
-                <OptionPill key={m.id} active={moduleId === m.id} onClick={() => { setModuleId(m.id); setWhat("general"); }}>
-                  <ModuleDot module={m} />{m.name}
-                </OptionPill>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-2"><FieldLabel>On what</FieldLabel><WhatSelect study={study} moduleId={moduleId} value={what} onChange={setWhat} /></div>
+          <ModuleAndWhat study={study} moduleId={moduleId} what={what} otherText={otherText} onModule={setModuleId} onWhat={setWhat} onOtherText={setOtherText} />
           {(seconds <= 0 || inFuture || error) && (
             <p className="text-xs text-red-400/80">{error ?? (inFuture ? "That session hasn't finished yet." : "The end has to be after the start.")}</p>
           )}
-          <button type="submit" disabled={seconds <= 0 || inFuture || saving} className={primaryButton}>Save session</button>
+          <button type="submit" disabled={seconds <= 0 || inFuture || missingOther || saving} className={primaryButton}>Save session</button>
         </form>
       </StudyModal>
     </Portal>
