@@ -25,6 +25,7 @@ import { MaterialsView, WorkingThrough } from "@/components/study/materials-view
 import { StudyClock } from "@/components/study/study-clock";
 import { useMusic } from "@/components/study/use-music";
 import { MusicPlayer } from "@/components/study/music-player";
+import { LectureReminder } from "@/components/study/lecture-reminder";
 import { ModuleDot } from "@/components/study/bits";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -385,6 +386,7 @@ export default function Home() {
       )}
       <StudyClock study={study} music={music} visible={currentDomain === "STUDY"} />
       <MusicPlayer music={music} inStudy={currentDomain === "STUDY"} />
+      <LectureReminder events={events} />
       {currentDomain === "WORK" && showListings ? (
         <ListingsView />
       ) : currentDomain === "WORK" && showAnalytics ? (
@@ -396,7 +398,7 @@ export default function Home() {
       ) : (
         <>
       {currentDomain === "STUDY" ? (
-        <UpcomingStrip study={study} />
+        <UpcomingStrip study={study} events={events} onSelectEvent={setSelectedEvent} />
       ) : (
       /* GOALS SECTION */
       <section className="flex flex-col gap-4">
