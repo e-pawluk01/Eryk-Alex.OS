@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Maximize2, Pause, Play, X } from "lucide-react";
+import { Pause, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatLength, parseVideoId, shortTitle } from "@/lib/music";
 import { MusicData, YTPlayer } from "./use-music";
@@ -32,10 +32,9 @@ function loadYouTubeApi(): Promise<YTNamespace> {
 }
 
 /**
- * The music panel (opened from the music button) and, while something is
- * loaded and the panel is closed, a small player above the clock. The video
- * always stays visible, as YouTube requires; it's one player that never
- * reloads, so music keeps going across pages.
+ * The music panel, opened from the music button. It's one player that never
+ * reloads, so music keeps going across pages; when the panel is closed it is
+ * moved off screen rather than removed (Eryk chose to hide it fully).
  */
 export function MusicPlayer({ music, inStudy }: { music: MusicData; inStudy: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -87,45 +86,27 @@ export function MusicPlayer({ music, inStudy }: { music: MusicData; inStudy: boo
 
   if (!mounted) return null;
   const panel = music.open && inStudy;
-  const mini = !panel && !!music.current;
 
+  // Closed panel: the player moves off screen (still running, so music keeps
+  // playing) and the music button carries the controls.
   return createPortal(
     <div
       className={cn(
-        "fixed right-6 bottom-24 z-[55] bg-zinc-950/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 flex flex-col",
-        panel ? "w-80 max-w-[calc(100vw-3rem)] p-4 gap-3" : "w-[220px] p-2 gap-2",
-        !panel && !mini && "hidden"
+        "fixed z-[55] bg-zinc-950/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 flex flex-col w-80 p-4 gap-3",
+        panel ? "right-6 bottom-24 max-w-[calc(100vw-3rem)]" : "-left-[10000px] top-0 pointer-events-none"
       )}
+      aria-hidden={!panel}
     >
-      {panel && (
-        <div key="head" className="flex items-center justify-between px-1">
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Study music</span>
-          <button onClick={() => music.setOpen(false)} className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10" aria-label="Close music">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      <div key="head" className="flex items-center justify-between px-1">
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Study music</span>
+        <button onClick={() => music.setOpen(false)} className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10" aria-label="Close music">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
 
       <div key="video" className={cn("relative aspect-video rounded-lg overflow-hidden bg-black border border-border", !music.current && "hidden")}>
         <div ref={hostRef} className="absolute inset-0 [&>iframe]:w-full [&>iframe]:h-full" />
       </div>
-
-      {mini && music.current && (
-        <div key="mini" className="flex items-center gap-1.5 px-1">
-          <span className="text-[11px] text-white/80 truncate flex-1 min-w-0">{music.current.title}</span>
-          <button onClick={music.toggle} className="p-1.5 rounded-full hover:bg-white/10 text-white/70 hover:text-white" aria-label={music.playing ? "Pause" : "Play"}>
-            {music.playing ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-          </button>
-          {inStudy && (
-            <button onClick={() => music.setOpen(true)} className="p-1.5 rounded-full hover:bg-white/10 text-white/50 hover:text-white" aria-label="Open playlist">
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <button onClick={music.stop} className="p-1.5 rounded-full hover:bg-white/10 text-white/40 hover:text-white" aria-label="Stop music">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
 
       {panel && <Playlist key="list" music={music} />}
     </div>,
