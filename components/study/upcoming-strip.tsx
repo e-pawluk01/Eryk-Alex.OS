@@ -60,7 +60,7 @@ export function UpcomingStrip({ study, events, onSelectEvent }: { study: StudyDa
               type="button"
               onClick={() => setOpenId(d.id)}
               className={cn(
-                "w-[240px] shrink-0 bg-card border p-4 rounded-lg flex flex-col gap-3 text-left hover:bg-white/[0.03] transition-colors",
+                "w-[240px] shrink-0 overflow-hidden bg-card border p-4 rounded-lg flex flex-col gap-3 text-left hover:bg-white/[0.03] transition-colors",
                 URGENCY_BORDER[urgency(daysUntil(d.cutoff_on))]
               )}
             >
@@ -68,9 +68,9 @@ export function UpcomingStrip({ study, events, onSelectEvent }: { study: StudyDa
                 <span className="flex items-center gap-1.5"><TypeChip type={d.type} module={module} /><OpenTag deadline={d} /></span>
                 <Countdown deadline={d} className="text-xs font-semibold" />
               </div>
-              <div className="flex items-center gap-2 font-medium text-foreground min-w-0">
-                <ModuleDot module={module} />
-                <span className="truncate">{d.title}</span>
+              <div className="flex items-start gap-2 font-medium text-foreground w-full min-w-0">
+                <ModuleDot module={module} className="mt-[7px]" />
+                <span className="min-w-0 leading-snug line-clamp-2 break-words" title={d.title}>{d.title}</span>
               </div>
               <span className="text-[11px] text-muted-foreground">
                 {d.opens_on ? "Cut-off " : ""}{shortDate(d.cutoff_on)}{shortTime(d.cutoff_time) ? ` · ${shortTime(d.cutoff_time)}` : ""}
@@ -128,7 +128,7 @@ function EventCards({ events, onSelect }: { events: Event[]; onSelect: (e: Event
             type="button"
             onClick={() => onSelect(e)}
             className={cn(
-              "w-[240px] shrink-0 bg-card border p-4 rounded-lg flex flex-col gap-3 text-left hover:bg-white/[0.03] transition-colors",
+              "w-[240px] shrink-0 overflow-hidden bg-card border p-4 rounded-lg flex flex-col gap-3 text-left hover:bg-white/[0.03] transition-colors",
               isToday ? "border-white/30" : "border-border"
             )}
           >
@@ -136,7 +136,7 @@ function EventCards({ events, onSelect }: { events: Event[]; onSelect: (e: Event
               <span className="px-1.5 py-0.5 rounded text-[8.5px] uppercase tracking-widest font-bold border border-border text-muted-foreground">Event</span>
               <span className={cn("font-mono tabular-nums text-xs font-semibold", isToday ? "text-white" : "text-muted-foreground")}>{when(e)}</span>
             </div>
-            <span className="font-medium text-foreground truncate">{e.title}</span>
+            <span className="block w-full min-w-0 font-medium text-foreground leading-snug line-clamp-2 break-words" title={e.title}>{e.title}</span>
             <span className="text-[11px] text-muted-foreground">
               {isToday ? "Today" : format(parseISO(e.event_date), "EEE d MMM")}{e.event_time ? ` · ${e.event_time.slice(0, 5)}` : ""}
             </span>
