@@ -140,7 +140,7 @@ export function PromptDialog({ icon, title, detail, confirmLabel, cancelLabel, o
             {stacked ? (
               <>
                 <button type="button" onClick={onConfirm} className="w-full py-3 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-white/90 transition-colors">{confirmLabel}</button>
-                <button type="button" onClick={onCancel} className={secondaryButton}>{cancelLabel}</button>
+                {cancelLabel && <button type="button" onClick={onCancel} className={secondaryButton}>{cancelLabel}</button>}
               </>
             ) : (
               <>
