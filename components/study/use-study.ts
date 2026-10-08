@@ -10,15 +10,26 @@ export function useStudy(person: string | null) {
   const [modules, setModules] = useState<StudyModule[]>([]);
   const [deadlines, setDeadlines] = useState<StudyDeadline[]>([]);
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
+  // Seconds of finished study sessions per deadline.
+  const [loggedByDeadline, setLoggedByDeadline] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!person) return;
     const load = async () => {
-      const [mods, dls, mats] = await Promise.all([
+      const [mods, dls, mats, sess] = await Promise.all([
         supabase.from("study_modules").select("*").eq("person", person).order("created_at"),
         supabase.from("study_deadlines").select("*").eq("person", person).order("cutoff_on"),
         supabase.from("study_materials").select("*").eq("person", person).order("created_at"),
+        supabase.from("study_sessions").select("deadline_id, started_at, ended_at").eq("person", person).not("deadline_id", "is", null).not("ended_at", "is", null),
       ]);
+      if (sess.error) console.error("Failed to load study time:", sess.error);
+      else {
+        const totals: Record<string, number> = {};
+        for (const s of sess.data as { deadline_id: string; started_at: string; ended_at: string }[]) {
+          totals[s.deadline_id] = (totals[s.deadline_id] ?? 0) + (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000;
+        }
+        setLoggedByDeadline(totals);
+      }
       if (mods.error) console.error("Failed to load study modules:", mods.error);
       else setModules(mods.data as StudyModule[]);
       if (dls.error) console.error("Failed to load deadlines:", dls.error);
@@ -53,7 +64,7 @@ export function useStudy(person: string | null) {
     if (error) console.error("Failed to delete module:", error);
   }, []);
 
-  const addDeadline = useCallback(async (d: Omit<StudyDeadline, "id" | "person" | "created_at" | "done" | "score" | "note">) => {
+  const addDeadline = useCallback(async (d: Omit<StudyDeadline, "id" | "person" | "created_at" | "done" | "score" | "note" | "progress_mode" | "progress_done" | "progress_total" | "progress_pct">) => {
     const { data, error } = await supabase.from("study_deadlines").insert({ ...d, person }).select().single();
     if (error) throw error;
     setDeadlines(prev => [...prev, data as StudyDeadline]);
@@ -90,7 +101,7 @@ export function useStudy(person: string | null) {
     if (error) console.error("Failed to delete material:", error);
   }, []);
 
-  return { person, modules, deadlines, materials, addMaterial, updateMaterial, deleteMaterial, addModule, updateModule, deleteModule, addDeadline, updateDeadline, deleteDeadline };
+  return { person, modules, deadlines, materials, loggedByDeadline, addMaterial, updateMaterial, deleteMaterial, addModule, updateModule, deleteModule, addDeadline, updateDeadline, deleteDeadline };
 }
 
 export type StudyData = ReturnType<typeof useStudy>;
