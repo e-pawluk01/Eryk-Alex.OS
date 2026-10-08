@@ -23,6 +23,8 @@ import { UpcomingStrip } from "@/components/study/upcoming-strip";
 import { DeadlinesView } from "@/components/study/deadlines-view";
 import { MaterialsView, WorkingThrough } from "@/components/study/materials-view";
 import { StudyClock } from "@/components/study/study-clock";
+import { useMusic } from "@/components/study/use-music";
+import { MusicPlayer } from "@/components/study/music-player";
 import { ModuleDot } from "@/components/study/bits";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -66,6 +68,7 @@ export default function Home() {
   const isMine = (row: { domain?: string | null; context: string }) =>
     (row.domain || "WORK") === "WORK" || row.context === me;
   const study = useStudy(me);
+  const music = useMusic(me);
   const isMyGoal = (g: { context: string }) =>
     ["WORK", "Reselling", "Drink idea"].includes(g.context) || g.context === me;
 
@@ -380,7 +383,8 @@ export default function Home() {
       {currentDomain === "WORK" && (
         <ActiveSessionWidget />
       )}
-      <StudyClock study={study} visible={currentDomain === "STUDY"} />
+      <StudyClock study={study} music={music} visible={currentDomain === "STUDY"} />
+      <MusicPlayer music={music} inStudy={currentDomain === "STUDY"} />
       {currentDomain === "WORK" && showListings ? (
         <ListingsView />
       ) : currentDomain === "WORK" && showAnalytics ? (
