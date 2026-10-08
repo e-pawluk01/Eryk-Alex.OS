@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Clock, History, Square } from "lucide-react";
+import { Clock, History, Music, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { openSessionOf, notifySessionsChanged, WorkSession } from "@/lib/work-sessions";
 import {
@@ -10,7 +10,8 @@ import {
 } from "@/lib/study-sessions";
 import { SessionFormDialog } from "@/components/session-form-dialog";
 import { StudyData } from "./use-study";
-import { ModuleDot, primaryButton, StudyModal } from "./bits";
+import { MusicData } from "./use-music";
+import { FieldLabel, ModuleDot, primaryButton, StudyModal } from "./bits";
 import { ModuleAndWhat, PromptDialog, StudyClockOutDialog, StudyMissedDialog, initialChoice } from "./study-clock-dialogs";
 
 const formatTime = (total: number) => {
@@ -30,7 +31,7 @@ const markRung = (id: string) => { try { localStorage.setItem(rungKey(id), "1");
  * Study clock, bottom right. Stays mounted in Work too (hidden) so a timer
  * still rings there; the pill only shows in Study.
  */
-export function StudyClock({ study, visible }: { study: StudyData; visible: boolean }) {
+export function StudyClock({ study, music, visible }: { study: StudyData; music: MusicData; visible: boolean }) {
   const person = study.person;
   const [active, setActive] = useState<StudySession | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -103,7 +104,7 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
   useEffect(() => () => stopRinging.current(), []);
 
   // Starting: if Work is running, ask first; clocking out of Work then starts Study.
-  const begin = async (moduleId: string, what: string, otherText: string, timerMinutes: number | null) => {
+  const begin = async (moduleId: string, what: string, otherText: string, timerMinutes: number | null, trackId: string) => {
     if (!person) return;
     const run = async () => {
       const { error } = await supabase.from("study_sessions").insert({
@@ -113,6 +114,7 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
         timer_minutes: timerMinutes,
       });
       if (error) { console.error("Failed to start studying:", error); return; }
+      if (trackId && music.current?.id !== trackId) music.play(trackId);
       setStarting(false);
       refresh();
     };
@@ -137,7 +139,14 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
     <>
       {visible && createPortal(
         !active ? (
-          <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <button
+              onClick={() => music.setOpen(!music.open)}
+              aria-label="Music"
+              className={`p-4 rounded-full bg-zinc-950/80 backdrop-blur-md border shadow-2xl hover:bg-white/10 transition-colors group ${music.open || music.playing ? "border-white/30" : "border-white/10"}`}
+            >
+              <Music className={`w-5 h-5 transition-colors ${music.open || music.playing ? "text-white" : "text-white/70 group-hover:text-white"}`} />
+            </button>
             <button
               onClick={() => { setStartModule(null); setStarting(true); }}
               aria-label="Start studying"
@@ -158,6 +167,13 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
               {timerLeft !== null && <span className="text-[11px] font-mono text-white/40 tabular-nums">{formatTime(timerLeft)} left</span>}
             </div>
             <button
+              onClick={() => music.setOpen(!music.open)}
+              aria-label="Music"
+              className={`p-2.5 rounded-full border transition-colors ${music.open || music.playing ? "bg-white/10 border-white/20 text-white" : "bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10"}`}
+            >
+              <Music className="w-4 h-4" />
+            </button>
+            <button
               onClick={() => setCheckingOut("stop")}
               aria-label="Clock out"
               className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
@@ -172,6 +188,7 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
       {starting && (
         <StartStudyDialog
           study={study}
+          music={music}
           initialModule={startModule}
           onClose={() => setStarting(false)}
           onBegin={begin}
@@ -224,11 +241,12 @@ export function StudyClock({ study, visible }: { study: StudyData; visible: bool
   );
 }
 
-function StartStudyDialog({ study, initialModule, onClose, onBegin, onAddMissed }: {
+function StartStudyDialog({ study, music, initialModule, onClose, onBegin, onAddMissed }: {
   study: StudyData;
+  music: MusicData;
   initialModule: string | null;
   onClose: () => void;
-  onBegin: (moduleId: string, what: string, otherText: string, timerMinutes: number | null) => Promise<void>;
+  onBegin: (moduleId: string, what: string, otherText: string, timerMinutes: number | null, trackId: string) => Promise<void>;
   onAddMissed: (moduleId: string, what: string, otherText: string) => void;
 }) {
   const start = initialChoice(study, initialModule);
@@ -238,6 +256,7 @@ function StartStudyDialog({ study, initialModule, onClose, onBegin, onAddMissed 
   const [hours, setHours] = useState("");
   const [minutes, setMinutes] = useState("");
   const [starting, setStarting] = useState(false);
+  const [trackId, setTrackId] = useState(music.current?.id ?? "");
   const timer = (parseInt(hours) || 0) * 60 + (parseInt(minutes) || 0);
 
   const handleBegin = async (e: React.FormEvent) => {
@@ -248,7 +267,7 @@ function StartStudyDialog({ study, initialModule, onClose, onBegin, onAddMissed 
     if (timer > 0 && "Notification" in window && Notification.permission === "default") {
       try { await Notification.requestPermission(); } catch { /* optional */ }
     }
-    await onBegin(moduleId, what, otherText, timer > 0 ? timer : null);
+    await onBegin(moduleId, what, otherText, timer > 0 ? timer : null, trackId);
     setStarting(false);
   };
 
@@ -258,17 +277,27 @@ function StartStudyDialog({ study, initialModule, onClose, onBegin, onAddMissed 
     <StudyModal title="Start Study Session" onClose={onClose}>
       <form onSubmit={handleBegin} className="flex flex-col gap-6">
         <ModuleAndWhat study={study} moduleId={moduleId} what={what} otherText={otherText} onModule={setModuleId} onWhat={setWhat} onOtherText={setOtherText} />
-        <details className="border-t border-white/[0.06] pt-4 group">
-          <summary className="flex justify-between text-[12.5px] text-muted-foreground group-open:text-white group-open:mb-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-            Timer <span className="font-medium text-white/40">{timer ? durTxt(timer) : "Off"}</span>
-          </summary>
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Timer · optional</FieldLabel>
           <div className="flex items-center gap-2">
             <input type="text" inputMode="numeric" placeholder="0" value={hours} onChange={e => setHours(e.target.value.replace(/\D/g, "").slice(0, 2))} className={numberBox} aria-label="Timer hours" />
             <span className="text-xs text-muted-foreground">h</span>
             <input type="text" inputMode="numeric" placeholder="0" value={minutes} onChange={e => setMinutes(e.target.value.replace(/\D/g, "").slice(0, 2))} className={numberBox} aria-label="Timer minutes" />
             <span className="text-xs text-muted-foreground">min</span>
           </div>
-        </details>
+        </div>
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Music · optional</FieldLabel>
+          <select
+            value={trackId}
+            onChange={e => setTrackId(e.target.value)}
+            aria-label="Music"
+            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 transition-colors appearance-none"
+          >
+            <option value="" className="bg-zinc-900">{music.tracks.length ? "None" : "None (add tracks from the music button)"}</option>
+            {music.tracks.map(t => <option key={t.id} value={t.id} className="bg-zinc-900">{t.title}</option>)}
+          </select>
+        </div>
         <div className="flex flex-col gap-2 pt-2">
           <button type="submit" disabled={starting || missingText(moduleId, what, otherText)} className={primaryButton}>{starting ? "Starting..." : "Begin Session"}</button>
           <button
