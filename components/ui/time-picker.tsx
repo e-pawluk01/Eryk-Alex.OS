@@ -53,7 +53,7 @@ export function TimePicker({ value, onChange, placeholder = "Select time", icon 
           {value ? value : placeholder}
         </span>
         {value && (
-          <button 
+          <button type="button" 
             onClick={(e) => { e.stopPropagation(); onChange(null); }}
             className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/20 transition-all text-muted-foreground hover:text-white ml-1"
           >
@@ -74,7 +74,7 @@ export function TimePicker({ value, onChange, placeholder = "Select time", icon 
               </div>
               <div className="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {HOURS.map(h => (
-                  <button
+                  <button type="button"
                     key={h}
                     onClick={() => setHour(h)}
                     className={cn(
@@ -97,7 +97,7 @@ export function TimePicker({ value, onChange, placeholder = "Select time", icon 
               </div>
               <div className="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {MINUTES.map(m => (
-                  <button
+                  <button type="button"
                     key={m}
                     onClick={() => setMinute(m)}
                     className={cn(
@@ -116,7 +116,7 @@ export function TimePicker({ value, onChange, placeholder = "Select time", icon 
 
           <div className="p-3 bg-white/[0.02] border-t border-white/5 flex justify-between items-center">
             <span className="text-sm font-mono font-bold tracking-widest">{hour}:{minute}</span>
-            <button 
+            <button type="button" 
               onClick={handleApply}
               className="flex items-center gap-1.5 bg-white text-black px-3 py-1.5 rounded text-[10px] uppercase tracking-widest font-bold hover:bg-white/90 transition-colors"
             >

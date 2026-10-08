@@ -50,7 +50,7 @@ export function DatePicker({ value, onChange, placeholder = "Select date", icon 
           {value ? format(parseISO(value), "MMM d, yyyy") : placeholder}
         </span>
         {value && (
-          <button 
+          <button type="button" 
             onClick={(e) => { e.stopPropagation(); onChange(null); }}
             className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/20 transition-all text-muted-foreground hover:text-white ml-1"
           >
@@ -66,13 +66,13 @@ export function DatePicker({ value, onChange, placeholder = "Select date", icon 
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xs font-semibold tracking-wide">{format(currentMonth, "MMMM yyyy")}</h3>
             <div className="flex items-center gap-2">
-              <button 
+              <button type="button" 
                 onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} 
                 className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
               >
                 <ChevronLeft className="w-3 h-3" />
               </button>
-              <button 
+              <button type="button" 
                 onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} 
                 className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
               >
@@ -94,7 +94,7 @@ export function DatePicker({ value, onChange, placeholder = "Select date", icon 
               const isTodayDate = isToday(day);
               
               return (
-                <button
+                <button type="button"
                   key={day.toString()}
                   onClick={() => {
                     onChange(format(day, "yyyy-MM-dd"));
@@ -115,7 +115,7 @@ export function DatePicker({ value, onChange, placeholder = "Select date", icon 
           </div>
 
           <div className="mt-4 pt-3 border-t border-white/5 flex justify-center">
-            <button 
+            <button type="button" 
               onClick={() => {
                 onChange(format(new Date(), "yyyy-MM-dd"));
                 setIsOpen(false);
