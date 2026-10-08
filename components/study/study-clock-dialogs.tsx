@@ -7,11 +7,12 @@ import { addDays, format, isSameDay, startOfDay } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { TimeField } from "@/components/ui/time-field";
 import { DatePills } from "@/components/ui/date-pills";
-import { StudyMaterial } from "@/lib/types";
+import { StudyDeadline, StudyMaterial } from "@/lib/types";
 import {
   StudySession, OTHER, CUSTOM, firstWhat, missingText, formatDuration, notifyStudyChanged, sessionFields, whatOptions,
 } from "@/lib/study-sessions";
 import { StudyData } from "./use-study";
+import { ProgressFields, progressOf } from "./deadline-progress";
 import { FieldLabel, ModuleDot, OptionPill, primaryButton, StudyModal } from "./bits";
 
 const hhmm = (d: Date) => format(d, "HH:mm");
@@ -167,21 +168,28 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
   const [label, setLabel] = useState("");
   const [material, setMaterial] = useState<StudyMaterial | null>(null);
   const [page, setPage] = useState("");
+  // Clocking out of a deadline asks how far you are, like a material's page.
+  const [deadline, setDeadline] = useState<StudyDeadline | null>(null);
+  const [progress, setProgress] = useState<ReturnType<typeof progressOf> | null>(null);
+  const [moduleColor, setModuleColor] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       const [{ data: mod }, mat, dl] = await Promise.all([
-        session.module_id ? supabase.from("study_modules").select("name").eq("id", session.module_id).maybeSingle() : Promise.resolve({ data: { name: "Other" } }),
+        session.module_id ? supabase.from("study_modules").select("name, color").eq("id", session.module_id).maybeSingle() : Promise.resolve({ data: { name: "Other", color: undefined } }),
         session.material_id ? supabase.from("study_materials").select("*").eq("id", session.material_id).maybeSingle() : Promise.resolve({ data: null }),
-        session.deadline_id ? supabase.from("study_deadlines").select("title").eq("id", session.deadline_id).maybeSingle() : Promise.resolve({ data: null }),
+        session.deadline_id ? supabase.from("study_deadlines").select("*").eq("id", session.deadline_id).maybeSingle() : Promise.resolve({ data: null }),
       ]);
       const m = mat.data as StudyMaterial | null;
       const what = m?.title ?? (dl.data as { title: string } | null)?.title
         ?? (session.kind === "revision" ? "Revision" : session.kind === "practice" ? "Practice questions" : session.kind === "other" ? session.note || "Other" : "General");
       setLabel(`${(mod as { name: string } | null)?.name ?? "Study"} · ${what}`);
       if (m?.total) { setMaterial(m); setPage(String(m.current)); }
+      const d = dl.data as StudyDeadline | null;
+      if (d && !d.done) { setDeadline(d); setProgress(progressOf(d)); }
+      setModuleColor((mod as { color?: string } | null)?.color);
     })();
   }, [session]);
 
@@ -201,6 +209,7 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
       const current = Math.max(0, Math.min(material.total ?? 0, parseInt(page) || 0));
       if (current !== material.current) await supabase.from("study_materials").update({ current }).eq("id", material.id);
     }
+    if (deadline && progress) await supabase.from("study_deadlines").update(progress).eq("id", deadline.id);
     notifyStudyChanged();
     onSaved();
   };
@@ -234,6 +243,12 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
                 />
                 <span className="font-mono text-xs text-muted-foreground">/ {material.total} {material.unit}</span>
               </div>
+            </div>
+          )}
+          {deadline && progress && (
+            <div className="flex flex-col gap-3 border-t border-white/[0.06] pt-4">
+              <FieldLabel>{deadline.title} · how far are you?</FieldLabel>
+              <ProgressFields value={progress} onChange={setProgress} color={moduleColor} />
             </div>
           )}
           {(seconds <= 0 || error) && <p className="text-xs text-red-400/80">{error ?? "The end has to be after the start."}</p>}

@@ -75,3 +75,33 @@ export function progressText(m: { total: number | null; current: number; unit: s
   if (!m.total) return "no total";
   return m.unit === "pages" ? `p.${m.current} / ${m.total}` : `${m.current} / ${m.total} ${m.unit ?? ""}`.trim();
 }
+
+// A deadline is "current" (you're working on it) when its window is open,
+// or, with no start date, when the cut-off is this close.
+export const CURRENT_WITHIN_DAYS = 21;
+
+export function isCurrent(d: StudyDeadline) {
+  if (d.done) return false;
+  if (d.opens_on) return daysUntil(d.opens_on) <= 0;
+  return daysUntil(d.cutoff_on) <= CURRENT_WITHIN_DAYS;
+}
+
+/** 0–100, or null when no progress has been entered yet. */
+export function progressPct(d: StudyDeadline) {
+  if (d.progress_mode === "parts" && d.progress_total) return Math.min(100, ((d.progress_done ?? 0) / d.progress_total) * 100);
+  if (d.progress_mode === "percent" && d.progress_pct !== null) return d.progress_pct;
+  return null;
+}
+
+export function progressLabel(d: StudyDeadline) {
+  if (d.progress_mode === "parts" && d.progress_total) return `${d.progress_done ?? 0} of ${d.progress_total} done`;
+  if (d.progress_mode === "percent" && d.progress_pct !== null) return `${d.progress_pct}% done`;
+  return "Not started";
+}
+
+/** "6h 45m" / "40m" / "0m" */
+export function hoursText(seconds: number) {
+  const mins = Math.round(seconds / 60);
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+}

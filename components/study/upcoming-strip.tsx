@@ -5,12 +5,14 @@ import { Plus } from "lucide-react";
 import { differenceInMinutes, format, parseISO } from "date-fns";
 import { Event } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { byCutoff, daysUntil, shortDate, shortTime, urgency, URGENCY_BORDER } from "@/lib/study";
+import { byCutoff, daysUntil, isCurrent, progressLabel, shortDate, shortTime, urgency, URGENCY_BORDER } from "@/lib/study";
+import { StudyDeadline } from "@/lib/types";
 import { StudyData } from "./use-study";
 import { Countdown, ModuleDot, OpenTag, TypeChip, WindowBar } from "./bits";
 import { DeadlinePanel } from "./deadline-panel";
 import { DeadlineDialog } from "./deadline-dialog";
 import { ModulesDialog } from "./modules-dialog";
+import { DeadlineProgressDialog, ProgressBar } from "./deadline-progress";
 
 const TAB_KEY = "study-upcoming-tab";
 
@@ -27,8 +29,46 @@ export function UpcomingStrip({ study, events, onSelectEvent }: { study: StudyDa
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [addingModule, setAddingModule] = useState(false);
-  const upcoming = study.deadlines.filter(d => !d.done).sort(byCutoff).slice(0, 8);
+  const [progressId, setProgressId] = useState<string | null>(null);
+  const live = study.deadlines.filter(d => !d.done).sort(byCutoff);
+  const current = live.filter(isCurrent);
+  const comingUp = live.filter(d => !isCurrent(d)).slice(0, 8);
   const open = study.deadlines.find(d => d.id === openId) ?? null;
+  const progressFor = study.deadlines.find(d => d.id === progressId) ?? null;
+
+  const card = (d: StudyDeadline, cur: boolean) => {
+    const module = study.modules.find(m => m.id === d.module_id);
+    return (
+      <button
+        key={d.id}
+        type="button"
+        onClick={() => (cur ? setProgressId(d.id) : setOpenId(d.id))}
+        className={cn(
+          "w-[240px] shrink-0 overflow-hidden bg-card border p-4 rounded-lg flex flex-col gap-3 text-left hover:bg-white/[0.03] transition-colors",
+          URGENCY_BORDER[urgency(daysUntil(d.cutoff_on))]
+        )}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5"><TypeChip type={d.type} module={module} /><OpenTag deadline={d} /></span>
+          <Countdown deadline={d} className="text-xs font-semibold" />
+        </div>
+        <div className="flex items-start gap-2 font-medium text-foreground w-full min-w-0">
+          <ModuleDot module={module} className="mt-[7px]" />
+          <span className="min-w-0 leading-snug line-clamp-2 break-words" title={d.title}>{d.title}</span>
+        </div>
+        <span className="text-[11px] text-muted-foreground flex justify-between gap-2 w-full">
+          <span>{d.opens_on ? "Cut-off " : ""}{shortDate(d.cutoff_on)}{shortTime(d.cutoff_time) ? ` · ${shortTime(d.cutoff_time)}` : ""}</span>
+          {cur && <span className="text-white/70 whitespace-nowrap">{progressLabel(d)}</span>}
+        </span>
+        {cur ? <ProgressBar deadline={d} module={module} /> : <WindowBar deadline={d} module={module} />}
+      </button>
+    );
+  };
+  const groupLabel = (text: string) => (
+    <div className="shrink-0 flex items-center">
+      <span className="text-[10px] uppercase tracking-[0.16em] font-semibold text-muted-foreground [writing-mode:vertical-rl] rotate-180">{text}</span>
+    </div>
+  );
 
   return (
     <section className="flex flex-col gap-4">
@@ -52,33 +92,9 @@ export function UpcomingStrip({ study, events, onSelectEvent }: { study: StudyDa
 
       {tab === "events" ? <EventCards events={events} onSelect={onSelectEvent} /> : (
       <div className="flex gap-4 overflow-x-auto pb-4 px-2 hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        {upcoming.map(d => {
-          const module = study.modules.find(m => m.id === d.module_id);
-          return (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => setOpenId(d.id)}
-              className={cn(
-                "w-[240px] shrink-0 overflow-hidden bg-card border p-4 rounded-lg flex flex-col gap-3 text-left hover:bg-white/[0.03] transition-colors",
-                URGENCY_BORDER[urgency(daysUntil(d.cutoff_on))]
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5"><TypeChip type={d.type} module={module} /><OpenTag deadline={d} /></span>
-                <Countdown deadline={d} className="text-xs font-semibold" />
-              </div>
-              <div className="flex items-start gap-2 font-medium text-foreground w-full min-w-0">
-                <ModuleDot module={module} className="mt-[7px]" />
-                <span className="min-w-0 leading-snug line-clamp-2 break-words" title={d.title}>{d.title}</span>
-              </div>
-              <span className="text-[11px] text-muted-foreground">
-                {d.opens_on ? "Cut-off " : ""}{shortDate(d.cutoff_on)}{shortTime(d.cutoff_time) ? ` · ${shortTime(d.cutoff_time)}` : ""}
-              </span>
-              <WindowBar deadline={d} module={module} />
-            </button>
-          );
-        })}
+        {current.length > 0 && <>{groupLabel("Working on")}{current.map(d => card(d, true))}</>}
+        {current.length > 0 && comingUp.length > 0 && <div className="shrink-0 w-px bg-border mx-1" />}
+        {comingUp.length > 0 && <>{groupLabel("Coming up")}{comingUp.map(d => card(d, false))}</>}
         <button
           type="button"
           onClick={() => setAdding(true)}
@@ -91,6 +107,15 @@ export function UpcomingStrip({ study, events, onSelectEvent }: { study: StudyDa
       )}
 
       <DeadlinePanel study={study} deadline={open} onClose={() => setOpenId(null)} />
+      {progressFor && (
+        <DeadlineProgressDialog
+          deadline={progressFor}
+          module={study.modules.find(m => m.id === progressFor.module_id)}
+          onSave={p => study.updateDeadline(progressFor.id, p)}
+          onClose={() => setProgressId(null)}
+          onDetails={() => { setProgressId(null); setOpenId(progressFor.id); }}
+        />
+      )}
       {adding && <DeadlineDialog study={study} onClose={() => setAdding(false)} onNeedModule={() => { setAdding(false); setAddingModule(true); }} />}
       {addingModule && <ModulesDialog study={study} startAdding onClose={() => setAddingModule(false)} />}
     </section>

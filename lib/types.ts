@@ -85,6 +85,11 @@ export interface StudyDeadline {
   done: boolean;
   score: string | null;
   note: string | null;
+  // How far you are: by parts ("2 of 5") or by percentage. Null until first set.
+  progress_mode: "parts" | "percent" | null;
+  progress_done: number | null;
+  progress_total: number | null;
+  progress_pct: number | null;
   created_at: string;
 }
 
