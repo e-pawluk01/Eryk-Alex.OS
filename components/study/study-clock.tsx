@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Clock, History, Music, Square } from "lucide-react";
+import { Clock, History, Music, Pause, Play, SkipBack, SkipForward, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { openSessionOf, notifySessionsChanged, WorkSession } from "@/lib/work-sessions";
 import {
@@ -140,13 +140,19 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
       {visible && createPortal(
         !active ? (
           <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <button
-              onClick={() => music.setOpen(!music.open)}
-              aria-label="Music"
-              className={`p-4 rounded-full bg-zinc-950/80 backdrop-blur-md border shadow-2xl hover:bg-white/10 transition-colors group ${music.open || music.playing ? "border-white/30" : "border-white/10"}`}
-            >
-              <Music className={`w-5 h-5 transition-colors ${music.open || music.playing ? "text-white" : "text-white/70 group-hover:text-white"}`} />
-            </button>
+            {music.current ? (
+              <div className="flex items-center gap-1 p-1.5 rounded-full bg-zinc-950/80 backdrop-blur-md border border-white/30 shadow-2xl">
+                <MusicControls music={music} size="lg" />
+              </div>
+            ) : (
+              <button
+                onClick={() => music.setOpen(!music.open)}
+                aria-label="Music"
+                className={`p-4 rounded-full bg-zinc-950/80 backdrop-blur-md border shadow-2xl hover:bg-white/10 transition-colors group ${music.open ? "border-white/30" : "border-white/10"}`}
+              >
+                <Music className={`w-5 h-5 transition-colors ${music.open ? "text-white" : "text-white/70 group-hover:text-white"}`} />
+              </button>
+            )}
             <button
               onClick={() => { setStartModule(null); setStarting(true); }}
               aria-label="Start studying"
@@ -166,13 +172,19 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
               <span className="text-sm font-semibold tracking-wider text-white font-mono min-w-[60px] text-center">{formatTime(elapsed)}</span>
               {timerLeft !== null && <span className="text-[11px] font-mono text-white/40 tabular-nums">{formatTime(timerLeft)} left</span>}
             </div>
-            <button
-              onClick={() => music.setOpen(!music.open)}
-              aria-label="Music"
-              className={`p-2.5 rounded-full border transition-colors ${music.open || music.playing ? "bg-white/10 border-white/20 text-white" : "bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10"}`}
-            >
-              <Music className="w-4 h-4" />
-            </button>
+            {music.current ? (
+              <div className="flex items-center gap-0.5">
+                <MusicControls music={music} size="sm" />
+              </div>
+            ) : (
+              <button
+                onClick={() => music.setOpen(!music.open)}
+                aria-label="Music"
+                className={`p-2.5 rounded-full border transition-colors ${music.open ? "bg-white/10 border-white/20 text-white" : "bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10"}`}
+              >
+                <Music className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={() => setCheckingOut("stop")}
               aria-label="Clock out"
@@ -312,5 +324,27 @@ function StartStudyDialog({ study, music, initialModule, onClose, onBegin, onAdd
       </form>
     </StudyModal>,
     document.body
+  );
+}
+
+/** Previous, pause/play, next track, and open the playlist: shown while a track is loaded. */
+function MusicControls({ music, size }: { music: MusicData; size: "sm" | "lg" }) {
+  const btn = size === "lg" ? "p-2.5 rounded-full hover:bg-white/10 transition-colors" : "p-2 rounded-full hover:bg-white/10 transition-colors";
+  const icon = size === "lg" ? "w-4 h-4" : "w-3.5 h-3.5";
+  return (
+    <>
+      <button onClick={music.prev} aria-label="Previous track" className={`${btn} text-white/60 hover:text-white`}>
+        <SkipBack className={`${icon} fill-current`} />
+      </button>
+      <button onClick={music.toggle} aria-label={music.playing ? "Pause music" : "Play music"} title={music.current?.title} className={`${btn} text-white`}>
+        {music.playing ? <Pause className={`${icon} fill-current`} /> : <Play className={`${icon} fill-current`} />}
+      </button>
+      <button onClick={music.next} aria-label="Next track" className={`${btn} text-white/60 hover:text-white`}>
+        <SkipForward className={`${icon} fill-current`} />
+      </button>
+      <button onClick={() => music.setOpen(!music.open)} aria-label="Playlist" className={`${btn} ${music.open ? "text-white bg-white/10" : "text-white/60 hover:text-white"}`}>
+        <Music className={icon} />
+      </button>
+    </>
   );
 }
