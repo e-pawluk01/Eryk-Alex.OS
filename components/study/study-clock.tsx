@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Clock, History, Music, Pause, Play, SkipForward, Square } from "lucide-react";
+import { Clock, History, Music, Pause, Play, SkipBack, SkipForward, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { openSessionOf, notifySessionsChanged, WorkSession } from "@/lib/work-sessions";
 import {
@@ -327,12 +327,15 @@ function StartStudyDialog({ study, music, initialModule, onClose, onBegin, onAdd
   );
 }
 
-/** Pause/play, next track, and open the playlist: shown while a track is loaded. */
+/** Previous, pause/play, next track, and open the playlist: shown while a track is loaded. */
 function MusicControls({ music, size }: { music: MusicData; size: "sm" | "lg" }) {
   const btn = size === "lg" ? "p-2.5 rounded-full hover:bg-white/10 transition-colors" : "p-2 rounded-full hover:bg-white/10 transition-colors";
   const icon = size === "lg" ? "w-4 h-4" : "w-3.5 h-3.5";
   return (
     <>
+      <button onClick={music.prev} aria-label="Previous track" className={`${btn} text-white/60 hover:text-white`}>
+        <SkipBack className={`${icon} fill-current`} />
+      </button>
       <button onClick={music.toggle} aria-label={music.playing ? "Pause music" : "Play music"} title={music.current?.title} className={`${btn} text-white`}>
         {music.playing ? <Pause className={`${icon} fill-current`} /> : <Play className={`${icon} fill-current`} />}
       </button>

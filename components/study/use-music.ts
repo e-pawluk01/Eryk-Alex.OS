@@ -67,6 +67,13 @@ export function useMusic(person: string | null) {
     play(tracks[(i + 1) % tracks.length].id);
   }, [tracks, currentId, play]);
 
+  /** Back to the previous track in the list. */
+  const prev = useCallback(() => {
+    if (!tracks.length || !currentId) return;
+    const i = tracks.findIndex(t => t.id === currentId);
+    play(tracks[(i - 1 + tracks.length) % tracks.length].id);
+  }, [tracks, currentId, play]);
+
   const addTrack = useCallback(async (videoId: string, title: string) => {
     const { data, error } = await supabase.from("study_tracks").insert({ person, video_id: videoId, title }).select().single();
     if (error) throw error;
@@ -85,7 +92,7 @@ export function useMusic(person: string | null) {
     await supabase.from("study_tracks").update({ seconds }).eq("id", id);
   }, []);
 
-  return { tracks, current, playing, setPlaying, open, setOpen, play, toggle, stop, next, addTrack, deleteTrack, saveLength, playerRef };
+  return { tracks, current, playing, setPlaying, open, setOpen, play, toggle, stop, next, prev, addTrack, deleteTrack, saveLength, playerRef };
 }
 
 export type MusicData = ReturnType<typeof useMusic>;
