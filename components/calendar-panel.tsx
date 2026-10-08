@@ -127,7 +127,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
       {/* Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 transition-opacity" 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] transition-opacity" 
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -135,7 +135,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
       {/* Slide-over Panel */}
       <div 
         className={cn(
-          "fixed right-0 top-0 h-full w-full max-w-[380px] bg-[#09090b] z-50",
+          "fixed right-0 top-0 h-full w-full max-w-[380px] bg-[#09090b] z-[60]",
           "transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col",
           isOpen ? "translate-x-0" : "translate-x-full"
         )}
