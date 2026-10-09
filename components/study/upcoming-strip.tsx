@@ -44,7 +44,7 @@ export function UpcomingStrip({ study, events, onSelectEvent }: { study: StudyDa
         type="button"
         onClick={() => (cur ? setProgressId(d.id) : setOpenId(d.id))}
         className={cn(
-          "w-[240px] shrink-0 overflow-hidden bg-card border p-4 rounded-lg flex flex-col gap-3 text-left hover:bg-white/[0.03] transition-colors",
+          "w-[200px] shrink-0 overflow-hidden bg-card border p-3.5 rounded-lg flex flex-col gap-2.5 text-left hover:bg-white/[0.03] transition-colors",
           URGENCY_BORDER[urgency(daysUntil(d.cutoff_on))]
         )}
       >
@@ -101,7 +101,7 @@ export function UpcomingStrip({ study, events, onSelectEvent }: { study: StudyDa
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="w-[240px] shrink-0 flex items-center justify-center gap-2 py-4 border border-dashed border-border rounded-lg text-muted-foreground hover:text-white hover:border-white/20 hover:bg-white/5 transition-colors group"
+          className="w-[200px] shrink-0 flex items-center justify-center gap-2 py-4 border border-dashed border-border rounded-lg text-muted-foreground hover:text-white hover:border-white/20 hover:bg-white/5 transition-colors group"
         >
           <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
           <span className="text-xs uppercase tracking-widest font-semibold">New Deadline</span>
@@ -156,7 +156,7 @@ function EventCards({ events, onSelect }: { events: Event[]; onSelect: (e: Event
             type="button"
             onClick={() => onSelect(e)}
             className={cn(
-              "w-[240px] shrink-0 overflow-hidden bg-card border p-4 rounded-lg flex flex-col gap-3 text-left hover:bg-white/[0.03] transition-colors",
+              "w-[200px] shrink-0 overflow-hidden bg-card border p-3.5 rounded-lg flex flex-col gap-2.5 text-left hover:bg-white/[0.03] transition-colors",
               isToday ? "border-white/30" : "border-border"
             )}
           >
