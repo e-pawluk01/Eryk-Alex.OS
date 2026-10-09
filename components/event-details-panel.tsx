@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
 import { TimePicker } from "./ui/time-picker";
 import { ConfirmDialog } from "./ui/confirm-dialog";
+import { TagPicker } from "./tags/tags";
 
 interface EventDetailsPanelProps {
   event: Event | null;
@@ -91,6 +92,10 @@ export function EventDetailsPanel({ event, isOpen, onClose, onUpdate, onDelete }
 
         {/* Body (Plain Text Note) */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col relative">
+          <div className="flex flex-col gap-2 mb-6">
+            <span className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Tag</span>
+            <TagPicker value={event.tag_id ?? null} onChange={id => onUpdate(event.id, { tag_id: id })} />
+          </div>
           <span className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-4">Note</span>
           <textarea
             value={descDraft}

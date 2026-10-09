@@ -26,6 +26,7 @@ import { StudyClock } from "@/components/study/study-clock";
 import { useMusic } from "@/components/study/use-music";
 import { MusicPlayer } from "@/components/study/music-player";
 import { LectureReminder } from "@/components/study/lecture-reminder";
+import { TagsProvider } from "@/components/tags/tags";
 import { ModuleDot } from "@/components/study/bits";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -380,6 +381,7 @@ export default function Home() {
   }
 
   return (
+    <TagsProvider>
     <div className="flex flex-col gap-12 mt-4 pb-20">
       {currentDomain === "WORK" && (
         <ActiveSessionWidget />
@@ -776,5 +778,6 @@ export default function Home() {
         description="Are you sure you want to delete this goal? This action cannot be undone."
       />
     </div>
+    </TagsProvider>
   );
 }

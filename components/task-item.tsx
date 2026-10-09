@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { differenceInDays, startOfDay } from "date-fns";
 import { Repeat, Users } from "lucide-react";
 import { ProgressSlider } from "./ui/progress-slider";
+import { TagChip } from "./tags/tags";
 
 interface TaskItemProps {
   task: Task;
@@ -77,6 +78,7 @@ export function TaskItem({ task, onToggleStatus, onSelect, onUpdate }: TaskItemP
             )}>
               {task.title}
             </span>
+            <TagChip tagId={task.tag_id} />
             {task.is_daily && (
               <Repeat className="w-3 h-3 text-muted-foreground ml-1" />
             )}

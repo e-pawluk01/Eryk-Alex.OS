@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ContextType } from "@/lib/types";
 import { NewCalendarItemDialog } from "./new-calendar-item-dialog";
+import { TagChip } from "./tags/tags";
 
 const contextDotColors: Record<ContextType, string> = {
   Eryk: "bg-blue-400",
@@ -230,7 +231,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
                   >
                     <div className={cn("absolute left-0 top-0 bottom-0 w-1", domainDotColors[dom])} />
                     <div className="flex items-start justify-between">
-                      <span className="text-sm font-medium">{event.title}</span>
+                      <span className="text-sm font-medium flex items-center gap-2 flex-wrap">{event.title}<TagChip tagId={event.tag_id} /></span>
                       <span className={cn("text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border", domainPillColors[dom])}>
                         {dom.charAt(0)}
                       </span>
@@ -265,6 +266,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
                         <span className={cn("text-sm break-words line-clamp-2", task.status === "done" && "line-through text-muted-foreground")}>
                           {task.title}
                         </span>
+                        <TagChip tagId={task.tag_id} />
                       </div>
                       <span className={cn("text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border shrink-0 ml-2", domainPillColors[dom])}>
                         {dom.charAt(0)}

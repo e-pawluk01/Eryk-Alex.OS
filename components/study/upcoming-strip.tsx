@@ -13,6 +13,7 @@ import { DeadlinePanel } from "./deadline-panel";
 import { DeadlineDialog } from "./deadline-dialog";
 import { ModulesDialog } from "./modules-dialog";
 import { DeadlineProgressDialog, ProgressBar } from "./deadline-progress";
+import { TagChip } from "@/components/tags/tags";
 
 const TAB_KEY = "study-upcoming-tab";
 
@@ -161,7 +162,7 @@ function EventCards({ events, onSelect }: { events: Event[]; onSelect: (e: Event
             )}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="px-1.5 py-0.5 rounded text-[8.5px] uppercase tracking-widest font-bold border border-border text-muted-foreground">Event</span>
+              {e.tag_id ? <TagChip tagId={e.tag_id} /> : <span className="px-1.5 py-0.5 rounded text-[8.5px] uppercase tracking-widest font-bold border border-border text-muted-foreground">Event</span>}
               <span className={cn("font-mono tabular-nums text-xs font-semibold", isToday ? "text-white" : "text-muted-foreground")}>{when(e)}</span>
             </div>
             <span className="block w-full min-w-0 font-medium text-foreground leading-snug line-clamp-2 break-words" title={e.title}>{e.title}</span>

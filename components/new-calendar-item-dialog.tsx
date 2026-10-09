@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
 import { TimePicker } from "./ui/time-picker";
+import { TagPicker } from "./tags/tags";
 
 interface NewCalendarItemDialogProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export function NewCalendarItemDialog({ isOpen, onClose, contextName, domainName
   const [title, setTitle] = useState("");
   const [timeOrDeadline, setTimeOrDeadline] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  const [tagId, setTagId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -42,6 +44,7 @@ export function NewCalendarItemDialog({ isOpen, onClose, contextName, domainName
           scheduled_date: selectedDateString,
           due_date: timeOrDeadline || null,
           description: description.trim() || null,
+          tag_id: tagId,
         };
         const { data, error } = await supabase.from("tasks").insert([newTask]).select().single();
         if (error) throw error;
@@ -54,6 +57,7 @@ export function NewCalendarItemDialog({ isOpen, onClose, contextName, domainName
           event_date: selectedDateString,
           event_time: timeOrDeadline || null,
           description: description.trim() || null,
+          tag_id: tagId,
         };
         const { data, error } = await supabase.from("events").insert([newEvent]).select().single();
         if (error) throw error;
@@ -64,6 +68,7 @@ export function NewCalendarItemDialog({ isOpen, onClose, contextName, domainName
       setTitle("");
       setTimeOrDeadline("");
       setDescription("");
+      setTagId(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -120,6 +125,10 @@ export function NewCalendarItemDialog({ isOpen, onClose, contextName, domainName
           />
 
           <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Tag</label>
+              <TagPicker value={tagId} onChange={setTagId} />
+            </div>
             <div className="flex flex-col gap-2 group relative">
               <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30 flex items-center gap-2 group-focus-within:text-white/60 transition-colors">
                 {type === "task" ? "Deadline (Optional)" : "Time (Optional)"}

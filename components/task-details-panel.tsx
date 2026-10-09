@@ -7,6 +7,7 @@ import { useGlobalContext } from "./global-context";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
 import { ConfirmDialog } from "./ui/confirm-dialog";
+import { TagPicker } from "./tags/tags";
 import { ContextTag } from "./ui/context-tag";
 
 interface TaskDetailsPanelProps {
@@ -117,6 +118,10 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
 
         {/* Body (Plain Text Note) */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+          <div className="flex flex-col gap-2 mb-6">
+            <span className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Tag</span>
+            <TagPicker value={task.tag_id ?? null} onChange={id => onUpdate(task.id, { tag_id: id })} />
+          </div>
           <textarea
             value={descDraft}
             onChange={(e) => setDescDraft(e.target.value)}

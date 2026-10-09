@@ -6,6 +6,7 @@ import { Plus, X, Flag, Repeat, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
+import { TagPicker } from "./tags/tags";
 
 const COLORS = [
   { name: "Purple", class: "bg-purple-500" },
@@ -33,6 +34,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
   const [isDaily, setIsDaily] = useState(false);
   const [trackProgress, setTrackProgress] = useState(false);
   const [isJoint, setIsJoint] = useState(false);
+  const [tagId, setTagId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,6 +57,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
         progress: 0,
         is_joint: domain === "WORK" ? isJoint : false,
         domain: domain || "WORK",
+        tag_id: tagId,
       };
 
       const { data, error } = await supabase.from("tasks").insert([newTask]).select().single();
@@ -68,6 +71,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
       setIsDaily(false);
       setTrackProgress(false);
       setIsJoint(false);
+      setTagId(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -124,6 +128,11 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
 
               {/* Deadline & Notes Grid */}
               <div className="flex flex-col gap-5">
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Tag</label>
+                  <TagPicker value={tagId} onChange={setTagId} />
+                </div>
                 
                 {/* Deadline */}
                 <div className="flex flex-col gap-2 group relative">
