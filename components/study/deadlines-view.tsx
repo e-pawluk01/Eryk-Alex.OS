@@ -102,7 +102,7 @@ export function DeadlinesView({ study }: { study: StudyData }) {
                     <Countdown deadline={d} className="text-lg font-semibold" />
                   </div>
                   <div className="flex justify-between gap-3 text-[11px] text-muted-foreground w-full">
-                    <span>
+                    <span className="truncate min-w-0">
                       {d.opens_on ? "Open now · cut-off " : ""}{shortDate(d.cutoff_on)}{shortTime(d.cutoff_time) ? ` · ${shortTime(d.cutoff_time)}` : ""}
                     </span>
                     <span className="whitespace-nowrap"><span className="text-white/70">{progressLabel(d)}</span> · {hoursText(study.loggedByDeadline[d.id] ?? 0)} logged</span>
