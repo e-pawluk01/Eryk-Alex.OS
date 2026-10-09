@@ -30,6 +30,7 @@ export interface Task {
   created_at: string;
   subTasks?: Task[];
   is_joint?: boolean;
+  tag_id?: string | null;
   is_daily?: boolean;
 }
 
@@ -54,6 +55,7 @@ export interface Event {
   event_time: string | null; // e.g. "14:30"
   context: ContextType;
   domain?: "WORK" | "STUDY" | null;
+  tag_id?: string | null;
   created_at: string;
 }
 
