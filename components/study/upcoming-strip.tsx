@@ -60,7 +60,10 @@ export function UpcomingStrip({ study, events, onSelectEvent }: { study: StudyDa
           <span>{d.opens_on ? "Cut-off " : ""}{shortDate(d.cutoff_on)}{shortTime(d.cutoff_time) ? ` · ${shortTime(d.cutoff_time)}` : ""}</span>
           {cur && <span className="text-white/70 whitespace-nowrap">{progressLabel(d)}</span>}
         </span>
-        {cur ? <ProgressBar deadline={d} module={module} /> : <WindowBar deadline={d} module={module} />}
+        {/* Pinned to the bottom so the bars line up across cards. */}
+        <div className="mt-auto w-full">
+          {cur ? <ProgressBar deadline={d} module={module} /> : <WindowBar deadline={d} module={module} />}
+        </div>
       </button>
     );
   };
