@@ -53,7 +53,7 @@ export function SessionsPanel({ sessions, onEdit }: SessionsPanelProps) {
                   <span className="min-w-0">
                     <span className="block truncate text-white">{s.task}</span>
                     <span className="block text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">
-                      {s.person} · {format(start, "EEE d MMM")} · {format(start, "HH:mm")}–{format(end, "HH:mm")}
+                      {s.person} · {format(start, "EEE d MMM")}{!s.no_times && ` · ${format(start, "HH:mm")}–${format(end, "HH:mm")}`}
                     </span>
                   </span>
                   <span className="tabular-nums text-white">{formatMinutes(Math.floor((s.duration || 0) / 60))}</span>

@@ -69,6 +69,11 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [together, setTogether] = useState(initialTogether);
+  // "Just hours": past work logged by length only, with no start or end.
+  const canJustHours = mode !== "clockout";
+  const [justHours, setJustHours] = useState(!!session?.no_times && canJustHours);
+  const [hoursTyped, setHoursTyped] = useState(session?.no_times ? String(Math.floor((session.duration ?? 0) / 3600)) : "");
+  const [minutesTyped, setMinutesTyped] = useState(session?.no_times ? String(Math.floor(((session.duration ?? 0) % 3600) / 60)) : "");
   // Clocking out a joint session: the partner's half, ended alongside.
   const [partnerSession, setPartnerSession] = useState<WorkSession | null>(null);
   const owner = session?.person ?? person;
@@ -87,11 +92,17 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
   // Resolve the typed times into real dates. Untouched times keep their exact
   // original timestamps; an edited end earlier than the start means the
   // session ran past midnight.
+  // Just-hours sessions are laid from midnight so they always stay on their day.
   const dayUnchanged = isSameDay(day, origStart);
-  const startDate = dayUnchanged && start === hhmm(origStart) ? origStart : atTime(day, start);
-  const endDate = dayUnchanged && end === hhmm(origEnd)
-    ? origEnd
-    : atTime(end < start ? addDays(day, 1) : day, end);
+  const typedSeconds = ((Number(hoursTyped) || 0) * 60 + (Number(minutesTyped) || 0)) * 60;
+  const startDate = justHours
+    ? startOfDay(day)
+    : dayUnchanged && start === hhmm(origStart) ? origStart : atTime(day, start);
+  const endDate = justHours
+    ? new Date(startDate.getTime() + typedSeconds * 1000)
+    : dayUnchanged && end === hhmm(origEnd)
+      ? origEnd
+      : atTime(end < start ? addDays(day, 1) : day, end);
   const totalSeconds = Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 1000));
 
   const split = parts.length > 1;
@@ -99,7 +110,9 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
   const firstSeconds = totalSeconds - extraSeconds;
 
   let error: string | null = null;
-  if (totalSeconds <= 0) error = "Start and end can't be the same time.";
+  if (justHours && totalSeconds <= 0) error = "Type how long you worked.";
+  else if (justHours && totalSeconds >= 24 * 3600) error = "That's more than a day.";
+  else if (totalSeconds <= 0) error = "Start and end can't be the same time.";
   else if (parts.slice(1).some((p) => partMinutes(p) <= 0)) error = "Enter a time for each task.";
   else if (split && firstSeconds < 60) error = "That's more time than the session lasted.";
 
@@ -136,7 +149,7 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
       return;
     }
 
-    const result = await saveSessionPieces(owner, pieces, mode === "add" ? undefined : session?.id, mode === "add" && together);
+    const result = await saveSessionPieces(owner, pieces, mode === "add" ? undefined : session?.id, mode === "add" && together, justHours);
     if (result.error) { setSaving(false); setSaveError(result.error); return; }
 
     if (partnerSession && (await isStillRunning(partnerSession.id))) {
@@ -164,6 +177,10 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
   const copy = COPY[mode];
   const fieldLabel = "text-[9px] uppercase tracking-widest font-semibold text-white/30";
   const selectClass = "w-full min-w-0 bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 transition-colors appearance-none";
+  const segButton = (on: boolean) => cn(
+    "px-2.5 py-1.5 rounded-[5px] text-[9px] font-bold uppercase tracking-widest transition-colors",
+    on ? "bg-white/[0.12] text-white" : "text-muted-foreground hover:text-white"
+  );
   const numberClass = "w-[42px] bg-black/40 border border-white/10 rounded-lg px-1 py-2.5 text-sm text-center text-white/90 tabular-nums outline-none focus:border-white/30 transition-colors";
 
   // Portalled to <body>: the timer pill and the analytics view both use
@@ -198,11 +215,13 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
               <p id="session-form-question" className="text-[15px] font-medium text-white">{copy.question}</p>
               <div className="text-3xl font-semibold text-white tabular-nums tracking-tight">
                 {totalSeconds > 0 ? (totalSeconds < 60 ? "<1m" : formatMinutes(Math.floor(totalSeconds / 60))) : "—"}
-                <span className="block text-[11px] font-medium tracking-normal text-muted-foreground mt-0.5">
-                  {totalSeconds > 0
-                    ? `${split ? `Split across ${parts.length} tasks` : parts[0].task} · ${start}–${end}`
-                    : "Check the start and end times"}
-                </span>
+                {mode !== "add" && (
+                  <span className="block text-[11px] font-medium tracking-normal text-muted-foreground mt-0.5">
+                    {totalSeconds > 0
+                      ? `${split ? `Split across ${parts.length} tasks` : parts[0].task} · ${justHours ? "no set hours" : `${start}–${end}`}`
+                      : justHours ? "Type how long you worked" : "Check the start and end times"}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -214,15 +233,50 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-2">
-                <label htmlFor="session-start" className={fieldLabel}>Start</label>
-                <TimeField id="session-start" value={start} onChange={setStart} />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label htmlFor="session-end" className={fieldLabel}>End</label>
-                <TimeField id="session-end" value={end} onChange={setEnd} />
-              </div>
+            <div className="flex flex-col gap-2">
+              {canJustHours && (
+                <div role="group" aria-label="How to enter the time" className="self-start inline-flex p-0.5 bg-black/40 border border-white/10 rounded-[7px]">
+                  <button type="button" aria-pressed={!justHours} onClick={() => setJustHours(false)} className={segButton(!justHours)}>Start – end</button>
+                  <button type="button" aria-pressed={justHours} onClick={() => setJustHours(true)} className={segButton(justHours)}>Just hours</button>
+                </div>
+              )}
+              {justHours ? (
+                <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                  <input
+                    inputMode="numeric"
+                    aria-label="Hours worked"
+                    autoFocus
+                    value={hoursTyped}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setHoursTyped(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                    className={cn(numberClass, "w-14")}
+                  />
+                  h
+                  <input
+                    inputMode="numeric"
+                    aria-label="Minutes worked"
+                    value={minutesTyped}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                      setMinutesTyped(v === "" ? "" : String(Math.min(59, Number(v))));
+                    }}
+                    className={cn(numberClass, "w-14")}
+                  />
+                  m
+                </span>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="session-start" className={fieldLabel}>Start</label>
+                    <TimeField id="session-start" value={start} onChange={setStart} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="session-end" className={fieldLabel}>End</label>
+                    <TimeField id="session-end" value={end} onChange={setEnd} />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">

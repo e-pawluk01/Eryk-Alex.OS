@@ -88,6 +88,8 @@ export interface WorkSession {
   started_at: string;
   ended_at: string | null;
   duration: number | null; // seconds
+  // Logged as "just hours": the day and length are real, the clock times aren't.
+  no_times?: boolean;
 }
 
 // Fired after any session is saved or deleted so open views can refetch.
@@ -112,7 +114,8 @@ export async function saveSessionPieces(
   person: string,
   pieces: SessionPiece[],
   replaceId?: string,
-  together = false
+  together = false,
+  noTimes = false
 ): Promise<{ error?: string }> {
   const rowsFor = (who: string) => pieces.map((p) => ({
     person: who,
@@ -120,6 +123,7 @@ export async function saveSessionPieces(
     started_at: p.startedAt.toISOString(),
     ended_at: p.endedAt.toISOString(),
     duration: Math.round((p.endedAt.getTime() - p.startedAt.getTime()) / 1000),
+    no_times: noTimes,
   }));
   const rows = rowsFor(person);
 
