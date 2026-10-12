@@ -14,6 +14,8 @@ export interface StudySession {
   task_id: string | null; // started from a timed task's play button
   started_at: string;
   ended_at: string | null;
+  paused_at: string | null; // set while paused
+  paused_seconds: number; // time spent paused, not counted as studying
   timer_minutes: number | null; // rings when this much time has passed
   created_at: string;
 }
@@ -25,15 +27,27 @@ export function notifyStudyChanged() {
   window.dispatchEvent(new Event(STUDY_CHANGED_EVENT));
 }
 
-// The task panel's play and pause buttons ask the Study clock to start or stop.
+// A task panel's play button asks the Study clock to start on that task.
 export const START_TASK_EVENT = "study-start-task";
-export const CLOCK_OUT_EVENT = "study-clock-out";
 export interface StartTaskDetail { taskId: string; title: string; minutes: number }
 export function startTaskTimer(detail: StartTaskDetail) {
   window.dispatchEvent(new CustomEvent<StartTaskDetail>(START_TASK_EVENT, { detail }));
 }
-export function requestStudyClockOut() {
-  window.dispatchEvent(new Event(CLOCK_OUT_EVENT));
+
+/** Seconds actually studied: start to end (or now), minus time paused. */
+export function studiedSeconds(s: Pick<StudySession, "started_at" | "ended_at" | "paused_at" | "paused_seconds">, now = Date.now()) {
+  const end = s.ended_at ? new Date(s.ended_at).getTime() : now;
+  const pausing = s.paused_at && !s.ended_at ? Math.max(0, now - new Date(s.paused_at).getTime()) : 0;
+  return Math.max(0, (end - new Date(s.started_at).getTime() - pausing) / 1000 - (s.paused_seconds ?? 0));
+}
+
+/** Pause or resume a running session. */
+export async function togglePause(s: StudySession) {
+  const update = s.paused_at
+    ? { paused_at: null, paused_seconds: (s.paused_seconds ?? 0) + Math.round((Date.now() - new Date(s.paused_at).getTime()) / 1000) }
+    : { paused_at: new Date().toISOString() };
+  await supabase.from("study_sessions").update(update).eq("id", s.id);
+  notifyStudyChanged();
 }
 
 /** Adds clocked time to a timed task; once its time limit is reached it's ticked off. */
@@ -44,6 +58,14 @@ export async function addTaskTime(taskId: string, seconds: number) {
   const updates: Record<string, unknown> = { time_spent_seconds: spent };
   if (data.time_limit_minutes && spent >= data.time_limit_minutes * 60) updates.status = "done";
   await supabase.from("tasks").update(updates).eq("id", taskId);
+}
+
+/** After a cancelled session: a timed task that ticked itself off goes back if its saved time is short. */
+export async function untickIfShort(taskId: string) {
+  const { data } = await supabase.from("tasks").select("time_limit_minutes, time_spent_seconds").eq("id", taskId).maybeSingle();
+  if (data?.time_limit_minutes && (data.time_spent_seconds ?? 0) < data.time_limit_minutes * 60) {
+    await supabase.from("tasks").update({ status: "todo" }).eq("id", taskId);
+  }
 }
 
 export async function openStudySessionOf(person: string): Promise<StudySession | null> {
