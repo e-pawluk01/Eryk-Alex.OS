@@ -5,7 +5,7 @@ import { Pause, Play } from "lucide-react";
 import { Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
-  StudySession, STUDY_CHANGED_EVENT, openStudySessionOf, requestStudyClockOut, startTaskTimer,
+  StudySession, STUDY_CHANGED_EVENT, openStudySessionOf, startTaskTimer, studiedSeconds, togglePause,
 } from "@/lib/study-sessions";
 
 /** The running Study session (if any), kept fresh as sessions start and stop. */
@@ -25,21 +25,23 @@ function useOpenStudySession(person: string) {
 export function TaskTimer({ task, person }: { task: Task; person: string }) {
   const session = useOpenStudySession(person);
   const running = !!session && session.task_id === task.id;
+  const paused = running && !!session!.paused_at;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!running) return;
+    if (!running || paused) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [running]);
+  }, [running, paused]);
 
   const limit = (task.time_limit_minutes ?? 0) * 60;
-  const live = running ? Math.max(0, (now - new Date(session!.started_at).getTime()) / 1000) : 0;
+  const live = running ? studiedSeconds(session!, now) : 0;
   const spent = (task.time_spent_seconds ?? 0) + live;
   const pct = task.status === "done" ? 100 : limit ? Math.min(100, (spent / limit) * 100) : 0;
   const done = task.status === "done";
 
+  // Play starts (or resumes); pause pauses. Clocking out is on the Study clock.
   const press = () => {
-    if (running) { requestStudyClockOut(); return; }
+    if (running) { togglePause(session!); return; }
     startTaskTimer({ taskId: task.id, title: task.title, minutes: Math.max(1, Math.ceil((limit - spent) / 60)) });
   };
 
@@ -49,13 +51,13 @@ export function TaskTimer({ task, person }: { task: Task; person: string }) {
         type="button"
         onClick={press}
         disabled={done}
-        aria-label={running ? "Pause" : "Start"}
+        aria-label={running && !paused ? "Pause" : "Start"}
         className={cn(
           "w-6 h-6 rounded-md grid place-items-center shrink-0 transition-colors",
           done ? "bg-white/15 text-black/60" : "bg-white text-black hover:bg-white/85"
         )}
       >
-        {running ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
+        {running && !paused ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
       </button>
       <div className="flex-1 min-w-0 h-1.5 bg-white/10 rounded-full relative">
         <div className="absolute left-0 top-0 bottom-0 rounded-full bg-white transition-all duration-300" style={{ width: `${pct}%` }} />

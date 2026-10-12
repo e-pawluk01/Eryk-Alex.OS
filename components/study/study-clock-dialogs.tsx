@@ -23,6 +23,7 @@ const atTime = (day: Date, time: string) => {
   return d;
 };
 const selectClass = "w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 transition-colors appearance-none";
+const pausedBox = "w-14 bg-black/40 border border-white/10 rounded-lg px-1 py-2.5 text-sm text-center text-white/90 tabular-nums outline-none focus:border-white/30 transition-colors";
 const secondaryButton = "w-full py-3 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-bold uppercase tracking-widest text-[10px] rounded-lg border border-white/10 transition-colors";
 
 // Overlays are portalled to <body>: the clock pill uses backdrop blur, which
@@ -174,6 +175,13 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
   const [moduleColor, setModuleColor] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Time paused so far (including a pause still going), taken off the total.
+  const origPaused = useMemo(
+    () => Math.round((session.paused_seconds ?? 0) + (session.paused_at ? (origEnd.getTime() - new Date(session.paused_at).getTime()) / 1000 : 0)),
+    [session.paused_seconds, session.paused_at, origEnd]
+  );
+  const [pausedH, setPausedH] = useState(String(Math.floor(Math.round(origPaused / 60) / 60)));
+  const [pausedM, setPausedM] = useState(String(Math.round(origPaused / 60) % 60));
 
   useEffect(() => {
     (async () => {
@@ -195,14 +203,17 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
 
   const startDate = start === hhmm(origStart) ? origStart : atTime(origStart, start);
   const endDate = end === hhmm(origEnd) ? origEnd : atTime(end < start ? addDays(origStart, 1) : origStart, end);
-  const seconds = Math.round((endDate.getTime() - startDate.getTime()) / 1000);
+  const span = Math.round((endDate.getTime() - startDate.getTime()) / 1000);
+  const typedPaused = ((parseInt(pausedH) || 0) * 60 + (parseInt(pausedM) || 0)) * 60;
+  const pausedSecs = typedPaused === Math.round(origPaused / 60) * 60 ? origPaused : typedPaused;
+  const seconds = span - pausedSecs;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (seconds <= 0 || saving) return;
     setSaving(true);
     const { error: err } = await supabase.from("study_sessions")
-      .update({ started_at: startDate.toISOString(), ended_at: endDate.toISOString() })
+      .update({ started_at: startDate.toISOString(), ended_at: endDate.toISOString(), paused_at: null, paused_seconds: pausedSecs })
       .eq("id", session.id);
     if (err) { setSaving(false); setError(err.message); return; }
     if (material) {
@@ -230,6 +241,19 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
             <div className="flex flex-col gap-2"><FieldLabel>Start</FieldLabel><TimeField id="study-out-start" value={start} onChange={setStart} /></div>
             <div className="flex flex-col gap-2"><FieldLabel>End</FieldLabel><TimeField id="study-out-end" value={end} onChange={setEnd} /></div>
           </div>
+          {origPaused > 0 && (
+            <div className="flex flex-col gap-2">
+              <FieldLabel>Paused</FieldLabel>
+              <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                <input inputMode="numeric" aria-label="Hours paused" value={pausedH} onFocus={e => e.target.select()}
+                  onChange={e => setPausedH(e.target.value.replace(/\D/g, "").slice(0, 2))} className={pausedBox} />
+                h
+                <input inputMode="numeric" aria-label="Minutes paused" value={pausedM} onFocus={e => e.target.select()}
+                  onChange={e => { const v = e.target.value.replace(/\D/g, "").slice(0, 2); setPausedM(v === "" ? "" : String(Math.min(59, Number(v)))); }} className={pausedBox} />
+                m
+              </span>
+            </div>
+          )}
           {material && (
             <div className="flex flex-col gap-2 border-t border-white/[0.06] pt-4">
               <FieldLabel>{material.title} · where are you up to?</FieldLabel>
@@ -252,7 +276,7 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
               <ProgressFields value={progress} onChange={setProgress} color={moduleColor} />
             </div>
           )}
-          {(seconds <= 0 || error) && <p className="text-xs text-red-400/80">{error ?? "The end has to be after the start."}</p>}
+          {(seconds <= 0 || error) && <p className="text-xs text-red-400/80">{error ?? (span > 0 ? "Paused is longer than the session." : "The end has to be after the start.")}</p>}
           <button type="submit" disabled={seconds <= 0 || saving} className={primaryButton}>Yes, save session</button>
         </form>
       </StudyModal>
