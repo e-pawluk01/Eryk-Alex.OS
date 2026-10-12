@@ -6,8 +6,8 @@ import { Clock, History, Music, Pause, Play, SkipBack, SkipForward, Square } fro
 import { supabase } from "@/lib/supabase";
 import { openSessionOf, notifySessionsChanged, WorkSession } from "@/lib/work-sessions";
 import {
-  StudySession, STUDY_CHANGED_EVENT, START_TASK_EVENT, CLOCK_OUT_EVENT, StartTaskDetail, OTHER,
-  missingText, moduleName, openStudySessionOf, sessionFields, startRinging, whatLabel,
+  StudySession, STUDY_CHANGED_EVENT, START_TASK_EVENT, StartTaskDetail, OTHER,
+  missingText, moduleName, openStudySessionOf, sessionFields, startRinging, studiedSeconds, togglePause, whatLabel,
 } from "@/lib/study-sessions";
 import { SessionFormDialog } from "@/components/session-form-dialog";
 import { StudyData } from "./use-study";
@@ -85,9 +85,8 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
   };
   useEffect(() => {
     if (!active) { setElapsed(0); return; }
-    const start = new Date(active.started_at).getTime();
     const tick = () => {
-      const secs = Math.floor((Date.now() - start) / 1000);
+      const secs = Math.floor(studiedSeconds(active));
       setElapsed(secs);
       if (active.timer_minutes && secs >= active.timer_minutes * 60) ringRef.current();
     };
@@ -139,13 +138,8 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
       if (active) { pendingTask.current = d; setCheckingOut("stop"); }
       else beginTask(d);
     };
-    const onClockOut = () => { if (active) setCheckingOut("stop"); };
     window.addEventListener(START_TASK_EVENT, onStart);
-    window.addEventListener(CLOCK_OUT_EVENT, onClockOut);
-    return () => {
-      window.removeEventListener(START_TASK_EVENT, onStart);
-      window.removeEventListener(CLOCK_OUT_EVENT, onClockOut);
-    };
+    return () => window.removeEventListener(START_TASK_EVENT, onStart);
   }, [active]);
 
   const afterClockOut = () => {
@@ -160,6 +154,7 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
   };
 
   if (!person || !loaded) return null;
+  const paused = !!active?.paused_at;
   const timerLeft = active?.timer_minutes ? Math.max(0, active.timer_minutes * 60 - elapsed) : null;
 
   return (
@@ -191,11 +186,11 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
         ) : (
           <div className="fixed bottom-6 right-6 z-50 flex items-center gap-4 pl-5 pr-2 py-2 rounded-full bg-zinc-950/80 backdrop-blur-md border border-white/10 shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-300">
             <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <div className={`w-2 h-2 rounded-full bg-red-500 ${paused ? "" : "animate-pulse"}`} />
               <span className="text-[9px] uppercase tracking-widest font-bold text-white/50 hidden md:block mt-px max-w-[220px] truncate">
-                {moduleName(active.module_id, study.modules)} · {whatLabel(active, study.materials, study.deadlines)}
+                {paused ? "Paused" : `${moduleName(active.module_id, study.modules)} · ${whatLabel(active, study.materials, study.deadlines)}`}
               </span>
-              <span className="text-sm font-semibold tracking-wider text-white font-mono min-w-[60px] text-center">{formatTime(elapsed)}</span>
+              <span className={`text-sm font-semibold tracking-wider font-mono min-w-[60px] text-center ${paused ? "text-white/40" : "text-white"}`}>{formatTime(elapsed)}</span>
               {timerLeft !== null && <span className="text-[11px] font-mono text-white/40 tabular-nums">{formatTime(timerLeft)} left</span>}
             </div>
             {music.current ? (
@@ -211,6 +206,16 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
                 <Music className="w-4 h-4" />
               </button>
             )}
+            <button
+              onClick={() => togglePause(active)}
+              aria-label={paused ? "Resume" : "Pause"}
+              title={paused ? "Resume" : "Pause"}
+              className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
+            >
+              {paused
+                ? <Play className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />
+                : <Pause className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />}
+            </button>
             <button
               onClick={() => setCheckingOut("stop")}
               aria-label="Clock out"

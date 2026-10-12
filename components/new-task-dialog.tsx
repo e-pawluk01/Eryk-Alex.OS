@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
 import { TagPicker } from "./tags/tags";
+import { TimeLimitFields } from "./task-timer";
 
 const COLORS = [
   { name: "Purple", class: "bg-purple-500" },
@@ -35,11 +36,15 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
   const [trackProgress, setTrackProgress] = useState(false);
   const [isJoint, setIsJoint] = useState(false);
   const [tagId, setTagId] = useState<string | null>(null);
+  // Study only: a time to work on it for, then it ticks itself off.
+  const [limitOn, setLimitOn] = useState(false);
+  const [limitMinutes, setLimitMinutes] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const timed = domain === "STUDY" && limitOn;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || isSubmitting) return;
+    if (!title.trim() || isSubmitting || (timed && !limitMinutes)) return;
 
     setIsSubmitting(true);
     try {
@@ -53,7 +58,8 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
         color: null,
         description: description.trim() || null,
         is_daily: isDaily,
-        track_progress: trackProgress,
+        track_progress: timed ? false : trackProgress,
+        time_limit_minutes: timed ? limitMinutes : null,
         progress: 0,
         is_joint: domain === "WORK" ? isJoint : false,
         domain: domain || "WORK",
@@ -72,6 +78,8 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
       setTrackProgress(false);
       setIsJoint(false);
       setTagId(null);
+      setLimitOn(false);
+      setLimitMinutes(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -185,27 +193,55 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
                   </button>
                 </div>
 
-                {/* Progress Toggle */}
-                <div className="flex items-center justify-between group py-2">
-                  <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
-                    <span className="text-[9px] uppercase tracking-widest font-semibold">
-                      Track Progress
-                    </span>
+                {/* Time Limit Toggle (STUDY only) */}
+                {domain === "STUDY" && (
+                  <div className="flex items-center justify-between group py-2">
+                    <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
+                      <span className="text-[9px] uppercase tracking-widest font-semibold">
+                        Time Limit
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLimitOn(!limitOn)}
+                      aria-label="Time limit"
+                      className={cn(
+                        "w-8 h-4 rounded-full transition-colors relative",
+                        limitOn ? "bg-white" : "bg-white/10"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
+                        limitOn ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
+                      )} />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setTrackProgress(!trackProgress)}
-                    className={cn(
-                      "w-8 h-4 rounded-full transition-colors relative",
-                      trackProgress ? "bg-white" : "bg-white/10"
-                    )}
-                  >
-                    <div className={cn(
-                      "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
-                      trackProgress ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
-                    )} />
-                  </button>
-                </div>
+                )}
+                {timed && <TimeLimitFields minutes={limitMinutes} onChange={setLimitMinutes} />}
+
+                {/* Progress Toggle (hidden for timed tasks) */}
+                {!timed && (
+                  <div className="flex items-center justify-between group py-2">
+                    <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
+                      <span className="text-[9px] uppercase tracking-widest font-semibold">
+                        Track Progress
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setTrackProgress(!trackProgress)}
+                      className={cn(
+                        "w-8 h-4 rounded-full transition-colors relative",
+                        trackProgress ? "bg-white" : "bg-white/10"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
+                        trackProgress ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
+                      )} />
+                    </button>
+                  </div>
+                )}
 
                 {/* Joint Task Toggle (WORK only) */}
                 {domain === "WORK" && (
@@ -238,7 +274,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
               <div className="mt-2 flex justify-end">
                 <button 
                   type="submit"
-                  disabled={!title.trim() || isSubmitting}
+                  disabled={!title.trim() || isSubmitting || (timed && !limitMinutes)}
                   className="px-6 py-2.5 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-full hover:bg-white/90 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100"
                 >
                   Create

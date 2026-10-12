@@ -20,13 +20,13 @@ export function useStudy(person: string | null) {
         supabase.from("study_modules").select("*").eq("person", person).order("created_at"),
         supabase.from("study_deadlines").select("*").eq("person", person).order("cutoff_on"),
         supabase.from("study_materials").select("*").eq("person", person).order("created_at"),
-        supabase.from("study_sessions").select("deadline_id, started_at, ended_at").eq("person", person).not("deadline_id", "is", null).not("ended_at", "is", null),
+        supabase.from("study_sessions").select("deadline_id, started_at, ended_at, paused_seconds").eq("person", person).not("deadline_id", "is", null).not("ended_at", "is", null),
       ]);
       if (sess.error) console.error("Failed to load study time:", sess.error);
       else {
         const totals: Record<string, number> = {};
-        for (const s of sess.data as { deadline_id: string; started_at: string; ended_at: string }[]) {
-          totals[s.deadline_id] = (totals[s.deadline_id] ?? 0) + (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000;
+        for (const s of sess.data as { deadline_id: string; started_at: string; ended_at: string; paused_seconds: number | null }[]) {
+          totals[s.deadline_id] = (totals[s.deadline_id] ?? 0) + (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000 - (s.paused_seconds ?? 0);
         }
         setLoggedByDeadline(totals);
       }
