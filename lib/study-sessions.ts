@@ -60,6 +60,14 @@ export async function addTaskTime(taskId: string, seconds: number) {
   await supabase.from("tasks").update(updates).eq("id", taskId);
 }
 
+/** After a cancelled session: a timed task that ticked itself off goes back if its saved time is short. */
+export async function untickIfShort(taskId: string) {
+  const { data } = await supabase.from("tasks").select("time_limit_minutes, time_spent_seconds").eq("id", taskId).maybeSingle();
+  if (data?.time_limit_minutes && (data.time_spent_seconds ?? 0) < data.time_limit_minutes * 60) {
+    await supabase.from("tasks").update({ status: "todo" }).eq("id", taskId);
+  }
+}
+
 export async function openStudySessionOf(person: string): Promise<StudySession | null> {
   const { data } = await supabase
     .from("study_sessions")

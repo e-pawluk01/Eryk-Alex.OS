@@ -9,7 +9,7 @@ import { TimeField } from "@/components/ui/time-field";
 import { DatePills } from "@/components/ui/date-pills";
 import { StudyDeadline, StudyMaterial } from "@/lib/types";
 import {
-  StudySession, OTHER, CUSTOM, addTaskTime, firstWhat, missingText, formatDuration, notifyStudyChanged, sessionFields, whatOptions,
+  StudySession, OTHER, CUSTOM, addTaskTime, untickIfShort, firstWhat, missingText, formatDuration, notifyStudyChanged, sessionFields, whatOptions,
 } from "@/lib/study-sessions";
 import { StudyData } from "./use-study";
 import { ProgressFields, progressOf } from "./deadline-progress";
@@ -175,6 +175,8 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
   const [moduleColor, setModuleColor] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Cancel deletes the running session: none of its time is saved. Tap twice.
+  const [confirmCancel, setConfirmCancel] = useState(false);
   // Time paused so far (including a pause still going), taken off the total.
   const origPaused = useMemo(
     () => Math.round((session.paused_seconds ?? 0) + (session.paused_at ? (origEnd.getTime() - new Date(session.paused_at).getTime()) / 1000 : 0)),
@@ -207,6 +209,17 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
   const typedPaused = ((parseInt(pausedH) || 0) * 60 + (parseInt(pausedM) || 0)) * 60;
   const pausedSecs = typedPaused === Math.round(origPaused / 60) * 60 ? origPaused : typedPaused;
   const seconds = span - pausedSecs;
+
+  const handleCancel = async () => {
+    if (!confirmCancel) { setConfirmCancel(true); return; }
+    if (saving) return;
+    setSaving(true);
+    const { error: err } = await supabase.from("study_sessions").delete().eq("id", session.id);
+    if (err) { setSaving(false); setError(err.message); return; }
+    if (session.task_id) await untickIfShort(session.task_id);
+    notifyStudyChanged();
+    onSaved();
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -277,7 +290,17 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
             </div>
           )}
           {(seconds <= 0 || error) && <p className="text-xs text-red-400/80">{error ?? (span > 0 ? "Paused is longer than the session." : "The end has to be after the start.")}</p>}
-          <button type="submit" disabled={seconds <= 0 || saving} className={primaryButton}>Yes, save session</button>
+          <div className="flex flex-col gap-2">
+            <button type="submit" disabled={seconds <= 0 || saving} className={primaryButton}>Yes, save session</button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={saving}
+              className="w-full py-2.5 border border-red-400/25 text-red-400/80 font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-40"
+            >
+              {confirmCancel ? "Tap again to cancel" : "Cancel session"}
+            </button>
+          </div>
         </form>
       </StudyModal>
     </Portal>
