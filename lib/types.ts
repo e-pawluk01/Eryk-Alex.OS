@@ -32,6 +32,8 @@ export interface Task {
   is_joint?: boolean;
   tag_id?: string | null;
   is_daily?: boolean;
+  time_limit_minutes?: number | null; // Study only: work on it for this long, then it ticks itself off
+  time_spent_seconds?: number; // time clocked on it so far (daily tasks go back to 0 at midnight)
 }
 
 export interface Topic {

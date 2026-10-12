@@ -91,7 +91,16 @@ export function TaskItem({ task, onToggleStatus, onSelect, onUpdate }: TaskItemP
               Open for notes
             </p>
           )}
-          {task.track_progress && (
+          {/* Timed Study task: the same bar as Track Progress, filled by time clocked */}
+          {task.domain === "STUDY" && !!task.time_limit_minutes && (
+            <div className="w-full h-1.5 bg-white/10 rounded-full relative mt-3 mb-1">
+              <div
+                className="absolute left-0 top-0 bottom-0 rounded-full bg-white"
+                style={{ width: `${task.status === "done" ? 100 : Math.min(100, ((task.time_spent_seconds ?? 0) / (task.time_limit_minutes * 60)) * 100)}%` }}
+              />
+            </div>
+          )}
+          {task.track_progress && !(task.domain === "STUDY" && task.time_limit_minutes) && (
             <ProgressSlider 
               progress={task.progress || 0}
               colorClass={task.color}

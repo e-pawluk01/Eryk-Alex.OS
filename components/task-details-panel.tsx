@@ -9,6 +9,7 @@ import { DatePicker } from "./ui/date-picker";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { TagPicker } from "./tags/tags";
 import { ContextTag } from "./ui/context-tag";
+import { TaskTimer, TimeLimitFields } from "./task-timer";
 
 interface TaskDetailsPanelProps {
   task: Task | null;
@@ -28,6 +29,8 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isTitleAtEnd, setIsTitleAtEnd] = useState(true);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  // Time Limit can be switched on before any time is typed in.
+  const [limitOn, setLimitOn] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -35,6 +38,10 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
       setDescDraft(task.description || "");
     }
   }, [task]);
+
+  useEffect(() => {
+    setLimitOn(!!task?.time_limit_minutes);
+  }, [task?.id, task?.time_limit_minutes]);
 
   const handleTitleBlur = () => {
     if (titleDraft !== (task?.title || "")) {
@@ -60,6 +67,13 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
   }, [titleDraft, isOpen]);
 
   if (!task) return null;
+  const isStudy = task.domain === "STUDY";
+  const timed = isStudy && limitOn;
+
+  const toggleLimit = () => {
+    if (limitOn) { setLimitOn(false); onUpdate(task.id, { time_limit_minutes: null }); }
+    else { setLimitOn(true); if (task.track_progress) onUpdate(task.id, { track_progress: false }); }
+  };
 
   return (
     <>
@@ -134,27 +148,61 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
         {/* Footer Actions */}
         <div className="p-6 bg-zinc-950/50 border-t border-white/5 flex flex-col gap-4 shrink-0">
           
-          {/* Extra Options */}
-          <div className="flex items-center justify-between group py-2">
-            <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
-              <span className="text-[9px] uppercase tracking-widest font-semibold">
-                Track Progress
-              </span>
+          {/* Time Limit (Study only): work on it for this long, then it ticks itself off */}
+          {isStudy && (
+            <div className="flex items-center justify-between group py-2">
+              <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
+                <span className="text-[9px] uppercase tracking-widest font-semibold">
+                  Time Limit
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleLimit}
+                aria-label="Time limit"
+                className={cn(
+                  "w-8 h-4 rounded-full transition-colors relative",
+                  limitOn ? "bg-white" : "bg-white/10"
+                )}
+              >
+                <div className={cn(
+                  "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
+                  limitOn ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
+                )} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => onUpdate(task.id, { track_progress: !task.track_progress, progress: !task.track_progress ? 0 : task.progress })}
-              className={cn(
-                "w-8 h-4 rounded-full transition-colors relative",
-                task.track_progress ? "bg-white" : "bg-white/10"
-              )}
-            >
-              <div className={cn(
-                "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
-                task.track_progress ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
-              )} />
-            </button>
-          </div>
+          )}
+          {timed && (
+            <TimeLimitFields
+              key={task.id}
+              minutes={task.time_limit_minutes ?? null}
+              onChange={m => onUpdate(task.id, { time_limit_minutes: m })}
+            />
+          )}
+
+          {/* Extra Options (hidden for timed tasks: the time bar shows progress) */}
+          {!timed && (
+            <div className="flex items-center justify-between group py-2">
+              <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
+                <span className="text-[9px] uppercase tracking-widest font-semibold">
+                  Track Progress
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onUpdate(task.id, { track_progress: !task.track_progress, progress: !task.track_progress ? 0 : task.progress })}
+                className={cn(
+                  "w-8 h-4 rounded-full transition-colors relative",
+                  task.track_progress ? "bg-white" : "bg-white/10"
+                )}
+              >
+                <div className={cn(
+                  "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
+                  task.track_progress ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
+                )} />
+              </button>
+            </div>
+          )}
 
           {/* Joint Task Toggle (WORK only) */}
           {task.domain === "WORK" && (
@@ -181,8 +229,9 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
             </div>
           )}
           
-          {/* Bottom Actions */}
-          <div className="flex items-end justify-end">
+          {/* Bottom Actions: play, time bar and delete for a timed task; just delete otherwise */}
+          <div className={cn("flex items-center gap-2.5", timed && task.time_limit_minutes ? "justify-between" : "justify-end")}>
+            {timed && !!task.time_limit_minutes && <TaskTimer task={task} person={userContextName} />}
 
             <button 
               onClick={() => setIsDeleteDialogOpen(true)} 

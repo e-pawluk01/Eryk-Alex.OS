@@ -6,12 +6,13 @@ import { Clock, History, Music, Pause, Play, SkipBack, SkipForward, Square } fro
 import { supabase } from "@/lib/supabase";
 import { openSessionOf, notifySessionsChanged, WorkSession } from "@/lib/work-sessions";
 import {
-  StudySession, STUDY_CHANGED_EVENT, OTHER, missingText, moduleName, openStudySessionOf, sessionFields, startRinging, whatLabel,
+  StudySession, STUDY_CHANGED_EVENT, START_TASK_EVENT, CLOCK_OUT_EVENT, StartTaskDetail, OTHER,
+  missingText, moduleName, openStudySessionOf, sessionFields, startRinging, whatLabel,
 } from "@/lib/study-sessions";
 import { SessionFormDialog } from "@/components/session-form-dialog";
 import { StudyData } from "./use-study";
 import { MusicData } from "./use-music";
-import { FieldLabel, ModuleDot, primaryButton, StudyModal } from "./bits";
+import { FieldLabel, primaryButton, StudyModal } from "./bits";
 import { ModuleAndWhat, PromptDialog, StudyClockOutDialog, StudyMissedDialog, initialChoice } from "./study-clock-dialogs";
 
 const formatTime = (total: number) => {
@@ -44,6 +45,8 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
   const [checkingOut, setCheckingOut] = useState<null | "stop" | "switch">(null);
   const [missed, setMissed] = useState<{ module: string; what: string; other: string } | null>(null);
   const stopRinging = useRef<() => void>(() => {});
+  // A task's play button pressed while another session was running: starts once that one is clocked out.
+  const pendingTask = useRef<StartTaskDetail | null>(null);
 
   const refresh = useCallback(async () => {
     if (!person) return;
@@ -67,6 +70,8 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
   ringRef.current = () => {
     if (!active || hasRung(active.id)) return;
     markRung(active.id);
+    // A timed task's time is up: it's done.
+    if (active.task_id) supabase.from("tasks").update({ status: "done" }).eq("id", active.task_id).then(() => {});
     stopRinging.current = startRinging();
     const what = whatLabel(active, study.materials, study.deadlines);
     const time = durTxt(active.timer_minutes ?? 0);
@@ -104,12 +109,13 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
   useEffect(() => () => stopRinging.current(), []);
 
   // Starting: if Work is running, ask first; clocking out of Work then starts Study.
-  const begin = async (moduleId: string, what: string, otherText: string, timerMinutes: number | null, trackId: string) => {
+  const begin = async (moduleId: string, what: string, otherText: string, timerMinutes: number | null, trackId: string, taskId: string | null = null) => {
     if (!person) return;
     const run = async () => {
       const { error } = await supabase.from("study_sessions").insert({
         person,
         ...sessionFields(moduleId, what, otherText),
+        task_id: taskId,
         started_at: new Date().toISOString(),
         timer_minutes: timerMinutes,
       });
@@ -123,16 +129,37 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
     else run();
   };
 
+  // A timed task's play button: logged as "Other" with the task's name, timer set to the time left.
+  const beginTaskRef = useRef<(d: StartTaskDetail) => void>(() => {});
+  beginTaskRef.current = d => { begin(OTHER, "", d.title, d.minutes, "", d.taskId); };
+  useEffect(() => {
+    const beginTask = (d: StartTaskDetail) => beginTaskRef.current(d);
+    const onStart = (e: Event) => {
+      const d = (e as CustomEvent<StartTaskDetail>).detail;
+      if (active) { pendingTask.current = d; setCheckingOut("stop"); }
+      else beginTask(d);
+    };
+    const onClockOut = () => { if (active) setCheckingOut("stop"); };
+    window.addEventListener(START_TASK_EVENT, onStart);
+    window.addEventListener(CLOCK_OUT_EVENT, onClockOut);
+    return () => {
+      window.removeEventListener(START_TASK_EVENT, onStart);
+      window.removeEventListener(CLOCK_OUT_EVENT, onClockOut);
+    };
+  }, [active]);
+
   const afterClockOut = () => {
     const mode = checkingOut;
     const mod = active ? active.module_id ?? OTHER : null;
     setCheckingOut(null);
     setActive(null);
-    if (mode === "switch") { setStartModule(mod); setStarting(true); }
+    const next = pendingTask.current;
+    pendingTask.current = null;
+    if (next) beginTaskRef.current(next);
+    else if (mode === "switch") { setStartModule(mod); setStarting(true); }
   };
 
   if (!person || !loaded) return null;
-  const module = active ? study.modules.find(m => m.id === active.module_id) : undefined;
   const timerLeft = active?.timer_minutes ? Math.max(0, active.timer_minutes * 60 - elapsed) : null;
 
   return (
@@ -165,7 +192,6 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
           <div className="fixed bottom-6 right-6 z-50 flex items-center gap-4 pl-5 pr-2 py-2 rounded-full bg-zinc-950/80 backdrop-blur-md border border-white/10 shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-300">
             <div className="flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <ModuleDot module={module} />
               <span className="text-[9px] uppercase tracking-widest font-bold text-white/50 hidden md:block mt-px max-w-[220px] truncate">
                 {moduleName(active.module_id, study.modules)} · {whatLabel(active, study.materials, study.deadlines)}
               </span>
@@ -245,7 +271,7 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
       )}
 
       {checkingOut && active && (
-        <StudyClockOutDialog session={active} onClose={() => setCheckingOut(null)} onSaved={afterClockOut} />
+        <StudyClockOutDialog session={active} onClose={() => { pendingTask.current = null; setCheckingOut(null); }} onSaved={afterClockOut} />
       )}
 
       {missed && <StudyMissedDialog study={study} initialModule={missed.module} initialWhat={missed.what} initialOther={missed.other} onClose={() => setMissed(null)} />}
