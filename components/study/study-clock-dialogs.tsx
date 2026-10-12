@@ -9,7 +9,7 @@ import { TimeField } from "@/components/ui/time-field";
 import { DatePills } from "@/components/ui/date-pills";
 import { StudyDeadline, StudyMaterial } from "@/lib/types";
 import {
-  StudySession, OTHER, CUSTOM, firstWhat, missingText, formatDuration, notifyStudyChanged, sessionFields, whatOptions,
+  StudySession, OTHER, CUSTOM, addTaskTime, firstWhat, missingText, formatDuration, notifyStudyChanged, sessionFields, whatOptions,
 } from "@/lib/study-sessions";
 import { StudyData } from "./use-study";
 import { ProgressFields, progressOf } from "./deadline-progress";
@@ -210,6 +210,7 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
       if (current !== material.current) await supabase.from("study_materials").update({ current }).eq("id", material.id);
     }
     if (deadline && progress) await supabase.from("study_deadlines").update(progress).eq("id", deadline.id);
+    if (session.task_id) await addTaskTime(session.task_id, seconds);
     notifyStudyChanged();
     onSaved();
   };

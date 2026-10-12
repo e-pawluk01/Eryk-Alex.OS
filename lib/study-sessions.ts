@@ -11,6 +11,7 @@ export interface StudySession {
   note: string | null; // what you were doing, typed (for "Other", or "Something else" in a module)
   material_id: string | null;
   deadline_id: string | null;
+  task_id: string | null; // started from a timed task's play button
   started_at: string;
   ended_at: string | null;
   timer_minutes: number | null; // rings when this much time has passed
@@ -22,6 +23,27 @@ export interface StudySession {
 export const STUDY_CHANGED_EVENT = "study-changed";
 export function notifyStudyChanged() {
   window.dispatchEvent(new Event(STUDY_CHANGED_EVENT));
+}
+
+// The task panel's play and pause buttons ask the Study clock to start or stop.
+export const START_TASK_EVENT = "study-start-task";
+export const CLOCK_OUT_EVENT = "study-clock-out";
+export interface StartTaskDetail { taskId: string; title: string; minutes: number }
+export function startTaskTimer(detail: StartTaskDetail) {
+  window.dispatchEvent(new CustomEvent<StartTaskDetail>(START_TASK_EVENT, { detail }));
+}
+export function requestStudyClockOut() {
+  window.dispatchEvent(new Event(CLOCK_OUT_EVENT));
+}
+
+/** Adds clocked time to a timed task; once its time limit is reached it's ticked off. */
+export async function addTaskTime(taskId: string, seconds: number) {
+  const { data } = await supabase.from("tasks").select("time_limit_minutes, time_spent_seconds").eq("id", taskId).maybeSingle();
+  if (!data) return;
+  const spent = (data.time_spent_seconds ?? 0) + Math.max(0, Math.round(seconds));
+  const updates: Record<string, unknown> = { time_spent_seconds: spent };
+  if (data.time_limit_minutes && spent >= data.time_limit_minutes * 60) updates.status = "done";
+  await supabase.from("tasks").update(updates).eq("id", taskId);
 }
 
 export async function openStudySessionOf(person: string): Promise<StudySession | null> {

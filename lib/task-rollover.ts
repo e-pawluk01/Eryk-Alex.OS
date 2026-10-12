@@ -7,7 +7,7 @@ export const londonToday = (now = new Date()) =>
 // The midnight tidy-up for tasks scheduled before today:
 //   - not ticked → moved to today
 //   - ticked     → deleted
-//   - daily      → moved to today and unticked, never deleted
+//   - daily      → moved to today and unticked (timed ones back to 0m), never deleted
 // Safe to run any number of times; it only touches days that have passed.
 export async function rolloverTasks(db: SupabaseClient, today = londonToday()) {
   const { data: deleted, error: delError } = await db
@@ -23,7 +23,7 @@ export async function rolloverTasks(db: SupabaseClient, today = londonToday()) {
   if (moveError) throw moveError;
 
   const { data: reset, error: dailyError } = await db
-    .from('tasks').update({ scheduled_date: today, status: 'todo', progress: 0 })
+    .from('tasks').update({ scheduled_date: today, status: 'todo', progress: 0, time_spent_seconds: 0 })
     .lt('scheduled_date', today).eq('status', 'done').eq('is_daily', true)
     .select('id');
   if (dailyError) throw dailyError;
