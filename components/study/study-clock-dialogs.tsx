@@ -214,8 +214,9 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
     if (!confirmCancel) { setConfirmCancel(true); return; }
     if (saving) return;
     setSaving(true);
-    const { error: err } = await supabase.from("study_sessions").delete().eq("id", session.id);
-    if (err) { setSaving(false); setError(err.message); return; }
+    const { data, error: err } = await supabase.from("study_sessions").delete().eq("id", session.id).select("id");
+    // The database skips rows it won't let us delete without an error, so check one went.
+    if (err || !data?.length) { setSaving(false); setError(err?.message ?? "The database didn't allow this session to be cancelled."); return; }
     if (session.task_id) await untickIfShort(session.task_id);
     notifyStudyChanged();
     onSaved();

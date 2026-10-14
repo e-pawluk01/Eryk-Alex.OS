@@ -9,7 +9,7 @@ import { TimeField } from "./ui/time-field";
 import { DatePills } from "./ui/date-pills";
 import {
   WORK_TASKS, WorkSession, SessionPiece, taskColor, formatMinutes,
-  saveSessionPieces, deleteSession, partnerOf, togetherSessionOf, isStillRunning,
+  saveSessionPieces, deleteSession, partnerOf, togetherSessionOf, isStillRunning, pausedSecondsOf,
 } from "@/lib/work-sessions";
 
 type Mode = "clockout" | "edit" | "add";
@@ -67,6 +67,15 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
   const [parts, setParts] = useState<Part[]>([{ task: session?.task ?? initialTask ?? "Sourcing", hours: "", minutes: "" }]);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Clocking out: Cancel deletes the running session instead, so no time is saved. Tap twice.
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  // Time paused on the running session (including a pause still going), taken off the total.
+  const origPaused = useMemo(
+    () => (mode === "clockout" && session ? Math.round(pausedSecondsOf(session, origEnd.getTime())) : 0),
+    [mode, session, origEnd]
+  );
+  const [pausedH, setPausedH] = useState(String(Math.floor(Math.round(origPaused / 60) / 60)));
+  const [pausedM, setPausedM] = useState(String(Math.round(origPaused / 60) % 60));
   const [saveError, setSaveError] = useState<string | null>(null);
   const [together, setTogether] = useState(initialTogether);
   // "Just hours": past work logged by length only, with no start or end.
@@ -103,7 +112,10 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
     : dayUnchanged && end === hhmm(origEnd)
       ? origEnd
       : atTime(end < start ? addDays(day, 1) : day, end);
-  const totalSeconds = Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 1000));
+  const spanSeconds = Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 1000));
+  const typedPaused = ((Number(pausedH) || 0) * 60 + (Number(pausedM) || 0)) * 60;
+  const pausedSeconds = typedPaused === Math.round(origPaused / 60) * 60 ? origPaused : typedPaused;
+  const totalSeconds = spanSeconds - pausedSeconds;
 
   const split = parts.length > 1;
   const extraSeconds = parts.slice(1).reduce((acc, p) => acc + partMinutes(p) * 60, 0);
@@ -112,7 +124,8 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
   let error: string | null = null;
   if (justHours && totalSeconds <= 0) error = "Type how long you worked.";
   else if (justHours && totalSeconds >= 24 * 3600) error = "That's more than a day.";
-  else if (totalSeconds <= 0) error = "Start and end can't be the same time.";
+  else if (spanSeconds <= 0) error = "Start and end can't be the same time.";
+  else if (totalSeconds <= 0) error = "Paused is longer than the session.";
   else if (parts.slice(1).some((p) => partMinutes(p) <= 0)) error = "Enter a time for each task.";
   else if (split && firstSeconds < 60) error = "That's more time than the session lasted.";
 
@@ -135,10 +148,11 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
     // Lay the pieces back-to-back in the order listed.
     const pieces: SessionPiece[] = [];
     let cursor = startDate;
+    // The first piece also holds the paused time, so the pieces still cover start to end.
     parts.forEach((p, i) => {
-      const seconds = i === 0 ? firstSeconds : partMinutes(p) * 60;
+      const seconds = i === 0 ? firstSeconds + pausedSeconds : partMinutes(p) * 60;
       const pieceEnd = new Date(cursor.getTime() + seconds * 1000);
-      pieces.push({ task: p.task, startedAt: cursor, endedAt: pieceEnd });
+      pieces.push({ task: p.task, startedAt: cursor, endedAt: pieceEnd, pausedSeconds: i === 0 ? pausedSeconds : 0 });
       cursor = pieceEnd;
     });
 
@@ -161,6 +175,18 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
       }
     }
     setSaving(false);
+    onSaved();
+  };
+
+  const handleCancel = async () => {
+    if (!session) return;
+    if (!confirmCancel) { setConfirmCancel(true); return; }
+    setSaving(true);
+    const result = await deleteSession(session.id);
+    // A joint session ends for both at clock-out, so it's cancelled for both too.
+    if (!result.error && partnerSession) await deleteSession(partnerSession.id);
+    setSaving(false);
+    if (result.error) { setSaveError(result.error); return; }
     onSaved();
   };
 
@@ -278,6 +304,21 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
                 </div>
               )}
             </div>
+
+            {origPaused > 0 && (
+              <div className="flex flex-col gap-2">
+                <span className={fieldLabel}>Paused</span>
+                <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                  <input inputMode="numeric" aria-label="Hours paused" value={pausedH} onFocus={(e) => e.target.select()}
+                    onChange={(e) => setPausedH(e.target.value.replace(/\D/g, "").slice(0, 2))} className={cn(numberClass, "w-14")} />
+                  h
+                  <input inputMode="numeric" aria-label="Minutes paused" value={pausedM} onFocus={(e) => e.target.select()}
+                    onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 2); setPausedM(v === "" ? "" : String(Math.min(59, Number(v)))); }}
+                    className={cn(numberClass, "w-14")} />
+                  m
+                </span>
+              </div>
+            )}
 
             <div className="flex flex-col gap-2">
               <span className={fieldLabel}>{split ? "Tasks" : "Task"}</span>
@@ -407,6 +448,16 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
               >
                 {saving ? "Saving..." : copy.save}
               </button>
+              {mode === "clockout" && (
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={saving}
+                  className="w-full py-2.5 border border-red-400/25 text-red-400/80 font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                >
+                  {confirmCancel ? "Tap again to cancel" : "Cancel session"}
+                </button>
+              )}
               {mode === "edit" && (
                 <button
                   type="button"

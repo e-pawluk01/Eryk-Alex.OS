@@ -90,6 +90,28 @@ export interface WorkSession {
   duration: number | null; // seconds
   // Logged as "just hours": the day and length are real, the clock times aren't.
   no_times?: boolean;
+  paused_at?: string | null; // set while paused
+  paused_seconds?: number; // paused so far on a running session
+}
+
+/** Seconds worked on a running session: since the start, minus time paused. */
+export function workedSeconds(s: WorkSession, now = Date.now()) {
+  const pausing = s.paused_at ? Math.max(0, now - new Date(s.paused_at).getTime()) : 0;
+  return Math.max(0, (now - new Date(s.started_at).getTime() - pausing) / 1000 - (s.paused_seconds ?? 0));
+}
+
+/** Paused so far, including a pause still going. */
+export function pausedSecondsOf(s: WorkSession, now = Date.now()) {
+  return (s.paused_seconds ?? 0) + (s.paused_at ? Math.max(0, now - new Date(s.paused_at).getTime()) / 1000 : 0);
+}
+
+/** Pause or resume a running session. */
+export async function togglePauseSession(s: WorkSession) {
+  const update = s.paused_at
+    ? { paused_at: null, paused_seconds: Math.round(pausedSecondsOf(s)) }
+    : { paused_at: new Date().toISOString() };
+  await supabase.from("work_sessions").update(update).eq("id", s.id);
+  notifySessionsChanged();
 }
 
 // Fired after any session is saved or deleted so open views can refetch.
@@ -103,6 +125,7 @@ export interface SessionPiece {
   task: string;
   startedAt: Date;
   endedAt: Date;
+  pausedSeconds?: number; // time paused inside this piece, not counted as worked
 }
 
 /**
@@ -122,7 +145,7 @@ export async function saveSessionPieces(
     task: p.task,
     started_at: p.startedAt.toISOString(),
     ended_at: p.endedAt.toISOString(),
-    duration: Math.round((p.endedAt.getTime() - p.startedAt.getTime()) / 1000),
+    duration: Math.round((p.endedAt.getTime() - p.startedAt.getTime()) / 1000 - (p.pausedSeconds ?? 0)),
     no_times: noTimes,
   }));
   const rows = rowsFor(person);
