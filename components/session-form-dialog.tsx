@@ -9,7 +9,7 @@ import { TimeField } from "./ui/time-field";
 import { DatePills } from "./ui/date-pills";
 import {
   WORK_TASKS, WorkSession, SessionPiece, taskColor, formatMinutes,
-  saveSessionPieces, deleteSession, partnerOf, togetherSessionOf, isStillRunning, pausedSecondsOf,
+  saveSessionPieces, deleteSession, partnerOf, togetherSessionOf, isStillRunning, pausedSecondsOf, sessionLabel,
 } from "@/lib/work-sessions";
 
 type Mode = "clockout" | "edit" | "add";
@@ -22,6 +22,7 @@ interface SessionFormDialogProps {
   person: string;
   // Starting choices for a new session, carried over from Start Work Session.
   initialTask?: string;
+  initialNote?: string;
   initialTogether?: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -31,6 +32,7 @@ interface Part {
   task: string;
   hours: string;   // typed; unused for the first part, which gets the leftover
   minutes: string;
+  note: string; // for "Other": what you were doing
 }
 
 const COPY: Record<Mode, { label: string; question: string; save: string }> = {
@@ -48,7 +50,7 @@ const atTime = (day: Date, time: string) => {
 };
 const partMinutes = (p: Part) => (Number(p.hours) || 0) * 60 + (Number(p.minutes) || 0);
 
-export function SessionFormDialog({ mode, session, person, initialTask, initialTogether = false, onClose, onSaved }: SessionFormDialogProps) {
+export function SessionFormDialog({ mode, session, person, initialTask, initialNote, initialTogether = false, onClose, onSaved }: SessionFormDialogProps) {
   // Original timestamps, so an untouched time keeps its exact seconds.
   const [origStart, origEnd] = useMemo(() => {
     if (mode === "add" || !session) {
@@ -64,7 +66,7 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
   const [day, setDay] = useState(startOfDay(origStart));
   const [start, setStart] = useState(hhmm(origStart));
   const [end, setEnd] = useState(hhmm(origEnd));
-  const [parts, setParts] = useState<Part[]>([{ task: session?.task ?? initialTask ?? "Sourcing", hours: "", minutes: "" }]);
+  const [parts, setParts] = useState<Part[]>([{ task: session?.task ?? initialTask ?? "Sourcing", hours: "", minutes: "", note: session?.note ?? initialNote ?? "" }]);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Clocking out: Cancel deletes the running session instead, so no time is saved. Tap twice.
@@ -127,6 +129,8 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
   else if (spanSeconds <= 0) error = "Start and end can't be the same time.";
   else if (totalSeconds <= 0) error = "Paused is longer than the session.";
   else if (parts.slice(1).some((p) => partMinutes(p) <= 0)) error = "Enter a time for each task.";
+  // Old "Other" sessions can be edited without one; new ones need it.
+  else if (mode !== "edit" && parts.some((p) => p.task === "Other" && !p.note.trim())) error = "Type what you were doing for Other.";
   else if (split && firstSeconds < 60) error = "That's more time than the session lasted.";
 
   const updatePart = (i: number, patch: Partial<Part>) =>
@@ -136,7 +140,7 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
     const used = new Set(parts.map((p) => p.task));
     const next = ["Packing / Shipping", "Listing", "Photography", "Sourcing", ...WORK_TASKS].find((t) => !used.has(t)) ?? "Other";
     const give = Math.max(1, Math.min(60, Math.floor(firstSeconds / 60 / 2)));
-    setParts((prev) => [...prev, { task: next, hours: String(Math.floor(give / 60)), minutes: String(give % 60) }]);
+    setParts((prev) => [...prev, { task: next, hours: String(Math.floor(give / 60)), minutes: String(give % 60), note: "" }]);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -152,7 +156,7 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
     parts.forEach((p, i) => {
       const seconds = i === 0 ? firstSeconds + pausedSeconds : partMinutes(p) * 60;
       const pieceEnd = new Date(cursor.getTime() + seconds * 1000);
-      pieces.push({ task: p.task, startedAt: cursor, endedAt: pieceEnd, pausedSeconds: i === 0 ? pausedSeconds : 0 });
+      pieces.push({ task: p.task, note: p.note, startedAt: cursor, endedAt: pieceEnd, pausedSeconds: i === 0 ? pausedSeconds : 0 });
       cursor = pieceEnd;
     });
 
@@ -244,7 +248,7 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
                 {mode !== "add" && (
                   <span className="block text-[11px] font-medium tracking-normal text-muted-foreground mt-0.5">
                     {totalSeconds > 0
-                      ? `${split ? `Split across ${parts.length} tasks` : parts[0].task} · ${justHours ? "no set hours" : `${start}–${end}`}`
+                      ? `${split ? `Split across ${parts.length} tasks` : sessionLabel(parts[0])} · ${justHours ? "no set hours" : `${start}–${end}`}`
                       : justHours ? "Type how long you worked" : "Check the start and end times"}
                   </span>
                 )}
@@ -324,8 +328,8 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
               <span className={fieldLabel}>{split ? "Tasks" : "Task"}</span>
               <div className="flex flex-col gap-2">
                 {parts.map((p, i) => (
+                  <React.Fragment key={i}>
                   <div
-                    key={i}
                     className={cn(
                       "grid items-center gap-2.5",
                       split ? "grid-cols-[8px_minmax(0,1fr)_auto_28px]" : "grid-cols-[8px_minmax(0,1fr)]"
@@ -386,6 +390,17 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialT
                       </>
                     )}
                   </div>
+                  {p.task === "Other" && (
+                    <input
+                      type="text"
+                      value={p.note}
+                      onChange={(e) => updatePart(i, { note: e.target.value })}
+                      placeholder="What were you doing?"
+                      aria-label={`What task ${i + 1} was`}
+                      className="ml-[18px] w-[calc(100%-18px)] bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 placeholder:text-white/25"
+                    />
+                  )}
+                  </React.Fragment>
                 ))}
               </div>
 

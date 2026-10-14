@@ -6,7 +6,7 @@ import { useGlobalContext } from "./global-context";
 import { ClockInDialog } from "./clock-in-dialog";
 import { SessionFormDialog } from "./session-form-dialog";
 import { Square, Clock, Pause, Play } from "lucide-react";
-import { WorkSession, SESSIONS_CHANGED_EVENT, togglePauseSession, workedSeconds } from "@/lib/work-sessions";
+import { WorkSession, SESSIONS_CHANGED_EVENT, sessionLabel, togglePauseSession, workedSeconds } from "@/lib/work-sessions";
 
 export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () => void }) {
   const [activeSession, setActiveSession] = useState<WorkSession | null>(null);
@@ -107,7 +107,7 @@ export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () =>
       <div className="flex items-center gap-3">
         <div className={`w-2 h-2 rounded-full bg-red-500 ${paused ? "" : "animate-pulse"}`} />
         <span className="text-[9px] uppercase tracking-widest font-bold text-white/50 hidden md:block mt-px">
-          {paused ? "Paused" : activeSession.task}
+          {paused ? "Paused" : sessionLabel(activeSession)}
         </span>
         <span className={`text-sm font-semibold tracking-wider font-mono w-[60px] text-center ${paused ? "text-white/40" : "text-white"}`}>
           {formatTime(elapsedSeconds)}

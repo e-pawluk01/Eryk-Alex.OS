@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { X, Play, History } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useGlobalContext } from "./global-context";
-import { WORK_TASKS, partnerOf, openSessionOf } from "@/lib/work-sessions";
+import { WORK_TASKS, partnerOf, openSessionOf, sessionLabel } from "@/lib/work-sessions";
 import { SessionFormDialog } from "./session-form-dialog";
 import { openStudySessionOf, StudySession } from "@/lib/study-sessions";
 import { PromptDialog, StudyClockOutDialog } from "./study/study-clock-dialogs";
@@ -19,6 +19,9 @@ interface ClockInDialogProps {
 export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [task, setTask] = useState<string>(TASKS[0]);
+  // "Other": what you're actually doing.
+  const [note, setNote] = useState("");
+  const missingNote = task === "Other" && !note.trim();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [together, setTogether] = useState(false);
   // What the other person is clocked in on, if anything: Together is off then.
@@ -36,12 +39,12 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
   useEffect(() => {
     if (!isOpen) return;
     setTogether(false);
-    openSessionOf(partner).then((s) => setPartnerBusy(s ? s.task : null));
+    openSessionOf(partner).then((s) => setPartnerBusy(s ? sessionLabel(s) : null));
   }, [isOpen, partner]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || missingNote) return;
     const studying = await openStudySessionOf(userContextName);
     if (studying) { setStudyClash(studying); return; }
     startWork();
@@ -56,7 +59,7 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
       const startedAt = new Date().toISOString();
       const people = together && !partnerBusy ? [userContextName, partner] : [userContextName];
       const { error } = await supabase.from("work_sessions").insert(
-        people.map((person) => ({ person, task, started_at: startedAt }))
+        people.map((person) => ({ person, task, note: task === "Other" ? note.trim() : null, started_at: startedAt }))
       );
       if (error) throw error;
       
@@ -116,6 +119,17 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
                     <option key={t} value={t} className="bg-zinc-900">{t}</option>
                   ))}
                 </select>
+                {task === "Other" && (
+                  <input
+                    type="text"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="What are you doing?"
+                    autoFocus
+                    disabled={isSubmitting}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 placeholder:text-white/25"
+                  />
+                )}
               </div>
 
               <label className={`flex items-start gap-3 ${partnerBusy ? "opacity-45" : "cursor-pointer"}`}>
@@ -137,7 +151,7 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
               <div className="flex flex-col gap-2 pt-2">
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || missingNote}
                   className="w-full py-3 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
                 >
                   {isSubmitting ? "Starting..." : "Begin Session"}
@@ -183,6 +197,7 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
           mode="add"
           person={userContextName}
           initialTask={task}
+          initialNote={note}
           initialTogether={together && !partnerBusy}
           onClose={() => setAddingMissed(false)}
           onSaved={() => setAddingMissed(false)}
