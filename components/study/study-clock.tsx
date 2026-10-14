@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Clock, History, Music, Pause, Play, SkipBack, SkipForward, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { openSessionOf, notifySessionsChanged, WorkSession } from "@/lib/work-sessions";
+import { openSessionOf, notifySessionsChanged, sessionLabel, WorkSession } from "@/lib/work-sessions";
 import {
   StudySession, STUDY_CHANGED_EVENT, START_TASK_EVENT, StartTaskDetail, OTHER,
   missingText, moduleName, openStudySessionOf, sessionFields, startRinging, studiedSeconds, togglePause, whatLabel,
@@ -244,7 +244,7 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
           icon="clock"
           stacked
           title="You're clocked into Work"
-          detail={`${workClash.session.task} · ${formatTime(Math.floor((Date.now() - new Date(workClash.session.started_at).getTime()) / 1000))}. Clock out of Work and start studying?`}
+          detail={`${sessionLabel(workClash.session)} · ${formatTime(Math.floor((Date.now() - new Date(workClash.session.started_at).getTime()) / 1000))}. Clock out of Work and start studying?`}
           confirmLabel="Clock out of Work"
           cancelLabel="Cancel"
           onConfirm={() => { setWorkCheckout(workClash); setWorkClash(null); }}

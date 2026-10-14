@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { Breakdown } from "./breakdown";
-import { WorkSession, PERSON_COLORS, taskColor, formatMinutes } from "@/lib/work-sessions";
+import { WorkSession, PERSON_COLORS, taskColor, formatMinutes, sessionLabel } from "@/lib/work-sessions";
 
 interface SessionsPanelProps {
   sessions: WorkSession[]; // this month's finished sessions, newest first
@@ -51,7 +51,7 @@ export function SessionsPanel({ sessions, onEdit }: SessionsPanelProps) {
                 >
                   <span className="w-2 h-2 rounded-full" style={{ background: taskColor(s.task) }} />
                   <span className="min-w-0">
-                    <span className="block truncate text-white">{s.task}</span>
+                    <span className="block truncate text-white">{sessionLabel(s)}</span>
                     <span className="block text-[11px] text-muted-foreground/50 tabular-nums mt-0.5">
                       {s.person} · {format(start, "EEE d MMM")}{!s.no_times && ` · ${format(start, "HH:mm")}–${format(end, "HH:mm")}`}
                     </span>
@@ -60,7 +60,7 @@ export function SessionsPanel({ sessions, onEdit }: SessionsPanelProps) {
                   <button
                     type="button"
                     onClick={() => onEdit(s)}
-                    aria-label={`Edit ${s.task} session`}
+                    aria-label={`Edit ${sessionLabel(s)} session`}
                     title="Edit"
                     className="w-7 h-7 grid place-items-center rounded-md text-muted-foreground/50 hover:bg-white/10 hover:text-white transition-colors"
                   >

@@ -90,8 +90,14 @@ export interface WorkSession {
   duration: number | null; // seconds
   // Logged as "just hours": the day and length are real, the clock times aren't.
   no_times?: boolean;
+  note?: string | null; // for "Other": what you were actually doing
   paused_at?: string | null; // set while paused
   paused_seconds?: number; // paused so far on a running session
+}
+
+/** What to call a session: the typed note for "Other", else the task. */
+export function sessionLabel(s: { task: string; note?: string | null }) {
+  return s.task === "Other" && s.note ? s.note : s.task;
 }
 
 /** Seconds worked on a running session: since the start, minus time paused. */
@@ -126,6 +132,7 @@ export interface SessionPiece {
   startedAt: Date;
   endedAt: Date;
   pausedSeconds?: number; // time paused inside this piece, not counted as worked
+  note?: string | null; // for "Other": what you were doing
 }
 
 /**
@@ -147,6 +154,7 @@ export async function saveSessionPieces(
     ended_at: p.endedAt.toISOString(),
     duration: Math.round((p.endedAt.getTime() - p.startedAt.getTime()) / 1000 - (p.pausedSeconds ?? 0)),
     no_times: noTimes,
+    note: p.task === "Other" ? p.note?.trim() || null : null,
   }));
   const rows = rowsFor(person);
 
