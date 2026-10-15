@@ -46,7 +46,9 @@ export async function togglePause(s: StudySession) {
   const update = s.paused_at
     ? { paused_at: null, paused_seconds: (s.paused_seconds ?? 0) + Math.round((Date.now() - new Date(s.paused_at).getTime()) / 1000) }
     : { paused_at: new Date().toISOString() };
-  await supabase.from("study_sessions").update(update).eq("id", s.id);
+  const { error } = await supabase.from("study_sessions").update(update).eq("id", s.id);
+  // Say so instead of silently doing nothing (e.g. the pause columns are missing).
+  if (error) { console.error("Pause failed:", error); alert(`Couldn't pause: ${error.message}`); return; }
   notifyStudyChanged();
 }
 

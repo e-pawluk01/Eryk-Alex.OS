@@ -116,7 +116,9 @@ export async function togglePauseSession(s: WorkSession) {
   const update = s.paused_at
     ? { paused_at: null, paused_seconds: Math.round(pausedSecondsOf(s)) }
     : { paused_at: new Date().toISOString() };
-  await supabase.from("work_sessions").update(update).eq("id", s.id);
+  const { error } = await supabase.from("work_sessions").update(update).eq("id", s.id);
+  // Say so instead of silently doing nothing (e.g. the pause columns are missing).
+  if (error) { console.error("Pause failed:", error); alert(`Couldn't pause: ${error.message}`); return; }
   notifySessionsChanged();
 }
 
