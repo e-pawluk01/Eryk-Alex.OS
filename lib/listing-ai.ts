@@ -1,4 +1,5 @@
 import { getMeasurementLabels } from "./measurement-labels";
+import { ListingModelId } from "./listing-models";
 
 // Depop and Vinted listing content, written by the AI from the item's photos
 // and details. The AI only ever returns discrete fields as JSON — it never
@@ -27,6 +28,7 @@ interface ItemInput {
   size: string;
   measurementsNotes: string;
   sellerNotes: string;
+  model: ListingModelId;
 }
 
 function buildUserText(input: ItemInput): string {
@@ -46,7 +48,7 @@ function buildImageContent(photos: Photo[]) {
   }));
 }
 
-async function callOpenRouter(systemPrompt: string, userText: string, photos: Photo[]): Promise<Record<string, unknown>> {
+async function callOpenRouter(model: ListingModelId, systemPrompt: string, userText: string, photos: Photo[]): Promise<Record<string, unknown>> {
   const content: unknown[] = [{ type: "text", text: userText }, ...buildImageContent(photos)];
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -56,7 +58,7 @@ async function callOpenRouter(systemPrompt: string, userText: string, photos: Ph
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content },
@@ -102,7 +104,7 @@ Never invent or estimate a measurement that wasn't actually given — leave it b
 
 ${VOICE_EXAMPLES}`;
 
-  const parsed = await callOpenRouter(systemPrompt, buildUserText(input), input.photos);
+  const parsed = await callOpenRouter(input.model, systemPrompt, buildUserText(input), input.photos);
   return {
     title: (parsed.title as string) ?? "",
     description: (parsed.description as string) ?? "",
@@ -138,7 +140,7 @@ Never invent or estimate a measurement that wasn't actually given — leave it b
 
 ${VOICE_EXAMPLES}`;
 
-  const parsed = await callOpenRouter(systemPrompt, buildUserText(input), input.photos);
+  const parsed = await callOpenRouter(input.model, systemPrompt, buildUserText(input), input.photos);
   const title = ((parsed.title as string) ?? "").slice(0, 100);
   return {
     title,

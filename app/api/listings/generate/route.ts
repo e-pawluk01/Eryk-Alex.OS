@@ -3,6 +3,7 @@ import { generateDepopContent, generateVintedContent } from "@/lib/listing-ai";
 import { buildDepopText, buildVintedText } from "@/lib/listing-templates";
 import { uploadListingTextFiles } from "@/lib/google-drive";
 import { generateSku } from "@/lib/sku";
+import { isListingModelId } from "@/lib/listing-models";
 
 // Photos + an AI vision call + two Drive round-trips routinely take longer
 // than the platform's default function timeout — give it real headroom.
@@ -23,6 +24,16 @@ export async function POST(req: NextRequest) {
     const condition = String(formData.get("condition") || "");
     const measurements = String(formData.get("measurements") || "");
     const notes = String(formData.get("notes") || "");
+    const model = String(formData.get("model") || "");
+    if (!isListingModelId(model)) {
+      return NextResponse.json({ error: "Pick an AI model first." }, { status: 400 });
+    }
+    const platforms = formData.getAll("platforms").map(String);
+    const wantDepop = platforms.includes("depop");
+    const wantVinted = platforms.includes("vinted");
+    if (!wantDepop && !wantVinted) {
+      return NextResponse.json({ error: "Tick Vinted, Depop or both first." }, { status: 400 });
+    }
 
     const photoFiles = formData.getAll("photos").filter((p): p is File => p instanceof File);
     if (photoFiles.length === 0) {
@@ -43,14 +54,15 @@ export async function POST(req: NextRequest) {
       size,
       measurementsNotes: measurements,
       sellerNotes: notes,
+      model,
     };
 
-    // 1. Write both platforms' content first — neither needs a SKU at all,
-    // so a failure here costs nothing. Run them together since they're
+    // 1. Write the ticked platforms' content first — neither needs a SKU at
+    // all, so a failure here costs nothing. Run them together since they're
     // independent AI calls.
     const [depopContent, vintedContent] = await Promise.all([
-      generateDepopContent(itemInput),
-      generateVintedContent(itemInput),
+      wantDepop ? generateDepopContent(itemInput) : null,
+      wantVinted ? generateVintedContent(itemInput) : null,
     ]);
 
     // 2. Only now spend a SKU, and only if the caller didn't already bring
@@ -66,15 +78,15 @@ export async function POST(req: NextRequest) {
       newlyGeneratedSku = true;
     }
 
-    // 3. File both — from here on the SKU is spent regardless of outcome,
+    // 3. File them — from here on the SKU is spent regardless of outcome,
     // since Drive needs it to name the folder.
-    const depopText = buildDepopText({ ...depopContent, brand, size, condition, sku, category });
-    const vintedText = buildVintedText({ ...vintedContent, brand, size, condition, sku, category });
+    const files: { filename: string; content: string }[] = [];
+    if (depopContent) files.push({ filename: "depop.txt", content: buildDepopText({ ...depopContent, brand, size, condition, sku, category }) });
+    if (vintedContent) files.push({ filename: "vinted.txt", content: buildVintedText({ ...vintedContent, brand, size, condition, sku, category }) });
 
-    const [depopLink, vintedLink] = await uploadListingTextFiles(sku, [
-      { filename: "depop.txt", content: depopText },
-      { filename: "vinted.txt", content: vintedText },
-    ]);
+    const links = await uploadListingTextFiles(sku, files);
+    const depopLink = depopContent ? links[0] : null;
+    const vintedLink = vintedContent ? links[files.length - 1] : null;
 
     return NextResponse.json({ depopLink, vintedLink, sku, newlyGeneratedSku });
   } catch (err) {
