@@ -46,7 +46,17 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
       photos.forEach((p) => formData.append("photos", p.file));
 
       const res = await fetch("/api/listings/generate", { method: "POST", body: formData });
-      const data = await res.json();
+      // A Vercel timeout or crash answers with a plain-text page, not JSON —
+      // say what actually happened instead of "couldn't reach the server".
+      const data = await res.json().catch(() => null);
+      if (!data) {
+        setGenerateError(
+          res.status === 504
+            ? "The server ran out of time before the listing was saved. If a SKU was made, type it into the SKU box before trying again."
+            : `The server failed (status ${res.status}). If a SKU was made, type it into the SKU box before trying again.`
+        );
+        return;
+      }
 
       // The server only spends a SKU once the AI content has already
       // succeeded — if one comes back here, it's real and already in the
