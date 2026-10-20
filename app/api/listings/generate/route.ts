@@ -3,7 +3,7 @@ import { generateDepopContent, generateVintedContent } from "@/lib/listing-ai";
 import { buildDepopText, buildVintedText } from "@/lib/listing-templates";
 import { uploadListingTextFiles } from "@/lib/google-drive";
 import { generateSku } from "@/lib/sku";
-import { isListingModelId } from "@/lib/listing-models";
+import { isListingModelId, LISTING_MODELS } from "@/lib/listing-models";
 
 // Photos + an AI vision call + two Drive round-trips routinely take longer
 // than the platform's default function timeout — give it real headroom.
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     // 1. Write the ticked platforms' content first — neither needs a SKU at
     // all, so a failure here costs nothing. Run them together since they're
     // independent AI calls.
-    const [depopContent, vintedContent] = await Promise.all([
+    const [depop, vinted] = await Promise.all([
       wantDepop ? generateDepopContent(itemInput) : null,
       wantVinted ? generateVintedContent(itemInput) : null,
     ]);
@@ -81,12 +81,13 @@ export async function POST(req: NextRequest) {
     // 3. File them — from here on the SKU is spent regardless of outcome,
     // since Drive needs it to name the folder.
     const files: { filename: string; content: string }[] = [];
-    if (depopContent) files.push({ filename: "depop.txt", content: buildDepopText({ ...depopContent, brand, size, condition, sku, category }) });
-    if (vintedContent) files.push({ filename: "vinted.txt", content: buildVintedText({ ...vintedContent, brand, size, condition, sku, category }) });
+    if (depop) files.push({ filename: "depop.txt", content: buildDepopText({ ...depop.content, brand, size, condition, sku, category }) });
+    if (vinted) files.push({ filename: "vinted.txt", content: buildVintedText({ ...vinted.content, brand, size, condition, sku, category }) });
+    files.push({ filename: "cost.txt", content: buildCostText(sku, model, { vinted: vinted?.cost, depop: depop?.cost }) });
 
     const links = await uploadListingTextFiles(sku, files);
-    const depopLink = depopContent ? links[0] : null;
-    const vintedLink = vintedContent ? links[files.length - 1] : null;
+    const depopLink = depop ? links[0] : null;
+    const vintedLink = vinted ? links[depop ? 1 : 0] : null;
 
     return NextResponse.json({ depopLink, vintedLink, sku, newlyGeneratedSku });
   } catch (err) {
@@ -94,4 +95,22 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : "Something went wrong generating the listing.";
     return NextResponse.json({ error: message, sku, newlyGeneratedSku }, { status: 500 });
   }
+}
+
+const formatCost = (cost: number | null) => (cost === null ? "unknown" : `$${cost.toFixed(4)}`);
+
+// What this generation cost, from OpenRouter's own figure for each AI call.
+// Only platforms that were ticked get a line.
+function buildCostText(sku: string, model: string, costs: { vinted?: number | null; depop?: number | null }): string {
+  const generated = new Date().toLocaleString("en-GB", { timeZone: "Europe/London", dateStyle: "medium", timeStyle: "short" });
+  const modelLabel = LISTING_MODELS.find((m) => m.id === model)?.label ?? model;
+  const platformCosts = (["vinted", "depop"] as const).filter((p) => costs[p] !== undefined);
+
+  const lines = [`SKU: ${sku}`, `Generated: ${generated}`, `Model: ${modelLabel}`, "Result: Success", ""];
+  for (const p of platformCosts) lines.push(`${p === "vinted" ? "Vinted" : "Depop"}: ${formatCost(costs[p] ?? null)}`);
+
+  const known = platformCosts.map((p) => costs[p]);
+  const total = known.every((c): c is number => typeof c === "number") ? known.reduce((a, b) => a + b, 0) : null;
+  lines.push(`Total: ${formatCost(total)}`);
+  return lines.join("\n");
 }

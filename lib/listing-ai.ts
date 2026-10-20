@@ -48,7 +48,14 @@ function buildImageContent(photos: Photo[]) {
   }));
 }
 
-async function callOpenRouter(model: ListingModelId, systemPrompt: string, userText: string, photos: Photo[]): Promise<Record<string, unknown>> {
+// What one AI call came back with, plus what OpenRouter charged for it (in
+// dollars), or null if it didn't say.
+interface AiResult {
+  parsed: Record<string, unknown>;
+  cost: number | null;
+}
+
+async function callOpenRouter(model: ListingModelId, systemPrompt: string, userText: string, photos: Photo[]): Promise<AiResult> {
   const content: unknown[] = [{ type: "text", text: userText }, ...buildImageContent(photos)];
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -74,7 +81,8 @@ async function callOpenRouter(model: ListingModelId, systemPrompt: string, userT
 
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("The AI's response wasn't in the expected format.");
-  return JSON.parse(jsonMatch[0]);
+  const cost = typeof data.usage?.cost === "number" ? data.usage.cost : null;
+  return { parsed: JSON.parse(jsonMatch[0]), cost };
 }
 
 export interface DepopContent {
@@ -86,7 +94,7 @@ export interface DepopContent {
   measurement2Value: string;
 }
 
-export async function generateDepopContent(input: ItemInput): Promise<DepopContent> {
+export async function generateDepopContent(input: ItemInput): Promise<{ content: DepopContent; cost: number | null }> {
   const labels = getMeasurementLabels(input.category);
   const measurementInstruction = labels
     ? `"measurement1Value": string, // the "${labels[0]}" measurement in inches, ONLY if explicitly given in the measurement notes, else ""\n  "measurement2Value": string, // the "${labels[1]}" measurement in inches, ONLY if explicitly given in the measurement notes, else ""`
@@ -104,8 +112,8 @@ Never invent or estimate a measurement that wasn't actually given — leave it b
 
 ${VOICE_EXAMPLES}`;
 
-  const parsed = await callOpenRouter(input.model, systemPrompt, buildUserText(input), input.photos);
-  return {
+  const { parsed, cost } = await callOpenRouter(input.model, systemPrompt, buildUserText(input), input.photos);
+  const content = {
     title: (parsed.title as string) ?? "",
     description: (parsed.description as string) ?? "",
     tags: Array.isArray(parsed.tags) ? (parsed.tags as string[]).slice(0, 5) : [],
@@ -113,6 +121,7 @@ ${VOICE_EXAMPLES}`;
     measurement1Value: (parsed.measurement1Value as string) ?? "",
     measurement2Value: (parsed.measurement2Value as string) ?? "",
   };
+  return { content, cost };
 }
 
 export interface VintedContent {
@@ -123,7 +132,7 @@ export interface VintedContent {
   measurement2Value: string;
 }
 
-export async function generateVintedContent(input: ItemInput): Promise<VintedContent> {
+export async function generateVintedContent(input: ItemInput): Promise<{ content: VintedContent; cost: number | null }> {
   const labels = getMeasurementLabels(input.category);
   const measurementInstruction = labels
     ? `"measurement1Value": string, // the "${labels[0]}" measurement in inches, ONLY if explicitly given in the measurement notes, else ""\n  "measurement2Value": string, // the "${labels[1]}" measurement in inches, ONLY if explicitly given in the measurement notes, else ""`
@@ -140,13 +149,14 @@ Never invent or estimate a measurement that wasn't actually given — leave it b
 
 ${VOICE_EXAMPLES}`;
 
-  const parsed = await callOpenRouter(input.model, systemPrompt, buildUserText(input), input.photos);
+  const { parsed, cost } = await callOpenRouter(input.model, systemPrompt, buildUserText(input), input.photos);
   const title = ((parsed.title as string) ?? "").slice(0, 100);
-  return {
+  const content = {
     title,
     tags: Array.isArray(parsed.tags) ? (parsed.tags as string[]).slice(0, 15) : [],
     itemType: (parsed.itemType as string) ?? input.category,
     measurement1Value: (parsed.measurement1Value as string) ?? "",
     measurement2Value: (parsed.measurement2Value as string) ?? "",
   };
+  return { content, cost };
 }
