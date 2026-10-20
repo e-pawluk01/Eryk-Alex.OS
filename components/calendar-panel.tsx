@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { ContextType } from "@/lib/types";
 import { NewCalendarItemDialog } from "./new-calendar-item-dialog";
 import { TagChip } from "./tags/tags";
+import { ListingsView } from "./listings-view";
 
 const contextDotColors: Record<ContextType, string> = {
   Eryk: "bg-blue-400",
@@ -41,14 +42,13 @@ interface CalendarPanelProps {
   onSelectEvent: (event: Event) => void;
   onAnalyticsToggle?: () => void;
   showAnalytics?: boolean;
-  onListingsToggle?: () => void;
-  showListings?: boolean;
   studyPage?: "deadlines" | "materials" | null;
   onStudyPageToggle?: (page: "deadlines" | "materials") => void;
 }
 
-export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics, onListingsToggle, showListings, studyPage, onStudyPageToggle }: CalendarPanelProps) {
+export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics, studyPage, onStudyPageToggle }: CalendarPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isListingsOpen, setIsListingsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -83,7 +83,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
       <div 
         className={cn(
           "fixed right-0 top-1/2 -translate-y-1/2 flex flex-col bg-white/5 border border-white/10 border-r-0 backdrop-blur-md rounded-l-lg z-40 transition-all duration-300 overflow-hidden divide-y divide-white/10",
-          isOpen ? "translate-x-full" : "translate-x-0"
+          isOpen || isListingsOpen ? "translate-x-full" : "translate-x-0"
         )}
       >
         <button 
@@ -100,12 +100,13 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
             {showAnalytics ? <X className="w-5 h-5 text-white/80" /> : <TrendingUp className="w-5 h-5 text-white/80" />}
           </button>
         )}
-        {currentDomain === "WORK" && onListingsToggle && (
+        {currentDomain === "WORK" && (
           <button
-            onClick={onListingsToggle}
+            onClick={() => setIsListingsOpen(true)}
             className="p-3 py-4 hover:bg-white/10 transition-colors"
+            title="Listings"
           >
-            {showListings ? <X className="w-5 h-5 text-white/80" /> : <Tag className="w-5 h-5 text-white/80" />}
+            <Tag className="w-5 h-5 text-white/80" />
           </button>
         )}
         {currentDomain === "STUDY" && onStudyPageToggle && (
@@ -287,6 +288,25 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
           <Plus className="w-5 h-5" strokeWidth={3} />
         </button>
 
+      </div>
+
+      {/* Listings Overlay */}
+      {isListingsOpen && (
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] transition-opacity" 
+          onClick={() => setIsListingsOpen(false)}
+        />
+      )}
+
+      {/* Listings Slide-over — stays mounted so a half-filled listing survives closing */}
+      <div 
+        className={cn(
+          "fixed right-0 top-0 h-full w-full max-w-[380px] bg-[#09090b] z-[60]",
+          "transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col",
+          isListingsOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        <ListingsView onClose={() => setIsListingsOpen(false)} />
       </div>
 
       <NewCalendarItemDialog 

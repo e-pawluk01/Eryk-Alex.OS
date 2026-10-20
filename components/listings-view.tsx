@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Check, AlertTriangle } from "lucide-react";
+import { Loader2, Check, AlertTriangle, X } from "lucide-react";
 import { GenerateSkuDialog } from "@/components/generate-sku-dialog";
 import { ListingPhotoPicker, PhotoSlot } from "@/components/listing-photo-picker";
 import { SkuGeneratedNotice } from "@/components/sku-generated-notice";
 import { SKU_CATEGORIES } from "@/lib/sku-categories";
 
-export function ListingsView() {
+export function ListingsView({ onClose }: { onClose: () => void }) {
   const [isSkuDialogOpen, setIsSkuDialogOpen] = useState(false);
   const [sku, setSku] = useState<string | null>(null);
   const [manualSku, setManualSku] = useState("");
@@ -70,31 +70,35 @@ export function ListingsView() {
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-500">
-      <div className="flex items-center justify-between border-b border-border pb-4">
-        <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Listings</h2>
-        <div className="flex items-center gap-3">
-          {sku ? (
-            <span className="text-[10px] font-mono text-white/40 tracking-wider">SKU: {sku}</span>
-          ) : (
-            <input
-              value={manualSku}
-              onChange={(e) => setManualSku(e.target.value)}
-              onBlur={() => { if (manualSku.trim()) setSku(manualSku.trim()); }}
-              placeholder="existing SKU"
-              className="w-32 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-white/70 placeholder:text-white/30 outline-none focus:border-white/30 tracking-wider transition-colors"
-            />
-          )}
-          <button
-            onClick={() => setIsSkuDialogOpen(true)}
-            className="border border-white/10 text-white/60 text-[9.5px] font-bold uppercase tracking-widest px-3.5 py-2 rounded-lg hover:text-white hover:border-white/30 transition-colors"
-          >
-            Generate SKU
-          </button>
-        </div>
+    <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+      <div className="flex items-center justify-between mt-2">
+        <h3 className="text-sm font-semibold tracking-wide">Listings</h3>
+        <button onClick={onClose} className="text-muted-foreground hover:text-white transition-colors">
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
-      <div className="max-w-4xl w-full mx-auto bg-[#111] border border-white/5 rounded-2xl p-6 flex flex-col gap-5">
+      <div className="flex items-center gap-2">
+        {sku ? (
+          <span className="flex-1 text-[10px] font-mono text-white/40 tracking-wider">SKU: {sku}</span>
+        ) : (
+          <input
+            value={manualSku}
+            onChange={(e) => setManualSku(e.target.value)}
+            onBlur={() => { if (manualSku.trim()) setSku(manualSku.trim()); }}
+            placeholder="existing SKU"
+            className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-[10px] font-mono text-white/70 placeholder:text-white/30 outline-none focus:border-white/30 tracking-wider transition-colors"
+          />
+        )}
+        <button
+          onClick={() => setIsSkuDialogOpen(true)}
+          className="border border-white/10 text-white/60 text-[9.5px] font-bold uppercase tracking-widest px-3.5 py-2 rounded-lg hover:text-white hover:border-white/30 transition-colors shrink-0"
+        >
+          Generate SKU
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-5">
         <ListingPhotoPicker photos={photos} onChange={setPhotos} />
 
         <div className="flex flex-col gap-2 bg-white/5 border border-white/10 rounded-xl p-4">
