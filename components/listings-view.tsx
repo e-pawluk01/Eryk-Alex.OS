@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Check, AlertTriangle, X } from "lucide-react";
+import { Loader2, Check, AlertTriangle, X, ChevronDown } from "lucide-react";
 import { GenerateSkuDialog } from "@/components/generate-sku-dialog";
 import { ListingPhotoPicker, PhotoSlot } from "@/components/listing-photo-picker";
 import { SkuGeneratedNotice } from "@/components/sku-generated-notice";
 import { SKU_CATEGORIES } from "@/lib/sku-categories";
+import { LISTING_MODELS, ListingModelId } from "@/lib/listing-models";
 
 export function ListingsView({ onClose }: { onClose: () => void }) {
   const [isSkuDialogOpen, setIsSkuDialogOpen] = useState(false);
@@ -21,6 +22,11 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
   const [measurements, setMeasurements] = useState("");
   const [notes, setNotes] = useState("");
 
+  const [model, setModel] = useState<ListingModelId>(LISTING_MODELS[0].id);
+  const [isPlatformsOpen, setIsPlatformsOpen] = useState(false);
+  const [saveVinted, setSaveVinted] = useState(true);
+  const [saveDepop, setSaveDepop] = useState(true);
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [depopLink, setDepopLink] = useState<string | null>(null);
@@ -30,6 +36,10 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
   const canGenerate = photos.length > 0 && !isGenerating;
 
   const generateListing = async () => {
+    if (!saveVinted && !saveDepop) {
+      setGenerateError("Tick Vinted, Depop or both first.");
+      return;
+    }
     setIsGenerating(true);
     setGenerateError(null);
     setDepopLink(null);
@@ -43,6 +53,9 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
       formData.set("condition", condition);
       formData.set("measurements", measurements);
       formData.set("notes", notes);
+      formData.set("model", model);
+      if (saveVinted) formData.append("platforms", "vinted");
+      if (saveDepop) formData.append("platforms", "depop");
       photos.forEach((p) => formData.append("photos", p.file));
 
       const res = await fetch("/api/listings/generate", { method: "POST", body: formData });
@@ -172,6 +185,56 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
             placeholder="Anything not visible in the photos — a stain, how it fits, a repair..."
             className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white placeholder:text-white/20 outline-none focus:border-white/50 transition-colors min-h-[64px] resize-none"
           />
+        </div>
+
+        <div className="flex flex-col gap-2 bg-white/5 border border-white/10 rounded-xl p-4">
+          <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">AI model</label>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value as ListingModelId)}
+            className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm text-white outline-none appearance-none"
+          >
+            {LISTING_MODELS.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col bg-white/5 border border-white/10 rounded-xl">
+          <button
+            onClick={() => setIsPlatformsOpen(!isPlatformsOpen)}
+            aria-expanded={isPlatformsOpen}
+            className="flex items-center justify-between px-4 py-3.5"
+          >
+            <span className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Save for</span>
+            <ChevronDown className={`w-4 h-4 text-white/50 transition-transform ${isPlatformsOpen ? "rotate-180" : ""}`} />
+          </button>
+          {isPlatformsOpen && (
+            <div className="flex items-center gap-10 px-4 pt-1 pb-[18px]">
+              <button
+                onClick={() => { setSaveVinted(!saveVinted); setGenerateError(null); }}
+                role="checkbox"
+                aria-checked={saveVinted}
+                className="flex items-center gap-3"
+              >
+                <span className="text-sm font-medium">Vinted</span>
+                <span className={`w-6 h-6 rounded-[7px] flex items-center justify-center transition-colors ${saveVinted ? "bg-white" : "border-[1.5px] border-white/25"}`}>
+                  {saveVinted && <Check className="w-3.5 h-3.5 text-black" strokeWidth={3.5} />}
+                </span>
+              </button>
+              <button
+                onClick={() => { setSaveDepop(!saveDepop); setGenerateError(null); }}
+                role="checkbox"
+                aria-checked={saveDepop}
+                className="flex items-center gap-3"
+              >
+                <span className="text-sm font-medium">Depop</span>
+                <span className={`w-6 h-6 rounded-[7px] flex items-center justify-center transition-colors ${saveDepop ? "bg-white" : "border-[1.5px] border-white/25"}`}>
+                  {saveDepop && <Check className="w-3.5 h-3.5 text-black" strokeWidth={3.5} />}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
 
         <button
