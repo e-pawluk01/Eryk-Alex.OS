@@ -6,7 +6,7 @@ import { generateSku } from "@/lib/sku";
 
 // Photos + an AI vision call + two Drive round-trips routinely take longer
 // than the platform's default function timeout — give it real headroom.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   // Tracked outside the try block so a failure after a SKU's been minted
