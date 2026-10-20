@@ -11,7 +11,6 @@ import { TaskDetailsPanel } from "@/components/task-details-panel";
 import { EventDetailsPanel } from "@/components/event-details-panel";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { AnalyticsView } from "@/components/analytics-view";
-import { ListingsView } from "@/components/listings-view";
 import { ActiveSessionWidget } from "@/components/active-session-widget";
 import { NewTaskDialog } from "@/components/new-task-dialog";
 import { NewGoalDialog } from "@/components/new-goal-dialog";
@@ -51,7 +50,6 @@ export default function Home() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [showListings, setShowListings] = useState(false);
   // Which Study page is open from the side tabs (null = Study home).
   const [studyPage, setStudyPage] = useState<"deadlines" | "materials" | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -389,9 +387,7 @@ export default function Home() {
       <StudyClock study={study} music={music} visible={currentDomain === "STUDY"} />
       <MusicPlayer music={music} inStudy={currentDomain === "STUDY"} />
       <LectureReminder events={events} />
-      {currentDomain === "WORK" && showListings ? (
-        <ListingsView />
-      ) : currentDomain === "WORK" && showAnalytics ? (
+      {currentDomain === "WORK" && showAnalytics ? (
         <AnalyticsView />
       ) : currentDomain === "STUDY" && studyPage === "deadlines" ? (
         <DeadlinesView study={study} />
@@ -692,10 +688,8 @@ export default function Home() {
         onAddEvent={handleAddEvent}
         onSelectTask={setSelectedTask}
         onSelectEvent={setSelectedEvent}
-        onAnalyticsToggle={() => { setShowAnalytics(!showAnalytics); setShowListings(false); }}
+        onAnalyticsToggle={() => setShowAnalytics(!showAnalytics)}
         showAnalytics={showAnalytics}
-        onListingsToggle={() => { setShowListings(!showListings); setShowAnalytics(false); }}
-        showListings={showListings}
         studyPage={studyPage}
         onStudyPageToggle={page => setStudyPage(studyPage === page ? null : page)}
       />
