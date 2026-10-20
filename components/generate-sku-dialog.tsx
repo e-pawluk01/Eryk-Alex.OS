@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Loader2, Check, AlertTriangle } from "lucide-react";
 import { SKU_CATEGORIES } from "@/lib/sku-categories";
 
@@ -49,7 +50,9 @@ export function GenerateSkuDialog({ isOpen, onClose, onGenerated }: GenerateSkuD
 
   if (!isOpen) return null;
 
-  return (
+  // Portalled to <body> so it centres on the screen, not inside the
+  // transformed Listings slide-over it's opened from.
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-md transition-opacity animate-in fade-in duration-300"
@@ -135,6 +138,7 @@ export function GenerateSkuDialog({ isOpen, onClose, onGenerated }: GenerateSkuD
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

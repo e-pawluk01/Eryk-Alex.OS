@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Check, AlertTriangle, X, ChevronDown } from "lucide-react";
+import { Loader2, Check, X, ChevronDown } from "lucide-react";
 import { GenerateSkuDialog } from "@/components/generate-sku-dialog";
 import { ListingPhotoPicker, PhotoSlot } from "@/components/listing-photo-picker";
-import { SkuGeneratedNotice } from "@/components/sku-generated-notice";
+import { ListingResultPopup, ListingResult } from "@/components/listing-result-popup";
 import { SKU_CATEGORIES } from "@/lib/sku-categories";
 import { LISTING_MODELS, ListingModelId } from "@/lib/listing-models";
 
@@ -28,22 +28,16 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
   const [saveDepop, setSaveDepop] = useState(true);
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState<string | null>(null);
-  const [depopLink, setDepopLink] = useState<string | null>(null);
-  const [vintedLink, setVintedLink] = useState<string | null>(null);
-  const [autoSkuNotice, setAutoSkuNotice] = useState<string | null>(null);
+  const [result, setResult] = useState<ListingResult | null>(null);
 
   const canGenerate = photos.length > 0 && !isGenerating;
 
   const generateListing = async () => {
     if (!saveVinted && !saveDepop) {
-      setGenerateError("Tick Vinted, Depop or both first.");
+      setResult({ kind: "failed", reason: "Tick Vinted, Depop or both first.", sku: null });
       return;
     }
     setIsGenerating(true);
-    setGenerateError(null);
-    setDepopLink(null);
-    setVintedLink(null);
     try {
       const formData = new FormData();
       if (sku) formData.set("sku", sku);
@@ -63,30 +57,26 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
       // say what actually happened instead of "couldn't reach the server".
       const data = await res.json().catch(() => null);
       if (!data) {
-        setGenerateError(
-          res.status === 504
-            ? "The server ran out of time before the listing was saved. If a SKU was made, type it into the SKU box before trying again."
-            : `The server failed (status ${res.status}). If a SKU was made, type it into the SKU box before trying again.`
-        );
+        const reason = res.status === 504
+          ? "The server ran out of time before the listing was saved."
+          : `The server failed (status ${res.status}).`;
+        setResult({ kind: "failed", reason: `${reason} If a SKU was made, check the sheet for it and type it into the SKU box before trying again.`, sku: null });
         return;
       }
 
       // The server only spends a SKU once the AI content has already
       // succeeded — if one comes back here, it's real and already in the
       // sheet, whether or not the rest of this request went on to succeed.
-      if (data.sku && data.newlyGeneratedSku) {
-        setSku(data.sku);
-        setAutoSkuNotice(data.sku);
-      }
+      // Keeping it means a retry reuses it rather than spending another.
+      if (data.sku && data.newlyGeneratedSku) setSku(data.sku);
 
       if (!res.ok) {
-        setGenerateError(data.error || "Failed to generate the listing.");
+        setResult({ kind: "failed", reason: data.error || "Failed to generate the listing.", sku: data.sku ?? null });
       } else {
-        setDepopLink(data.depopLink);
-        setVintedLink(data.vintedLink);
+        setResult({ kind: "saved", sku: data.sku, vintedLink: data.vintedLink, depopLink: data.depopLink });
       }
     } catch {
-      setGenerateError("Couldn't reach the server.");
+      setResult({ kind: "failed", reason: "Couldn't reach the server.", sku: null });
     } finally {
       setIsGenerating(false);
     }
@@ -212,7 +202,7 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
           {isPlatformsOpen && (
             <div className="flex items-center gap-10 px-4 pt-1 pb-[18px]">
               <button
-                onClick={() => { setSaveVinted(!saveVinted); setGenerateError(null); }}
+                onClick={() => setSaveVinted(!saveVinted)}
                 role="checkbox"
                 aria-checked={saveVinted}
                 className="flex items-center gap-3"
@@ -223,7 +213,7 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
                 </span>
               </button>
               <button
-                onClick={() => { setSaveDepop(!saveDepop); setGenerateError(null); }}
+                onClick={() => setSaveDepop(!saveDepop)}
                 role="checkbox"
                 aria-checked={saveDepop}
                 className="flex items-center gap-3"
@@ -245,34 +235,6 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
           {isGenerating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {isGenerating ? "Generating" : "Generate Listing"}
         </button>
-
-        {generateError && (
-          <div className="flex items-center gap-2 text-red-400/80 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5 text-xs">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>{generateError}</span>
-          </div>
-        )}
-
-        {(depopLink || vintedLink) && (
-          <div className="flex flex-col gap-2">
-            {depopLink && (
-              <div className="flex items-center justify-center gap-2 text-emerald-400/80 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2.5 text-xs">
-                <Check className="w-4 h-4 shrink-0" />
-                <a href={depopLink} target="_blank" rel="noreferrer" className="underline">
-                  Depop listing saved to Drive
-                </a>
-              </div>
-            )}
-            {vintedLink && (
-              <div className="flex items-center justify-center gap-2 text-emerald-400/80 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2.5 text-xs">
-                <Check className="w-4 h-4 shrink-0" />
-                <a href={vintedLink} target="_blank" rel="noreferrer" className="underline">
-                  Vinted listing saved to Drive
-                </a>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       <GenerateSkuDialog
@@ -281,7 +243,7 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
         onGenerated={(newSku) => setSku(newSku)}
       />
 
-      <SkuGeneratedNotice sku={autoSkuNotice} onClose={() => setAutoSkuNotice(null)} />
+      <ListingResultPopup result={result} onClose={() => setResult(null)} />
     </div>
   );
 }
