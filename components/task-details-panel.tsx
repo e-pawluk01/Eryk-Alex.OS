@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Task, ContextType } from "@/lib/types";
-import { X, Tag, AlignLeft, Calendar, Flag, Clock, Trash2, Users } from "lucide-react";
+import { X, Flag, Clock, Trash2, Users, Percent, Timer } from "lucide-react";
 import { useGlobalContext } from "./global-context";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
@@ -19,6 +19,35 @@ interface TaskDetailsPanelProps {
   onDelete: (id: string) => void;
 }
 
+const WIDTH_KEY = "task-panel-width";
+const MIN_WIDTH = 380;
+
+/** A switch row shown as just an icon; its name fades in on hover. */
+function IconSwitch({ icon: Icon, label, on, onToggle }: { icon: React.ElementType; label: string; on: boolean; onToggle: () => void }) {
+  return (
+    <div className="flex items-center justify-between group py-2">
+      <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors" title={label}>
+        <Icon className="w-4 h-4" />
+        <span className="text-[9px] uppercase tracking-widest font-semibold opacity-0 group-hover:opacity-100 transition-opacity">{label}</span>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={label}
+        className={cn(
+          "w-8 h-4 rounded-full transition-colors relative",
+          on ? "bg-white" : "bg-white/10"
+        )}
+      >
+        <div className={cn(
+          "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
+          on ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
+        )} />
+      </button>
+    </div>
+  );
+}
+
 export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: TaskDetailsPanelProps) {
   const { userEmail } = useGlobalContext();
   const userContextName = (userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk") as ContextType;
@@ -27,8 +56,10 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
   const [titleDraft, setTitleDraft] = useState("");
   const [descDraft, setDescDraft] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isTitleAtEnd, setIsTitleAtEnd] = useState(true);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  // Panel width: drag its left edge; remembered for next time.
+  const [width, setWidth] = useState(448);
+  const [resizing, setResizing] = useState(false);
   // Time Limit can be switched on before any time is typed in.
   const [limitOn, setLimitOn] = useState(false);
 
@@ -55,16 +86,45 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
     }
   };
 
-  const checkScroll = () => {
-    if (titleInputRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = titleInputRef.current;
-      setIsTitleAtEnd(Math.abs(scrollWidth - clientWidth - scrollLeft) <= 2);
-    }
+  // Long titles wrap onto more lines; the box grows to fit.
+  const growTitle = () => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
   };
+  useEffect(growTitle, [titleDraft, isOpen, width]);
 
   useEffect(() => {
-    checkScroll();
-  }, [titleDraft, isOpen]);
+    try {
+      const saved = parseInt(localStorage.getItem(WIDTH_KEY) ?? "");
+      if (saved) setWidth(saved);
+    } catch { /* optional */ }
+  }, []);
+
+  useEffect(() => {
+    if (!resizing) return;
+    const move = (e: PointerEvent) => {
+      const max = Math.min(960, window.innerWidth - 40);
+      setWidth(Math.round(Math.max(MIN_WIDTH, Math.min(max, window.innerWidth - e.clientX))));
+    };
+    const up = () => setResizing(false);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [resizing]);
+
+  useEffect(() => {
+    if (resizing) return;
+    try { localStorage.setItem(WIDTH_KEY, String(width)); } catch { /* optional */ }
+  }, [resizing, width]);
 
   if (!task) return null;
   const isStudy = task.domain === "STUDY";
@@ -84,28 +144,36 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
       />
 
       {/* Slide-over panel */}
-      <div className="fixed inset-y-0 right-0 w-full max-w-md bg-black/80 backdrop-blur-2xl border-l border-white/10 z-[70] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+      <div
+        className="fixed inset-y-0 right-0 max-w-full bg-black/80 backdrop-blur-2xl border-l border-white/10 z-[70] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300"
+        style={{ width }}
+      >
+        {/* Drag handle on the left edge */}
+        <div
+          onPointerDown={e => { e.preventDefault(); setResizing(true); }}
+          title="Drag to resize"
+          className="absolute -left-1.5 top-0 bottom-0 w-3 cursor-col-resize group z-10"
+        >
+          <div className={cn(
+            "absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-1 rounded-full transition-all",
+            resizing ? "h-16 bg-white/40" : "h-10 bg-white/10 group-hover:h-16 group-hover:bg-white/40"
+          )} />
+        </div>
         
         {/* Header */}
         <div className="flex flex-col gap-4 p-6 border-b border-white/5 relative">
           
           <div className="flex items-start justify-between gap-4">
-            {/* Title with conditional gradient fade */}
-            <div className={cn(
-              "flex-1 relative transition-all duration-300",
-              !isTitleAtEnd && "[mask-image:linear-gradient(to_right,black_85%,transparent_100%)]"
-            )}>
-              <input 
-                ref={titleInputRef}
-                type="text"
-                value={titleDraft}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                onScroll={checkScroll}
-                onBlur={handleTitleBlur}
-                className="w-full bg-transparent text-xl font-semibold text-white outline-none placeholder:text-muted-foreground"
-                placeholder="Task title..."
-              />
-            </div>
+            <textarea
+              ref={titleRef}
+              rows={1}
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
+              onBlur={handleTitleBlur}
+              className="flex-1 min-w-0 bg-transparent text-xl font-semibold text-white outline-none resize-none overflow-hidden leading-snug placeholder:text-muted-foreground"
+              placeholder="Task title..."
+            />
             
             <button onClick={onClose} className="p-1.5 -mr-1.5 hover:bg-white/10 rounded-full transition-colors text-muted-foreground hover:text-white shrink-0">
               <X className="w-5 h-5" />
@@ -132,8 +200,7 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
 
         {/* Body (Plain Text Note) */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col">
-          <div className="flex flex-col gap-2 mb-6">
-            <span className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Tag</span>
+          <div className="mb-6">
             <TagPicker value={task.tag_id ?? null} onChange={id => onUpdate(task.id, { tag_id: id })} />
           </div>
           <textarea
@@ -149,29 +216,7 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
         <div className="p-6 bg-zinc-950/50 border-t border-white/5 flex flex-col gap-4 shrink-0">
           
           {/* Time Limit (Study only): work on it for this long, then it ticks itself off */}
-          {isStudy && (
-            <div className="flex items-center justify-between group py-2">
-              <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
-                <span className="text-[9px] uppercase tracking-widest font-semibold">
-                  Time Limit
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={toggleLimit}
-                aria-label="Time limit"
-                className={cn(
-                  "w-8 h-4 rounded-full transition-colors relative",
-                  limitOn ? "bg-white" : "bg-white/10"
-                )}
-              >
-                <div className={cn(
-                  "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
-                  limitOn ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
-                )} />
-              </button>
-            </div>
-          )}
+          {isStudy && <IconSwitch icon={Timer} label="Time limit" on={limitOn} onToggle={toggleLimit} />}
           {timed && (
             <TimeLimitFields
               key={task.id}
@@ -182,51 +227,17 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
 
           {/* Extra Options (hidden for timed tasks: the time bar shows progress) */}
           {!timed && (
-            <div className="flex items-center justify-between group py-2">
-              <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
-                <span className="text-[9px] uppercase tracking-widest font-semibold">
-                  Track Progress
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => onUpdate(task.id, { track_progress: !task.track_progress, progress: !task.track_progress ? 0 : task.progress })}
-                className={cn(
-                  "w-8 h-4 rounded-full transition-colors relative",
-                  task.track_progress ? "bg-white" : "bg-white/10"
-                )}
-              >
-                <div className={cn(
-                  "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
-                  task.track_progress ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
-                )} />
-              </button>
-            </div>
+            <IconSwitch
+              icon={Percent}
+              label="Track progress"
+              on={!!task.track_progress}
+              onToggle={() => onUpdate(task.id, { track_progress: !task.track_progress, progress: !task.track_progress ? 0 : task.progress })}
+            />
           )}
 
           {/* Joint Task Toggle (WORK only) */}
           {task.domain === "WORK" && (
-            <div className="flex items-center justify-between group py-2">
-              <div className="flex items-center gap-2 text-white/30 group-hover:text-white/60 transition-colors">
-                <Users className="w-3 h-3" />
-                <span className="text-[9px] uppercase tracking-widest font-semibold">
-                  Joint Task
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => onUpdate(task.id, { is_joint: !task.is_joint })}
-                className={cn(
-                  "w-8 h-4 rounded-full transition-colors relative",
-                  task.is_joint ? "bg-white" : "bg-white/10"
-                )}
-              >
-                <div className={cn(
-                  "absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300",
-                  task.is_joint ? "left-[18px] bg-black" : "left-0.5 bg-white/50"
-                )} />
-              </button>
-            </div>
+            <IconSwitch icon={Users} label="Joint task" on={!!task.is_joint} onToggle={() => onUpdate(task.id, { is_joint: !task.is_joint })} />
           )}
           
           {/* Bottom Actions: play, time bar and delete for a timed task; just delete otherwise */}

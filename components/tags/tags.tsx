@@ -1,8 +1,8 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Pencil, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { TASK_COLORS } from "@/lib/work-sessions";
@@ -83,12 +83,6 @@ export function TagChip({ tagId, className }: { tagId: string | null | undefined
   );
 }
 
-const pill = (active: boolean) =>
-  cn(
-    "inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border transition-colors",
-    active ? "text-white bg-white/[0.06]" : "border-border text-muted-foreground hover:text-white hover:border-white/20"
-  );
-
 function ColorSwatches({ value, onChange }: { value: string; onChange: (c: string) => void }) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -106,71 +100,125 @@ function ColorSwatches({ value, onChange }: { value: string; onChange: (c: strin
   );
 }
 
-/** Pick a tag, make a new one, or open the tag manager. */
+/**
+ * The chosen tag plus a small round button that opens the tag list: search,
+ * pick, make a new one by typing its name, or open the tag manager.
+ */
 export function TagPicker({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
   const { tags, addTag } = useTags();
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [color, setColor] = useState(TAG_COLORS[0]);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [managing, setManaging] = useState(false);
   const [saving, setSaving] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
 
-  const startCreating = () => {
-    const used = tags.map(t => t.color);
-    setColor(TAG_COLORS.find(c => !used.includes(c)) ?? TAG_COLORS[0]);
-    setName("");
-    setCreating(true);
-  };
+  // Clicking anywhere else closes the list.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!boxRef.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
 
-  const save = async () => {
-    if (!name.trim() || saving) return;
+  const q = query.trim().toLowerCase();
+  const matches = tags.filter(t => t.name.toLowerCase().includes(q));
+  const exact = tags.some(t => t.name.toLowerCase() === q);
+  const used = tags.map(t => t.color);
+  const nextColor = TAG_COLORS.find(c => !used.includes(c)) ?? TAG_COLORS[tags.length % TAG_COLORS.length];
+
+  const pick = (id: string | null) => { onChange(id); setOpen(false); setQuery(""); };
+
+  // New tags take the next unused colour; it can be changed in the tag manager.
+  const make = async () => {
+    if (!query.trim() || saving) return;
     setSaving(true);
     try {
-      const tag = await addTag(name.trim(), color);
-      onChange(tag.id);
-      setCreating(false);
+      const tag = await addTag(query.trim(), nextColor);
+      pick(tag.id);
     } catch (err) {
       console.error("Failed to add tag:", err);
     }
     setSaving(false);
   };
 
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!q) return;
+      const hit = tags.find(t => t.name.toLowerCase() === q) ?? matches[0];
+      if (hit) pick(hit.id); else make();
+    }
+  };
+
+  const row = (active: boolean) =>
+    cn(
+      "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-left transition-colors",
+      active ? "bg-white/[0.06] text-white" : "text-white/70 hover:bg-white/5 hover:text-white"
+    );
+
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2 items-center">
-        {tags.map(t => (
-          <button key={t.id} type="button" onClick={() => onChange(t.id)} className={pill(value === t.id)} style={value === t.id ? { borderColor: t.color } : undefined}>
-            <span className="inline-block w-2 h-2 rounded-full" style={{ background: t.color }} />
-            {t.name}
-          </button>
-        ))}
-        <button type="button" onClick={() => onChange(null)} className={cn(pill(value === null), value === null && "border-white/35")}>No tag</button>
-        {!creating && (
-          <button type="button" onClick={startCreating} className="inline-flex text-xs px-3 py-1.5 rounded-lg border border-dashed border-border text-muted-foreground hover:text-white">
-            + New tag
-          </button>
-        )}
-        {tags.length > 0 && !creating && (
-          <button type="button" onClick={() => setManaging(true)} className="p-1.5 rounded-md text-white/30 hover:text-white hover:bg-white/10" title="Edit tags" aria-label="Edit tags">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-        )}
+    <div className="relative w-max" ref={boxRef}>
+      <div className="flex items-center gap-2">
+        <TagChip tagId={value} className="text-[10px] px-2 py-1" />
+        <button
+          type="button"
+          onClick={() => { setOpen(!open); setQuery(""); }}
+          aria-label={value ? "Change tag" : "Add a tag"}
+          title={value ? "Change tag" : "Add a tag"}
+          className={cn(
+            "w-6 h-6 rounded-full border grid place-items-center transition-all",
+            open ? "border-white/30 bg-white/10 text-white" : "border-white/10 text-white/40 hover:border-white/30 hover:bg-white/5 hover:text-white"
+          )}
+        >
+          {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
       </div>
-      {creating && (
-        <div className="flex flex-col gap-3 border border-white/10 rounded-lg p-3 bg-black/30">
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 w-64 p-1.5 bg-[#111] border border-white/10 rounded-xl shadow-2xl shadow-black/60 z-[150] flex flex-col">
           <input
             type="text"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); save(); } }}
-            placeholder="Tag name, e.g. Lecture"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={onKey}
+            placeholder="Find or make a tag…"
             autoFocus
-            className="bg-transparent border-b border-white/10 pb-1.5 text-sm text-white outline-none focus:border-white/30"
+            autoComplete="off"
+            className="bg-transparent px-2.5 py-2 text-xs text-white outline-none placeholder:text-white/25 border-b border-white/[0.06] mb-1"
           />
-          <ColorSwatches value={color} onChange={setColor} />
-          <div className="flex gap-2">
-            <button type="button" onClick={save} disabled={!name.trim() || saving} className="px-3 py-1.5 bg-white text-black rounded-lg text-[10px] uppercase tracking-widest font-bold disabled:opacity-50">Save tag</button>
-            <button type="button" onClick={() => setCreating(false)} className="px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold text-white/50 hover:text-white">Cancel</button>
+          <div className="max-h-[212px] overflow-y-auto flex flex-col hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {!q && (
+              <button type="button" onClick={() => pick(null)} className={row(value === null)}>
+                <span className="w-2 h-2 rounded-full border border-white/30 shrink-0" />
+                <span className="flex-1">No tag</span>
+                {value === null && <Check className="w-3.5 h-3.5 text-white/60" />}
+              </button>
+            )}
+            {matches.map(t => (
+              <button key={t.id} type="button" onClick={() => pick(t.id)} className={row(value === t.id)}>
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
+                <span className="flex-1 truncate">{t.name}</span>
+                {value === t.id && <Check className="w-3.5 h-3.5 text-white/60" />}
+              </button>
+            ))}
+            {q && !exact && (
+              <button type="button" onClick={make} disabled={saving} className={row(false)}>
+                <Plus className="w-3.5 h-3.5 text-white/50" />
+                <span className="flex-1">Make “{query.trim()}”</span>
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: nextColor }} />
+              </button>
+            )}
+          </div>
+          <div className="border-t border-white/[0.06] mt-1 pt-1">
+            <button
+              type="button"
+              onClick={() => { setOpen(false); setManaging(true); }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-white/40 hover:text-white hover:bg-white/5 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit tags
+            </button>
           </div>
         </div>
       )}

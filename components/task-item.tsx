@@ -5,7 +5,7 @@ import { Task } from "@/lib/types";
 import { CustomCheckbox } from "./ui/custom-checkbox";
 import { cn } from "@/lib/utils";
 import { differenceInDays, startOfDay } from "date-fns";
-import { Repeat, Users } from "lucide-react";
+import { Pin, Repeat, Users } from "lucide-react";
 import { ProgressSlider } from "./ui/progress-slider";
 import { TagChip } from "./tags/tags";
 
@@ -14,9 +14,10 @@ interface TaskItemProps {
   onToggleStatus: (id: string, newStatus: "todo" | "done") => void;
   onSelect?: (task: Task) => void;
   onUpdate?: (id: string, updates: Partial<Task>) => void;
+  noTick?: boolean; // Kanban cards: the column says whether it's done
 }
 
-export function TaskItem({ task, onToggleStatus, onSelect, onUpdate }: TaskItemProps) {
+export function TaskItem({ task, onToggleStatus, onSelect, onUpdate, noTick }: TaskItemProps) {
 
   let daysLeftText = "";
   let colorClass = "text-muted-foreground";
@@ -61,7 +62,7 @@ export function TaskItem({ task, onToggleStatus, onSelect, onUpdate }: TaskItemP
           if (onSelect) onSelect(task);
         }}
       >
-        {!task.track_progress && (
+        {!noTick && (
           <div className="pt-0.5 relative z-10" onClick={e => e.stopPropagation()}>
             <CustomCheckbox 
               checked={task.status === "done"} 
@@ -102,7 +103,7 @@ export function TaskItem({ task, onToggleStatus, onSelect, onUpdate }: TaskItemP
           )}
           {task.track_progress && !(task.domain === "STUDY" && task.time_limit_minutes) && (
             <ProgressSlider 
-              progress={task.progress || 0}
+              progress={task.status === "done" ? 100 : task.progress || 0}
               colorClass={task.color}
               onChange={(p) => {
                 // Optimistic visual update handled internally by slider
@@ -129,6 +130,22 @@ export function TaskItem({ task, onToggleStatus, onSelect, onUpdate }: TaskItemP
             </span>
             {dotClass && <div className={cn("w-2 h-2 rounded-full", dotClass)} />}
           </div>
+        )}
+
+        {/* Pin: keeps the task at the top of its list */}
+        {onUpdate && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onUpdate(task.id, { pinned: !task.pinned }); }}
+            title={task.pinned ? "Unpin" : "Pin to top"}
+            aria-label={task.pinned ? "Unpin" : "Pin to top"}
+            className={cn(
+              "pt-0.5 -mr-1 shrink-0 transition-opacity relative z-10",
+              task.pinned ? "text-white/80" : "opacity-0 group-hover:opacity-100 text-white/30 hover:text-white"
+            )}
+          >
+            <Pin className={cn("w-3.5 h-3.5", task.pinned && "fill-current")} />
+          </button>
         )}
       </div>
     </div>
