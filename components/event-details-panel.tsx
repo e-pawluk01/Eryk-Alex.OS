@@ -93,7 +93,7 @@ export function EventDetailsPanel({ event, isOpen, onClose, onUpdate, onDelete }
         {/* Body (Plain Text Note) */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col relative">
           <div className="mb-6">
-            <TagPicker value={event.tag_id ?? null} onChange={id => onUpdate(event.id, { tag_id: id })} />
+            <TagPicker domain={event.domain ?? "WORK"} value={event.tag_id ?? null} onChange={id => onUpdate(event.id, { tag_id: id })} />
           </div>
           <span className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-4">Note</span>
           <textarea

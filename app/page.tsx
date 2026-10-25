@@ -305,7 +305,7 @@ export default function Home() {
   }
 
   return (
-    <TagsProvider>
+    <TagsProvider me={me}>
     <div className="flex flex-col gap-12 mt-4 pb-20">
       {currentDomain === "WORK" && (
         <ActiveSessionWidget music={music} />

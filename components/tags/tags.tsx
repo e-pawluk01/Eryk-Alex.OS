@@ -8,11 +8,15 @@ import { cn } from "@/lib/utils";
 import { TASK_COLORS } from "@/lib/work-sessions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-// Reusable coloured labels for events and tasks. One shared list for both of you.
+// Reusable coloured labels for events and tasks. Work has one list shared by
+// both of you; Study tags belong to one person, like the rest of Study.
+export type TagDomain = "WORK" | "STUDY";
 export interface Tag {
   id: string;
   name: string;
   color: string; // hex
+  domain: TagDomain;
+  person: string | null; // Study tags only
   created_at: string;
 }
 
@@ -21,7 +25,7 @@ export const TAG_COLORS = Object.values(TASK_COLORS);
 
 interface TagsContextValue {
   tags: Tag[];
-  addTag: (name: string, color: string) => Promise<Tag>;
+  addTag: (name: string, color: string, domain: TagDomain) => Promise<Tag>;
   updateTag: (id: string, updates: Partial<Pick<Tag, "name" | "color">>) => Promise<void>;
   deleteTag: (id: string) => Promise<void>;
 }
@@ -33,22 +37,26 @@ const TagsContext = createContext<TagsContextValue>({
   deleteTag: async () => {},
 });
 
-export function TagsProvider({ children }: { children: React.ReactNode }) {
+/** Loads Work's tags and your own Study tags. */
+export function TagsProvider({ me, children }: { me: string | null; children: React.ReactNode }) {
   const [tags, setTags] = useState<Tag[]>([]);
 
   useEffect(() => {
-    supabase.from("tags").select("*").order("created_at").then(({ data, error }) => {
+    if (!me) return;
+    supabase.from("tags").select("*").or(`domain.eq.WORK,and(domain.eq.STUDY,person.eq.${me})`).order("created_at").then(({ data, error }) => {
       if (error) console.error("Failed to load tags:", error);
       else setTags(data as Tag[]);
     });
-  }, []);
+  }, [me]);
 
-  const addTag = useCallback(async (name: string, color: string) => {
-    const { data, error } = await supabase.from("tags").insert({ name, color }).select().single();
+  const addTag = useCallback(async (name: string, color: string, domain: TagDomain) => {
+    const { data, error } = await supabase.from("tags")
+      .insert({ name, color, domain, person: domain === "STUDY" ? me : null })
+      .select().single();
     if (error) throw error;
     setTags(prev => [...prev, data as Tag]);
     return data as Tag;
-  }, []);
+  }, [me]);
 
   const updateTag = useCallback(async (id: string, updates: Partial<Pick<Tag, "name" | "color">>) => {
     setTags(prev => prev.map(t => (t.id === id ? { ...t, ...updates } : t)));
@@ -104,8 +112,9 @@ function ColorSwatches({ value, onChange }: { value: string; onChange: (c: strin
  * The chosen tag plus a small round button that opens the tag list: search,
  * pick, make a new one by typing its name, or open the tag manager.
  */
-export function TagPicker({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
-  const { tags, addTag } = useTags();
+export function TagPicker({ value, onChange, domain }: { value: string | null; onChange: (id: string | null) => void; domain: TagDomain }) {
+  const { tags: allTags, addTag } = useTags();
+  const tags = allTags.filter(t => t.domain === domain);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [managing, setManaging] = useState(false);
@@ -133,7 +142,7 @@ export function TagPicker({ value, onChange }: { value: string | null; onChange:
     if (!query.trim() || saving) return;
     setSaving(true);
     try {
-      const tag = await addTag(query.trim(), nextColor);
+      const tag = await addTag(query.trim(), nextColor, domain);
       pick(tag.id);
     } catch (err) {
       console.error("Failed to add tag:", err);
@@ -222,14 +231,15 @@ export function TagPicker({ value, onChange }: { value: string | null; onChange:
           </div>
         </div>
       )}
-      {managing && <TagManager onClose={() => setManaging(false)} />}
+      {managing && <TagManager domain={domain} onClose={() => setManaging(false)} />}
     </div>
   );
 }
 
 /** Rename, recolour or delete tags. */
-export function TagManager({ onClose }: { onClose: () => void }) {
-  const { tags, updateTag, deleteTag } = useTags();
+export function TagManager({ domain, onClose }: { domain: TagDomain; onClose: () => void }) {
+  const { tags: allTags, updateTag, deleteTag } = useTags();
+  const tags = allTags.filter(t => t.domain === domain);
   const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [color, setColor] = useState(TAG_COLORS[0]);

@@ -201,7 +201,7 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
         {/* Body (Plain Text Note) */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col">
           <div className="mb-6">
-            <TagPicker value={task.tag_id ?? null} onChange={id => onUpdate(task.id, { tag_id: id })} />
+            <TagPicker domain={task.domain ?? "WORK"} value={task.tag_id ?? null} onChange={id => onUpdate(task.id, { tag_id: id })} />
           </div>
           <textarea
             value={descDraft}
