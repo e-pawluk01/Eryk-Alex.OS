@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import { Goal, Task, Event, Topic, ContextType } from "@/lib/types";
+import { Task, Event, Topic, ContextType } from "@/lib/types";
 import { useGlobalContext, DomainType } from "@/components/global-context";
 import { cn } from "@/lib/utils";
 import { ContextTag } from "@/components/ui/context-tag";
@@ -13,10 +13,10 @@ import { CalendarPanel } from "@/components/calendar-panel";
 import { AnalyticsView } from "@/components/analytics-view";
 import { ActiveSessionWidget } from "@/components/active-session-widget";
 import { NewTaskDialog } from "@/components/new-task-dialog";
-import { NewGoalDialog } from "@/components/new-goal-dialog";
 import { NewTopicDialog } from "@/components/new-topic-dialog";
 import { TopicItem } from "@/components/topic-item";
-import { HallOfFamePanel } from "@/components/hall-of-fame-panel";
+import { WorkUpcoming } from "@/components/work-upcoming";
+import { TaskKanban } from "@/components/task-kanban";
 import { useStudy } from "@/components/study/use-study";
 import { UpcomingStrip } from "@/components/study/upcoming-strip";
 import { DeadlinesView } from "@/components/study/deadlines-view";
@@ -27,11 +27,9 @@ import { MusicPlayer } from "@/components/study/music-player";
 import { LectureReminder } from "@/components/study/lecture-reminder";
 import { TagsProvider } from "@/components/tags/tags";
 import { ModuleDot } from "@/components/study/bits";
-import { CustomCheckbox } from "@/components/ui/custom-checkbox";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { rolloverTasks } from "@/lib/task-rollover";
-import { isToday, isTomorrow, isAfter, isBefore, startOfDay, addDays, isSameDay, format, subDays, parseISO, differenceInDays } from "date-fns";
-import { Clock, Trophy, Pencil, X, Plus, Trash2 } from "lucide-react";
+import { startOfDay, addDays, isSameDay, format, parseISO, differenceInDays } from "date-fns";
+import { Plus } from "lucide-react";
 
 export default function Home() {
   const { currentDomain, userEmail } = useGlobalContext();
@@ -42,7 +40,6 @@ export default function Home() {
     STUDY: [userContextName as ContextType],
   }), [userContextName]);
 
-  const [goals, setGoals] = useState<Goal[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -54,13 +51,15 @@ export default function Home() {
   const [studyPage, setStudyPage] = useState<"deadlines" | "materials" | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
-  const [isHallOfFameOpen, setIsHallOfFameOpen] = useState(false);
-  const goalsScrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollGoalsLeft, setCanScrollGoalsLeft] = useState(false);
-  const [canScrollGoalsRight, setCanScrollGoalsRight] = useState(false);
-  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
-  const [editingGoalTitle, setEditingGoalTitle] = useState("");
-  const [isDeleteGoalOpen, setIsDeleteGoalOpen] = useState(false);
+  // Today in Work: both of you side by side, or your own Kanban board.
+  const [todayView, setTodayView] = useState<"overview" | "kanban">("overview");
+  useEffect(() => {
+    try { if (localStorage.getItem("work-today-view") === "kanban") setTodayView("kanban"); } catch { /* optional */ }
+  }, []);
+  const pickTodayView = (v: "overview" | "kanban") => {
+    setTodayView(v);
+    try { localStorage.setItem("work-today-view", v); } catch { /* optional */ }
+  };
 
   // Work is shared; Study belongs to whoever is logged in. Only that person's
   // Study rows are downloaded or kept from live updates.
@@ -69,9 +68,6 @@ export default function Home() {
     (row.domain || "WORK") === "WORK" || row.context === me;
   const study = useStudy(me);
   const music = useMusic(me);
-  const isMyGoal = (g: { context: string }) =>
-    ["WORK", "Reselling", "Drink idea"].includes(g.context) || g.context === me;
-
   useEffect(() => {
     if (!me) return;
     const workOrMine = `domain.is.null,domain.eq.WORK,and(domain.eq.STUDY,context.eq.${me})`;
@@ -79,19 +75,16 @@ export default function Home() {
       try {
         // Tidy up past days first so the list loads already rolled over.
         await rolloverTasks(supabase).catch(err => console.error("Task rollover failed:", err));
-        const [goalsRes, tasksRes, eventsRes, topicsRes] = await Promise.all([
-          supabase.from("goals").select("*").or(`context.in.(WORK,Reselling,"Drink idea"),context.eq.${me}`).order("year", { ascending: false }),
+        const [tasksRes, eventsRes, topicsRes] = await Promise.all([
           supabase.from("tasks").select("*").or(workOrMine).order("created_at", { ascending: false }),
           supabase.from("events").select("*").or(workOrMine).order("event_date", { ascending: true }),
           supabase.from("study_topics").select("*").eq("context", me).order("next_review_date", { ascending: true }),
         ]);
 
-        if (goalsRes.error) throw goalsRes.error;
         if (tasksRes.error) throw tasksRes.error;
         if (eventsRes.error) throw eventsRes.error;
         if (topicsRes.error) throw topicsRes.error;
 
-        setGoals(goalsRes.data as Goal[]);
         setTasks(tasksRes.data as Task[]);
         setEvents(eventsRes.data as Event[]);
         setTopics(topicsRes.data as Topic[]);
@@ -170,20 +163,6 @@ export default function Home() {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'goals' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            if (!isMyGoal(payload.new as Goal)) return;
-            setGoals(prev => prev.some(g => g.id === payload.new.id) ? prev : [payload.new as Goal, ...prev].sort((a, b) => b.year - a.year));
-          } else if (payload.eventType === 'UPDATE') {
-            setGoals(prev => prev.map(g => g.id === payload.new.id ? { ...g, ...(payload.new as Partial<Goal>) } : g));
-          } else if (payload.eventType === 'DELETE') {
-            setGoals(prev => prev.filter(g => g.id !== payload.old.id));
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
         { event: '*', schema: 'public', table: 'study_topics' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
@@ -209,14 +188,19 @@ export default function Home() {
     };
   }, [me]);
 
+  // Ticking or unticking takes a task out of In progress. A ticked progress-bar
+  // task shows a full bar; unticking one that was dragged to 100% empties it.
   const handleToggleStatus = async (id: string, newStatus: "todo" | "done") => {
+    const task = tasks.find(t => t.id === id);
+    const updates: Partial<Task> = { status: newStatus, in_progress: false };
+    if (newStatus === "todo" && task?.track_progress && (task.progress ?? 0) >= 100) updates.progress = 0;
     setTasks(prev => 
-      prev.map(t => t.id === id ? { ...t, status: newStatus } : t)
+      prev.map(t => t.id === id ? { ...t, ...updates } : t)
     );
     if (selectedTask?.id === id) {
-      setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
+      setSelectedTask(prev => prev ? { ...prev, ...updates } : null);
     }
-    await supabase.from("tasks").update({ status: newStatus }).eq("id", id);
+    await supabase.from("tasks").update(updates).eq("id", id);
   };
 
   const handleUpdateTask = async (id: string, updates: Partial<Task>) => {
@@ -241,32 +225,6 @@ export default function Home() {
 
   const handleAddEvent = (newEvent: Event) => {
     setEvents(prev => [...prev, newEvent].sort((a, b) => parseISO(a.event_date).getTime() - parseISO(b.event_date).getTime()));
-  };
-
-  const handleToggleGoalStatus = async (id: string, newStatus: "active" | "completed") => {
-    setGoals(prev => prev.map(g => g.id === id ? { ...g, status: newStatus } : g));
-    await supabase.from("goals").update({ status: newStatus }).eq("id", id);
-  };
-
-  const handleUpdateGoalTitle = async (id: string) => {
-    if (!editingGoalTitle.trim()) {
-      setEditingGoalId(null);
-      return;
-    }
-    setGoals(prev => prev.map(g => g.id === id ? { ...g, title: editingGoalTitle } : g));
-    await supabase.from("goals").update({ title: editingGoalTitle.trim() }).eq("id", id);
-    setEditingGoalId(null);
-  };
-
-  const handleDeleteGoal = async (id: string) => {
-    setGoals(prev => prev.filter(g => g.id !== id));
-    setEditingGoalId(null);
-    setEditingGoalTitle("");
-    await supabase.from("goals").delete().eq("id", id);
-  };
-
-  const handleAddGoal = (newGoal: Goal) => {
-    setGoals(prev => [newGoal, ...prev].sort((a, b) => b.year - a.year));
   };
 
   const filteredTopics = useMemo(() => {
@@ -299,15 +257,6 @@ export default function Home() {
     await supabase.from("events").delete().eq("id", id);
   };
 
-  const filteredGoals = useMemo(() => {
-    // If a goal was created previously under 'Reselling' or 'Drink idea', treat it as 'WORK'
-    return goals.filter(g => 
-      g.context === currentDomain || 
-      (currentDomain === "WORK" && ["Reselling", "Drink idea"].includes(g.context)) ||
-      (currentDomain === "STUDY" && g.context === userContextName)
-    );
-  }, [goals, currentDomain, userContextName]);
-
   const filteredTasks = useMemo(() => {
     const valid = DOMAIN_MAP[currentDomain];
     return tasks.filter(t => valid.includes(t.context) && (t.domain || "WORK") === currentDomain);
@@ -318,37 +267,14 @@ export default function Home() {
     return events.filter(e => valid.includes(e.context) && (e.domain || "WORK") === currentDomain);
   }, [events, currentDomain]);
 
-  const upcomingEvents = useMemo(() => {
-    return filteredEvents
-      .filter(e => {
-        const date = parseISO(e.event_date);
-        return isAfter(date, subDays(new Date(), 1)) && isBefore(date, addDays(new Date(), 8));
-      }) // include today up to 7 days in the future
-      .sort((a, b) => parseISO(a.event_date).getTime() - parseISO(b.event_date).getTime())
-      .slice(0, 3); // next 3 upcoming within a week
-  }, [filteredEvents]);
-
-  const checkGoalsScroll = () => {
-    if (goalsScrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = goalsScrollRef.current;
-      setCanScrollGoalsLeft(scrollLeft > 0);
-      setCanScrollGoalsRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth);
-    }
-  };
-
-  useEffect(() => {
-    checkGoalsScroll();
-    window.addEventListener('resize', checkGoalsScroll);
-    return () => window.removeEventListener('resize', checkGoalsScroll);
-  }, [filteredGoals]);
-
   // Tasks mapped for the rail
   const topLevelTasks = filteredTasks.filter(t => !t.parent_id);
 
   // Filter tasks for the selected date
-  const selectedDayTasks = filteredTasks.filter(t => 
-    t.scheduled_date && isSameDay(new Date(t.scheduled_date), selectedDate)
-  );
+  // Pinned tasks first, otherwise in the usual order.
+  const selectedDayTasks = filteredTasks
+    .filter(t => t.scheduled_date && isSameDay(new Date(t.scheduled_date), selectedDate))
+    .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
 
   // Filter topics for user
   const userTopics = useMemo(() => {
@@ -382,10 +308,10 @@ export default function Home() {
     <TagsProvider>
     <div className="flex flex-col gap-12 mt-4 pb-20">
       {currentDomain === "WORK" && (
-        <ActiveSessionWidget />
+        <ActiveSessionWidget music={music} />
       )}
       <StudyClock study={study} music={music} visible={currentDomain === "STUDY"} />
-      <MusicPlayer music={music} inStudy={currentDomain === "STUDY"} />
+      <MusicPlayer music={music} />
       <LectureReminder events={events} />
       {currentDomain === "WORK" && showAnalytics ? (
         <AnalyticsView />
@@ -398,76 +324,7 @@ export default function Home() {
       {currentDomain === "STUDY" ? (
         <UpcomingStrip study={study} events={events} onSelectEvent={setSelectedEvent} />
       ) : (
-      /* GOALS SECTION */
-      <section className="flex flex-col gap-4">
-        <div className="flex items-center justify-between border-b border-border pb-2">
-          <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Goals</h2>
-          <button 
-            onClick={() => setIsHallOfFameOpen(true)}
-            className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-semibold text-yellow-500/70 hover:text-yellow-500 transition-colors bg-yellow-500/10 px-2 py-1 rounded"
-          >
-            <Trophy className="w-3 h-3" />
-            Hall of Goals
-          </button>
-        </div>
-        
-        <div className="relative w-full">
-          {/* Fade indicators */}
-          <div className={cn(
-            "absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none transition-opacity duration-300",
-            canScrollGoalsLeft ? "opacity-100" : "opacity-0"
-          )} />
-          <div className={cn(
-            "absolute right-0 top-0 bottom-4 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none transition-opacity duration-300",
-            canScrollGoalsRight ? "opacity-100" : "opacity-0"
-          )} />
-          
-          <div 
-            ref={goalsScrollRef}
-            onScroll={checkGoalsScroll}
-            className="flex gap-4 overflow-x-auto pb-4 px-2 snap-x snap-mandatory hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-          >
-            {filteredGoals.filter(g => g.status !== "completed").map(goal => (
-              <div key={goal.id} className="w-[280px] snap-start shrink-0 bg-card border border-border p-4 rounded-lg flex flex-col gap-3 justify-between group hover:border-primary/20 transition-colors relative">
-                
-                {editingGoalId !== goal.id && (
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setEditingGoalTitle(goal.title);
-                      setEditingGoalId(goal.id);
-                    }}
-                    className="absolute top-3 right-3 p-1.5 bg-background/80 hover:bg-white/10 rounded-md text-white/40 hover:text-white opacity-0 group-hover:opacity-100 transition-all z-20 backdrop-blur-sm"
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </button>
-                )}
-
-                <div className="flex gap-3">
-                  <div className="pt-0.5 shrink-0">
-                    <CustomCheckbox 
-                      checked={goal.status === "completed"} 
-                      onChange={(checked) => handleToggleGoalStatus(goal.id, checked ? "completed" : "active")} 
-                    />
-                  </div>
-                  <div className="relative flex-1 overflow-hidden">
-                    <h3 className="font-medium text-foreground pr-8 whitespace-nowrap overflow-x-auto hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                      {goal.title}
-                    </h3>
-                    <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-card to-transparent pointer-events-none" />
-                  </div>
-                </div>
-                <div className="flex justify-between items-center ml-8 shrink-0">
-                  <span className="text-xs text-muted-foreground">{goal.year}</span>
-                </div>
-              </div>
-            ))}
-            <div className="snap-start shrink-0">
-              <NewGoalDialog onGoalAdded={handleAddGoal} context={currentDomain} />
-            </div>
-          </div>
-        </div>
-      </section>
+        <WorkUpcoming tasks={tasks} events={filteredEvents} me={userContextName} onSelectTask={setSelectedTask} onSelectEvent={setSelectedEvent} />
       )}
 
       {/* WEEK SECTION */}
@@ -518,41 +375,38 @@ export default function Home() {
         </div>
       </section>
 
-      {/* UPCOMING EVENTS WIDGET */}
-      {currentDomain === "WORK" && upcomingEvents.length > 0 && (
-        <section className="flex flex-col gap-3 pb-6 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Clock className="w-3 h-3 text-muted-foreground" />
-            <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Upcoming Events</h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {upcomingEvents.map(event => (
-              <div 
-                key={event.id} 
-                onClick={() => setSelectedEvent(event)}
-                className="flex flex-col gap-1 bg-card/50 border border-border rounded-lg px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                <span className="text-xs font-semibold truncate">{event.title}</span>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                  {isToday(parseISO(event.event_date)) ? "Today" : 
-                   isTomorrow(parseISO(event.event_date)) ? "Tomorrow" : 
-                   format(parseISO(event.event_date), "MMM d")} 
-                  {event.event_time && ` • ${event.event_time.slice(0, 5)}`}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* TODAY'S TASKS LIST SECTION */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between border-b border-border pb-2">
           <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
             {isSameDay(selectedDate, startOfDay(new Date())) ? "Today" : format(selectedDate, "MMM d, yyyy")}
           </h2>
+          {currentDomain === "WORK" && (
+            <div className="flex gap-1.5">
+              {(["overview", "kanban"] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => pickTodayView(v)}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border transition-all",
+                    todayView === v ? "bg-white/15 text-white border-white/30" : "bg-white/[0.03] text-white/40 border-white/10 hover:text-white"
+                  )}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        
+
+          {currentDomain === "WORK" && todayView === "kanban" ? (
+            <TaskKanban
+              tasks={selectedDayTasks.filter(t => !t.parent_id && (t.context === userContextName || t.is_joint))}
+              onSelect={setSelectedTask}
+              onUpdate={handleUpdateTask}
+              onToggleStatus={handleToggleStatus}
+            />
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {currentDomain === "WORK" ? (
               DOMAIN_MAP[currentDomain].map(contextName => {
@@ -563,6 +417,17 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                       <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">{contextName}</h3>
                       <div className="h-px bg-border flex-1" />
+                      <NewTaskDialog 
+                        contextName={contextName} 
+                        selectedDateString={format(selectedDate, "yyyy-MM-dd")} 
+                        onTaskAdded={handleAddTask} 
+                        domain={currentDomain}
+                        trigger={
+                          <div title={`Add to ${contextName}`} className="w-8 h-8 rounded-full border border-dashed border-white/10 hover:border-white/30 hover:bg-white/5 text-white/40 hover:text-white transition-all flex items-center justify-center shrink-0">
+                            <Plus className="w-4 h-4" />
+                          </div>
+                        }
+                      />
                     </div>
                     
                     <div className="flex flex-col gap-2">
@@ -575,12 +440,6 @@ export default function Home() {
                           onUpdate={handleUpdateTask}
                         />
                       ))}
-                      <NewTaskDialog 
-                        contextName={contextName} 
-                        selectedDateString={format(selectedDate, "yyyy-MM-dd")} 
-                        onTaskAdded={handleAddTask} 
-                        domain={currentDomain}
-                      />
                     </div>
                   </div>
                 );
@@ -658,6 +517,7 @@ export default function Home() {
               </>
             )}
           </div>
+          )}
       </section>
       {currentDomain === "STUDY" && <WorkingThrough study={study} />}
       </>
@@ -694,83 +554,6 @@ export default function Home() {
         onStudyPageToggle={page => setStudyPage(studyPage === page ? null : page)}
       />
 
-      <HallOfFamePanel 
-        isOpen={isHallOfFameOpen}
-        onClose={() => setIsHallOfFameOpen(false)}
-        goals={filteredGoals}
-        onToggleStatus={handleToggleGoalStatus}
-      />
-
-      {editingGoalId && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center">
-          <div 
-            className="absolute inset-0 bg-black/40 backdrop-blur-md transition-opacity animate-in fade-in duration-300" 
-            onClick={() => { setEditingGoalId(null); setEditingGoalTitle(""); }} 
-          />
-          
-          <div className="relative bg-zinc-950/80 backdrop-blur-3xl border border-white/5 rounded-2xl w-[90%] max-w-lg overflow-visible shadow-2xl shadow-black/50 animate-in fade-in zoom-in-[0.98] duration-300 slide-in-from-bottom-4">
-            
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-t-2xl" />
-
-            <div className="flex items-center justify-between px-6 py-5">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Edit Goal</span>
-              <button 
-                type="button"
-                onClick={() => { setEditingGoalId(null); setEditingGoalTitle(""); }} 
-                className="p-1.5 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleUpdateGoalTitle(editingGoalId);
-              }} 
-              className="px-6 pb-6 flex flex-col gap-6"
-            >
-              <textarea 
-                placeholder="Goal title..."
-                value={editingGoalTitle}
-                onChange={(e) => setEditingGoalTitle(e.target.value)}
-                autoFocus
-                rows={4}
-                className="w-full bg-transparent text-lg font-medium tracking-wide outline-none text-white placeholder:text-white/20 resize-none hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-              />
-
-              <div className="flex items-center gap-3">
-              <button 
-                type="button"
-                onClick={() => setIsDeleteGoalOpen(true)}
-                className="p-3 hover:bg-red-500/20 rounded-lg transition-colors text-red-500/50 hover:text-red-500 shrink-0"
-                title="Delete Goal"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-              <button 
-                type="submit"
-                disabled={!editingGoalTitle.trim()}
-                className="flex-1 py-3 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
-              >
-                Save Changes
-              </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      <ConfirmDialog
-        isOpen={isDeleteGoalOpen && !!editingGoalId}
-        onClose={() => setIsDeleteGoalOpen(false)}
-        onConfirm={() => {
-          if (editingGoalId) handleDeleteGoal(editingGoalId);
-          setIsDeleteGoalOpen(false);
-        }}
-        title="Delete Goal?"
-        description="Are you sure you want to delete this goal? This action cannot be undone."
-      />
     </div>
     </TagsProvider>
   );

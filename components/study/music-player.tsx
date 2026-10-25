@@ -36,7 +36,7 @@ function loadYouTubeApi(): Promise<YTNamespace> {
  * reloads, so music keeps going across pages; when the panel is closed it is
  * moved off screen rather than removed (Eryk chose to hide it fully).
  */
-export function MusicPlayer({ music, inStudy }: { music: MusicData; inStudy: boolean }) {
+export function MusicPlayer({ music }: { music: MusicData }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const latest = useRef(music);
   latest.current = music;
@@ -81,11 +81,8 @@ export function MusicPlayer({ music, inStudy }: { music: MusicData; inStudy: boo
     return () => { cancelled = true; };
   }, [mounted]);
 
-  // Leaving Study shrinks the panel to the small player.
-  useEffect(() => { if (!inStudy) music.setOpen(false); }, [inStudy]); // eslint-disable-line react-hooks/exhaustive-deps
-
   if (!mounted) return null;
-  const panel = music.open && inStudy;
+  const panel = music.open;
 
   // Closed panel: the player moves off screen (still running, so music keeps
   // playing) and the music button carries the controls.
@@ -98,7 +95,7 @@ export function MusicPlayer({ music, inStudy }: { music: MusicData; inStudy: boo
       aria-hidden={!panel}
     >
       <div key="head" className="flex items-center justify-between px-1">
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Study music</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Music</span>
         <button onClick={() => music.setOpen(false)} className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10" aria-label="Close music">
           <X className="w-4 h-4" />
         </button>

@@ -359,7 +359,7 @@ function StartStudyDialog({ study, music, initialModule, onClose, onBegin, onAdd
 }
 
 /** Previous, pause/play, next track, and open the playlist: shown while a track is loaded. */
-function MusicControls({ music, size }: { music: MusicData; size: "sm" | "lg" }) {
+export function MusicControls({ music, size }: { music: MusicData; size: "sm" | "lg" }) {
   const btn = size === "lg" ? "p-2.5 rounded-full hover:bg-white/10 transition-colors" : "p-2 rounded-full hover:bg-white/10 transition-colors";
   const icon = size === "lg" ? "w-4 h-4" : "w-3.5 h-3.5";
   return (

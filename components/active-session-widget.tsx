@@ -5,10 +5,12 @@ import { supabase } from "@/lib/supabase";
 import { useGlobalContext } from "./global-context";
 import { ClockInDialog } from "./clock-in-dialog";
 import { SessionFormDialog } from "./session-form-dialog";
-import { Square, Clock, Pause, Play } from "lucide-react";
+import { Square, Clock, Pause, Play, Music } from "lucide-react";
+import { MusicData } from "./study/use-music";
+import { MusicControls } from "./study/study-clock";
 import { WorkSession, SESSIONS_CHANGED_EVENT, sessionLabel, togglePauseSession, workedSeconds } from "@/lib/work-sessions";
 
-export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () => void }) {
+export function ActiveSessionWidget({ music, onHoursUpdated }: { music: MusicData; onHoursUpdated?: () => void }) {
   const [activeSession, setActiveSession] = useState<WorkSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -87,7 +89,21 @@ export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () =>
 
   if (!activeSession) {
     return (
-      <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Music: the same button as Study's, beside the clock */}
+        {music.current ? (
+          <div className="flex items-center gap-1 p-1.5 rounded-full bg-zinc-950/80 backdrop-blur-md border border-white/30 shadow-2xl">
+            <MusicControls music={music} size="lg" />
+          </div>
+        ) : (
+          <button
+            onClick={() => music.setOpen(!music.open)}
+            aria-label="Music"
+            className={`p-4 rounded-full bg-zinc-950/80 backdrop-blur-md border shadow-2xl hover:bg-white/10 transition-colors group ${music.open ? "border-white/30" : "border-white/10"}`}
+          >
+            <Music className={`w-5 h-5 transition-colors ${music.open ? "text-white" : "text-white/70 group-hover:text-white"}`} />
+          </button>
+        )}
         <ClockInDialog 
           onSessionStarted={fetchActiveSession} 
           trigger={
@@ -113,6 +129,20 @@ export function ActiveSessionWidget({ onHoursUpdated }: { onHoursUpdated?: () =>
           {formatTime(elapsedSeconds)}
         </span>
       </div>
+
+      {music.current ? (
+        <div className="flex items-center gap-0.5">
+          <MusicControls music={music} size="sm" />
+        </div>
+      ) : (
+        <button
+          onClick={() => music.setOpen(!music.open)}
+          aria-label="Music"
+          className={`p-2.5 rounded-full border transition-colors ${music.open ? "bg-white/10 border-white/20 text-white" : "bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10"}`}
+        >
+          <Music className="w-4 h-4" />
+        </button>
+      )}
 
       <button
         onClick={() => togglePauseSession(activeSession)}
