@@ -139,7 +139,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
 
                 <div className="flex flex-col gap-2">
                   <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Tag</label>
-                  <TagPicker value={tagId} onChange={setTagId} />
+                  <TagPicker domain={domain ?? "WORK"} value={tagId} onChange={setTagId} />
                 </div>
                 
                 {/* Deadline */}
