@@ -31,6 +31,15 @@ import { rolloverTasks } from "@/lib/task-rollover";
 import { startOfDay, addDays, isSameDay, format, parseISO, differenceInDays } from "date-fns";
 import { Plus } from "lucide-react";
 
+/** The round + at the end of a task list's name line (Work and Study alike). */
+function AddTaskButton({ name }: { name: string }) {
+  return (
+    <div title={`Add to ${name}`} className="w-8 h-8 rounded-full border border-dashed border-white/10 hover:border-white/30 hover:bg-white/5 text-white/40 hover:text-white transition-all flex items-center justify-center shrink-0">
+      <Plus className="w-4 h-4" />
+    </div>
+  );
+}
+
 export default function Home() {
   const { currentDomain, userEmail } = useGlobalContext();
 
@@ -422,11 +431,7 @@ export default function Home() {
                         selectedDateString={format(selectedDate, "yyyy-MM-dd")} 
                         onTaskAdded={handleAddTask} 
                         domain={currentDomain}
-                        trigger={
-                          <div title={`Add to ${contextName}`} className="w-8 h-8 rounded-full border border-dashed border-white/10 hover:border-white/30 hover:bg-white/5 text-white/40 hover:text-white transition-all flex items-center justify-center shrink-0">
-                            <Plus className="w-4 h-4" />
-                          </div>
-                        }
+                        trigger={<AddTaskButton name={contextName} />}
                       />
                     </div>
                     
@@ -452,6 +457,13 @@ export default function Home() {
                   <div className="flex items-center gap-2">
                     <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Study Tasks</h3>
                     <div className="h-px bg-border flex-1" />
+                    <NewTaskDialog 
+                      contextName={userContextName as ContextType} 
+                      selectedDateString={format(selectedDate, "yyyy-MM-dd")} 
+                      onTaskAdded={handleAddTask} 
+                      domain={currentDomain}
+                      trigger={<AddTaskButton name={userContextName} />}
+                    />
                   </div>
                   
                   <div className="flex flex-col gap-2">
@@ -464,12 +476,6 @@ export default function Home() {
                         onUpdate={handleUpdateTask}
                       />
                     ))}
-                    <NewTaskDialog 
-                      contextName={userContextName as ContextType} 
-                      selectedDateString={format(selectedDate, "yyyy-MM-dd")} 
-                      onTaskAdded={handleAddTask} 
-                      domain={currentDomain}
-                    />
                   </div>
                 </div>
 
