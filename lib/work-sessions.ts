@@ -12,6 +12,7 @@ export const WORK_TASKS = [
   "Relisting",
   "Packing / Shipping",
   "Content",
+  "Engagement",
   "Strategy",
   "Operations",
   "Development",
@@ -33,6 +34,7 @@ export const TASK_COLORS: Record<string, string> = {
   "Strategy": "#a24bb5",
   "Operations": "#a87b4f",
   "Content": "#9085e9",
+  "Engagement": "#e8c547",
   "Development": "#e66767",
   "Other": "#555553",
 };
