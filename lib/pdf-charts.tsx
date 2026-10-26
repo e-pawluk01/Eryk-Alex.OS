@@ -12,6 +12,7 @@ const TASK_PRINT: Record<string, string> = {
   'Cleaning / Restoration': PRINT.yellow, 'Packing / Shipping': PRINT.magenta, 'Admin': PRINT.green,
   'Content': PRINT.violet, 'Development': PRINT.red, 'Other': PRINT.other,
   'Relisting': '#86b6ea', 'Research': '#178f9c', 'Sewing': '#6f8a1f', 'Operations': '#8a6440', 'Strategy': '#8e3fa0',
+  'Engagement': '#c9a227',
 };
 export const taskPrint = (task: string) => TASK_PRINT[task] ?? PRINT.other;
 
