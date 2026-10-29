@@ -24,6 +24,8 @@ interface SessionFormDialogProps {
   initialTask?: string;
   initialNote?: string;
   initialTogether?: boolean;
+  // Clocking out of several tasks in turn: which one this is, e.g. "2 of 3".
+  step?: string;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -50,7 +52,7 @@ const atTime = (day: Date, time: string) => {
 };
 const partMinutes = (p: Part) => (Number(p.hours) || 0) * 60 + (Number(p.minutes) || 0);
 
-export function SessionFormDialog({ mode, session, person, initialTask, initialNote, initialTogether = false, onClose, onSaved }: SessionFormDialogProps) {
+export function SessionFormDialog({ mode, session, person, initialTask, initialNote, initialTogether = false, step, onClose, onSaved }: SessionFormDialogProps) {
   // Original timestamps, so an untouched time keeps its exact seconds.
   const [origStart, origEnd] = useMemo(() => {
     if (mode === "add" || !session) {
@@ -229,7 +231,7 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialN
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-t-2xl" />
 
           <div className="flex items-center justify-between px-6 pt-5 pb-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">{copy.label}</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">{copy.label}{step && ` · ${step}`}</span>
             <button
               type="button"
               onClick={onClose}
@@ -489,5 +491,33 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialN
       </div>
     </div>,
     document.body
+  );
+}
+
+/**
+ * Clock out of every open session, one "are these hours correct?" check each:
+ * the current task first, then any you switched away from.
+ */
+export function WorkClockOut({ sessions, person, onClose, onSaved }: {
+  sessions: WorkSession[];
+  person: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  // Fixed at the start: each save refetches the open sessions behind this.
+  const [queue] = useState(sessions);
+  const [index, setIndex] = useState(0);
+  const session = queue[index];
+  if (!session) return null;
+  return (
+    <SessionFormDialog
+      key={session.id}
+      mode="clockout"
+      session={session}
+      person={person}
+      step={queue.length > 1 ? `${index + 1} of ${queue.length}` : undefined}
+      onClose={onClose}
+      onSaved={() => (index + 1 < queue.length ? setIndex(index + 1) : onSaved())}
+    />
   );
 }
