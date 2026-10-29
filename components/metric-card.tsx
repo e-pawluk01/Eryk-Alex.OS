@@ -28,7 +28,7 @@ interface MetricCardProps {
   badge?: string;
 }
 
-export function MetricCard({ title, value, prefix, suffix, className, comparison, sub, compact, onClick, expanded, badge }: MetricCardProps) {
+export function MetricCard({ title, value, prefix, suffix, className, sub, compact, onClick, expanded, badge }: MetricCardProps) {
   const Tag = onClick ? "button" : "div";
   return (
     <Tag
@@ -57,17 +57,7 @@ export function MetricCard({ title, value, prefix, suffix, className, comparison
         {suffix && <span className="text-sm text-muted-foreground/50 font-medium">{suffix}</span>}
       </div>
       
-      {comparison && (
-        <div className={cn(
-          "flex items-center gap-1 mt-2 text-[10px] uppercase font-bold tracking-widest",
-          comparison.tone === "good" && "text-emerald-400/80",
-          comparison.tone === "bad" && "text-red-400/80",
-          comparison.tone === "neutral" && "text-muted-foreground/75"
-        )}>
-          <span>{comparison.direction === "up" ? "+" : "−"}{comparison.percentage.toFixed(1)}% {comparison.label}</span>
-        </div>
-      )}
-      {!comparison && sub && (
+      {sub && (
         <div className="mt-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50 truncate">{sub}</div>
       )}
       {badge && <EarlyBadge label={badge} className="self-start mt-1.5" />}
