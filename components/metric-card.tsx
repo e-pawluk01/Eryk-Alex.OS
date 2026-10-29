@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { ArrowUpRight, ArrowDownRight, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 export interface MetricComparison {
   percentage: number;
@@ -64,8 +64,7 @@ export function MetricCard({ title, value, prefix, suffix, className, comparison
           comparison.tone === "bad" && "text-red-400/80",
           comparison.tone === "neutral" && "text-muted-foreground/75"
         )}>
-          {comparison.direction === "up" ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-          <span>{comparison.percentage.toFixed(1)}% {comparison.label}</span>
+          <span>{comparison.direction === "up" ? "+" : "−"}{comparison.percentage.toFixed(1)}% {comparison.label}</span>
         </div>
       )}
       {!comparison && sub && (
