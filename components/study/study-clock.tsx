@@ -4,12 +4,12 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Clock, History, Music, Pause, Play, SkipBack, SkipForward, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { openSessionOf, notifySessionsChanged, sessionLabel, WorkSession } from "@/lib/work-sessions";
+import { openSessionOf, openSessionsOf, notifySessionsChanged, sessionLabel, WorkSession } from "@/lib/work-sessions";
 import {
   StudySession, STUDY_CHANGED_EVENT, START_TASK_EVENT, StartTaskDetail, OTHER,
   missingText, moduleName, openStudySessionOf, sessionFields, startRinging, studiedSeconds, togglePause, whatLabel,
 } from "@/lib/study-sessions";
-import { SessionFormDialog } from "@/components/session-form-dialog";
+import { WorkClockOut } from "@/components/session-form-dialog";
 import { StudyData } from "./use-study";
 import { MusicData } from "./use-music";
 import { FieldLabel, primaryButton, StudyModal } from "./bits";
@@ -40,7 +40,7 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
   const [starting, setStarting] = useState(false);
   const [startModule, setStartModule] = useState<string | null>(null);
   const [workClash, setWorkClash] = useState<{ session: WorkSession; then: () => void } | null>(null);
-  const [workCheckout, setWorkCheckout] = useState<{ session: WorkSession; then: () => void } | null>(null);
+  const [workCheckout, setWorkCheckout] = useState<{ sessions: WorkSession[]; then: () => void } | null>(null);
   const [ringing, setRinging] = useState(false);
   const [checkingOut, setCheckingOut] = useState<null | "stop" | "switch">(null);
   const [missed, setMissed] = useState<{ module: string; what: string; other: string } | null>(null);
@@ -247,15 +247,14 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
           detail={`${sessionLabel(workClash.session)} · ${formatTime(Math.floor((Date.now() - new Date(workClash.session.started_at).getTime()) / 1000))}. Clock out of Work and start studying?`}
           confirmLabel="Clock out of Work"
           cancelLabel="Cancel"
-          onConfirm={() => { setWorkCheckout(workClash); setWorkClash(null); }}
+          onConfirm={() => { const { then } = workClash; setWorkClash(null); openSessionsOf(person).then((sessions) => setWorkCheckout({ sessions, then })).catch(() => setWorkCheckout({ sessions: [workClash.session], then })); }}
           onCancel={() => setWorkClash(null)}
         />
       )}
 
       {workCheckout && (
-        <SessionFormDialog
-          mode="clockout"
-          session={workCheckout.session}
+        <WorkClockOut
+          sessions={workCheckout.sessions}
           person={person}
           onClose={() => setWorkCheckout(null)}
           onSaved={() => { const then = workCheckout.then; setWorkCheckout(null); notifySessionsChanged(); then(); }}

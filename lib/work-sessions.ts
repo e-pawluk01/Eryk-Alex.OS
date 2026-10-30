@@ -52,16 +52,30 @@ export function taskColor(task: string) {
 // start time, which is how the two are recognised as a pair at clock-out.
 export const partnerOf = (person: string) => (person === "Alex" ? "Eryk" : "Alex");
 
-/** The other person's running session, if they're clocked in. */
-export async function openSessionOf(person: string): Promise<WorkSession | null> {
-  const { data } = await supabase
+/**
+ * Every session still open for someone, the current one first.
+ * Switching task keeps the task you leave open but paused, so there can be
+ * several: the current one is the one not paused, or else the one paused last.
+ */
+export async function openSessionsOf(person: string): Promise<WorkSession[]> {
+  const { data, error } = await supabase
     .from("work_sessions")
     .select("*")
     .eq("person", person)
     .is("ended_at", null)
-    .order("started_at", { ascending: false })
-    .limit(1);
-  return (data?.[0] as WorkSession) ?? null;
+    .order("started_at", { ascending: false });
+  if (error) throw error;
+  const pausedAt = (s: WorkSession) => (s.paused_at ? new Date(s.paused_at).getTime() : Infinity);
+  return ((data as WorkSession[]) ?? []).sort((a, b) => pausedAt(b) - pausedAt(a));
+}
+
+/** Someone's current session, if they're clocked in. */
+export async function openSessionOf(person: string): Promise<WorkSession | null> {
+  try {
+    return (await openSessionsOf(person))[0] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** The partner's half of a joint session that is still running, if any. */
@@ -122,6 +136,38 @@ export async function togglePauseSession(s: WorkSession) {
   // Say so instead of silently doing nothing (e.g. the pause columns are missing).
   if (error) { console.error("Pause failed:", error); alert(`Couldn't pause: ${error.message}`); return; }
   notifySessionsChanged();
+}
+
+/**
+ * Leave the current session paused and carry on with another task: a paused
+ * one of yours picks back up where it left off, otherwise a new one starts.
+ */
+export async function switchSession(
+  current: WorkSession,
+  to: { resume: WorkSession } | { task: string; note?: string }
+): Promise<{ error?: string }> {
+  const now = new Date().toISOString();
+  if (!current.paused_at) {
+    const { error } = await supabase.from("work_sessions").update({ paused_at: now }).eq("id", current.id);
+    if (error) return { error: friendlyError(error.message) };
+  }
+  const { error } = "resume" in to
+    ? await supabase.from("work_sessions")
+        .update({ paused_at: null, paused_seconds: Math.round(pausedSecondsOf(to.resume)) })
+        .eq("id", to.resume.id)
+    : await supabase.from("work_sessions").insert({
+        person: current.person,
+        task: to.task,
+        note: to.task === "Other" ? to.note?.trim() || null : null,
+        started_at: now,
+      });
+  if (error) {
+    // Undo the pause so you're not left with nothing running.
+    if (!current.paused_at) await supabase.from("work_sessions").update({ paused_at: null }).eq("id", current.id);
+    return { error: friendlyError(error.message) };
+  }
+  notifySessionsChanged();
+  return {};
 }
 
 // Fired after any session is saved or deleted so open views can refetch.

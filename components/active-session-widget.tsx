@@ -1,40 +1,31 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
 import { useGlobalContext } from "./global-context";
 import { ClockInDialog } from "./clock-in-dialog";
-import { SessionFormDialog } from "./session-form-dialog";
-import { Square, Clock, Pause, Play, Music } from "lucide-react";
+import { WorkClockOut } from "./session-form-dialog";
+import { SwitchTaskDialog } from "./switch-task-dialog";
+import { Square, Clock, Pause, Play, Music, ArrowLeftRight } from "lucide-react";
 import { MusicData } from "./study/use-music";
 import { MusicControls } from "./study/study-clock";
-import { WorkSession, SESSIONS_CHANGED_EVENT, sessionLabel, togglePauseSession, workedSeconds } from "@/lib/work-sessions";
+import { WorkSession, SESSIONS_CHANGED_EVENT, openSessionsOf, sessionLabel, togglePauseSession, workedSeconds } from "@/lib/work-sessions";
 
 export function ActiveSessionWidget({ music, onHoursUpdated }: { music: MusicData; onHoursUpdated?: () => void }) {
-  const [activeSession, setActiveSession] = useState<WorkSession | null>(null);
+  // The current session, then any tasks switched away from (open but paused).
+  const [openSessions, setOpenSessions] = useState<WorkSession[]>([]);
+  const activeSession = openSessions[0] ?? null;
+  const parked = openSessions.slice(1);
   const [loading, setLoading] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const { userEmail } = useGlobalContext();
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
 
   // Starts out loading; later re-checks keep the widget on screen.
   const fetchActiveSession = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("work_sessions")
-        .select("*")
-        .eq("person", userContextName)
-        .is("ended_at", null)
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error && error.code !== "PGRST116") {
-        throw error;
-      }
-      
-      setActiveSession(data || null);
+      setOpenSessions(await openSessionsOf(userContextName));
     } catch (err) {
       console.error("Failed to fetch active session", err);
     } finally {
@@ -68,7 +59,7 @@ export function ActiveSessionWidget({ music, onHoursUpdated }: { music: MusicDat
   // Clocking out always goes through the "are these hours correct?" check.
   const handleClockedOut = () => {
     setCheckingOut(false);
-    setActiveSession(null);
+    setOpenSessions([]);
     setElapsedSeconds(0);
     if (onHoursUpdated) onHoursUpdated();
   };
@@ -145,6 +136,20 @@ export function ActiveSessionWidget({ music, onHoursUpdated }: { music: MusicDat
       )}
 
       <button
+        onClick={() => setSwitching(true)}
+        aria-label="Switch task"
+        title="Switch task"
+        className="relative p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
+      >
+        <ArrowLeftRight className="w-4 h-4 text-white/60 group-hover:text-white transition-colors" />
+        {parked.length > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-white text-black text-[10px] font-bold grid place-items-center">
+            {parked.length}
+          </span>
+        )}
+      </button>
+
+      <button
         onClick={() => togglePauseSession(activeSession)}
         aria-label={paused ? "Resume" : "Pause"}
         title={paused ? "Resume" : "Pause"}
@@ -163,12 +168,20 @@ export function ActiveSessionWidget({ music, onHoursUpdated }: { music: MusicDat
         <Square className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />
       </button>
 
+      {switching && (
+        <SwitchTaskDialog
+          current={activeSession}
+          parked={parked}
+          formatTime={formatTime}
+          onClose={() => setSwitching(false)}
+        />
+      )}
+
       {checkingOut && (
-        <SessionFormDialog
-          mode="clockout"
-          session={activeSession}
+        <WorkClockOut
+          sessions={openSessions}
           person={userContextName}
-          onClose={() => setCheckingOut(false)}
+          onClose={() => { setCheckingOut(false); fetchActiveSession(); }}
           onSaved={handleClockedOut}
         />
       )}
