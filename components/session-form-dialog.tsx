@@ -9,7 +9,7 @@ import { TimeField } from "./ui/time-field";
 import { DatePills } from "./ui/date-pills";
 import {
   WORK_TASKS, WorkSession, SessionPiece, taskColor, formatMinutes,
-  saveSessionPieces, deleteSession, partnerOf, togetherSessionOf, isStillRunning, pausedSecondsOf, sessionLabel,
+  saveSessionPieces, deleteSession, partnerOf, togetherSessionOf, isStillRunning, pausedSecondsOf,
 } from "@/lib/work-sessions";
 
 type Mode = "clockout" | "edit" | "add";
@@ -247,13 +247,6 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialN
               <p id="session-form-question" className="text-[15px] font-medium text-white">{copy.question}</p>
               <div className="text-3xl font-semibold text-white tabular-nums tracking-tight">
                 {totalSeconds > 0 ? (totalSeconds < 60 ? "<1m" : formatMinutes(Math.floor(totalSeconds / 60))) : "—"}
-                {mode !== "add" && (
-                  <span className="block text-[11px] font-medium tracking-normal text-muted-foreground mt-0.5">
-                    {totalSeconds > 0
-                      ? `${split ? `Split across ${parts.length} tasks` : sessionLabel(parts[0])} · ${justHours ? "no set hours" : `${start}–${end}`}`
-                      : justHours ? "Type how long you worked" : "Check the start and end times"}
-                  </span>
-                )}
               </div>
             </div>
 
@@ -420,7 +413,6 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialN
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-muted-foreground/50 mt-1">The first task gets whatever time is left.</p>
                 </>
               )}
 
