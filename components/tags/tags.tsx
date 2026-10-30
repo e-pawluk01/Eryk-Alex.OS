@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Check, ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import { TASK_COLORS } from "@/lib/work-sessions";
+import { TASK_COLORS, WORK_TASKS } from "@/lib/work-sessions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // Reusable coloured labels for events and tasks. Work has one list shared by
@@ -22,6 +22,30 @@ export interface Tag {
 
 // Same colour set as the Work charts.
 export const TAG_COLORS = Object.values(TASK_COLORS);
+
+// Work always has a tag for each task in Analytics, in its chart colour.
+// They're kept in the tags table like any other, but can't be changed.
+// ("Other" isn't one: a tag says what the thing is.)
+const BUILT_IN_TAGS: string[] = WORK_TASKS.filter(w => w !== "Other");
+const builtInName = (t: Pick<Tag, "name" | "domain">) =>
+  t.domain === "WORK" ? BUILT_IN_TAGS.find(w => w.toLowerCase() === t.name.trim().toLowerCase()) : undefined;
+export const isBuiltInTag = (t: Pick<Tag, "name" | "domain">) => !!builtInName(t);
+
+/** Analytics tags first, in their usual order and colours; then your own; no repeats. */
+function arrangeTags(tags: Tag[]): Tag[] {
+  const seen = new Set<string>();
+  const builtIns: Tag[] = [];
+  const own: Tag[] = [];
+  for (const t of tags) {
+    const name = builtInName(t);
+    if (!name) { own.push(t); continue; }
+    if (seen.has(name)) continue;
+    seen.add(name);
+    builtIns.push({ ...t, name, color: TASK_COLORS[name] });
+  }
+  builtIns.sort((a, b) => BUILT_IN_TAGS.indexOf(a.name) - BUILT_IN_TAGS.indexOf(b.name));
+  return [...builtIns, ...own];
+}
 
 interface TagsContextValue {
   tags: Tag[];
@@ -43,10 +67,24 @@ export function TagsProvider({ me, children }: { me: string | null; children: Re
 
   useEffect(() => {
     if (!me) return;
-    supabase.from("tags").select("*").or(`domain.eq.WORK,and(domain.eq.STUDY,person.eq.${me})`).order("created_at").then(({ data, error }) => {
-      if (error) console.error("Failed to load tags:", error);
-      else setTags(data as Tag[]);
-    });
+    let alive = true;
+    (async () => {
+      const { data, error } = await supabase.from("tags").select("*").or(`domain.eq.WORK,and(domain.eq.STUDY,person.eq.${me})`).order("created_at");
+      if (error) { console.error("Failed to load tags:", error); return; }
+      let loaded = data as Tag[];
+      // Add any Analytics task that doesn't have its tag yet.
+      const have = new Set(loaded.map(builtInName).filter(Boolean));
+      const missing = BUILT_IN_TAGS.filter(w => !have.has(w));
+      if (missing.length) {
+        const { data: added, error: addError } = await supabase.from("tags")
+          .insert(missing.map(name => ({ name, color: TASK_COLORS[name], domain: "WORK", person: null })))
+          .select();
+        if (addError) console.error("Failed to add the Analytics tags:", addError);
+        else loaded = [...loaded, ...(added as Tag[])];
+      }
+      if (alive) setTags(arrangeTags(loaded));
+    })();
+    return () => { alive = false; };
   }, [me]);
 
   const addTag = useCallback(async (name: string, color: string, domain: TagDomain) => {
@@ -54,22 +92,26 @@ export function TagsProvider({ me, children }: { me: string | null; children: Re
       .insert({ name, color, domain, person: domain === "STUDY" ? me : null })
       .select().single();
     if (error) throw error;
-    setTags(prev => [...prev, data as Tag]);
+    setTags(prev => arrangeTags([...prev, data as Tag]));
     return data as Tag;
   }, [me]);
 
   const updateTag = useCallback(async (id: string, updates: Partial<Pick<Tag, "name" | "color">>) => {
+    const tag = tags.find(t => t.id === id);
+    if (!tag || isBuiltInTag(tag)) return;
     setTags(prev => prev.map(t => (t.id === id ? { ...t, ...updates } : t)));
     const { error } = await supabase.from("tags").update(updates).eq("id", id);
     if (error) console.error("Failed to save tag:", error);
-  }, []);
+  }, [tags]);
 
   // Items that used the tag keep everything else; the database clears their tag.
   const deleteTag = useCallback(async (id: string) => {
+    const tag = tags.find(t => t.id === id);
+    if (!tag || isBuiltInTag(tag)) return;
     setTags(prev => prev.filter(t => t.id !== id));
     const { error } = await supabase.from("tags").delete().eq("id", id);
     if (error) console.error("Failed to delete tag:", error);
-  }, []);
+  }, [tags]);
 
   return <TagsContext.Provider value={{ tags, addTag, updateTag, deleteTag }}>{children}</TagsContext.Provider>;
 }
@@ -284,12 +326,16 @@ export function TagManager({ domain, onClose }: { domain: TagDomain; onClose: ()
               <div key={t.id} className="flex items-center gap-3 py-2.5 border-b border-white/[0.06]">
                 <TagChip tagId={t.id} className="text-[10px]" />
                 <span className="flex-1" />
+                {isBuiltInTag(t) ? (
+                  <span className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Analytics</span>
+                ) : (<>
                 <button type="button" onClick={() => startEdit(t)} className="p-1.5 rounded-md text-white/40 hover:text-white hover:bg-white/10" title="Rename or recolour">
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button type="button" onClick={() => setToDelete(t)} className="p-1.5 rounded-md text-red-500/50 hover:text-red-500 hover:bg-red-500/10" title="Delete tag">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
+                </>)}
               </div>
             )
           ))}
