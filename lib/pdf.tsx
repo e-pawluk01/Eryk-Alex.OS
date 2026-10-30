@@ -9,6 +9,14 @@ import {
   styles, Metric, Section, ChartHead, num, fmtCurrency, fmtPercent, fmtHours, fmtMinutes, isNil, CHART_W,
 } from './pdf-parts';
 
+// Page 1 has room for about six one-line rows of "What Other was" in the busiest
+// month (every task in Hours by task); five leaves a margin. A note longer than
+// one line takes two.
+const OTHER_ON_PAGE_ONE = 5;
+const OTHER_NOTE_CHARS = 70;
+const oneLine = (note: string) => (note.length > OTHER_NOTE_CHARS ? `${note.slice(0, OTHER_NOTE_CHARS - 1).trimEnd()}…` : note);
+const OTHER_COLUMNS: [string, number][] = [['What', 46], ['Who', 18], ['Sessions', 12], ['Hours', 12], ['Of Other', 12]];
+
 const PROFIT_BANDS = [
   { label: 'Loss', test: (p: number) => p < 0, color: PRINT.red },
   { label: '£0–10', test: (p: number) => p >= 0 && p < 10, color: PRINT.blue },
@@ -51,6 +59,34 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
         .reduce((a, [, h]) => a + h, 0)),
     }))
     .filter((x) => x.values.some((v) => v > 0));
+
+  // What "Other" was: page 1 holds a few rows; a longer list goes in full on the last page.
+  const otherRows = time?.other ?? [];
+  const otherHours = otherRows.reduce((a, r) => a + r.hours, 0);
+  const otherFits = otherRows.length <= OTHER_ON_PAGE_ONE && otherRows.every((r) => (r.note?.length ?? 0) <= OTHER_NOTE_CHARS);
+  const OtherTable = ({ rows, clip = false }: { rows: typeof otherRows; clip?: boolean }) => (
+    <View style={styles.table}>
+      <View style={styles.row}>
+        {OTHER_COLUMNS.map(([h, w], i) => (
+          <Text key={h} style={[styles.cell, styles.headCell, { width: `${w}%`, textAlign: i > 1 ? 'right' : 'left' }]}>{h}</Text>
+        ))}
+      </View>
+      {rows.map((r, i) => (
+        <View style={styles.row} key={i} wrap={false}>
+          <Text style={[styles.cell, { width: `${OTHER_COLUMNS[0][1]}%` }, r.note ? {} : { color: '#999999' }]}>{r.note ? (clip ? oneLine(r.note) : r.note) : 'No note'}</Text>
+          <Text style={[styles.cell, { width: `${OTHER_COLUMNS[1][1]}%` }]}>{r.people.join(', ')}</Text>
+          <Text style={[styles.cell, { width: `${OTHER_COLUMNS[2][1]}%`, textAlign: 'right' }]}>{String(r.sessions)}</Text>
+          <Text style={[styles.cell, { width: `${OTHER_COLUMNS[3][1]}%`, textAlign: 'right' }]}>{fmtHours(r.hours)}</Text>
+          <Text style={[styles.cell, { width: `${OTHER_COLUMNS[4][1]}%`, textAlign: 'right', color: '#999999' }]}>
+            {otherHours > 0 ? `${Math.round((r.hours / otherHours) * 100)}%` : '—'}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+  const otherHead = (sub: string) => (
+    <ChartHead title="What “Other” was" sub={`${fmtHours(otherHours)} logged as Other, ${sub}`} />
+  );
 
   const trend = [...history, { label: monthShort, revenue: num(snapshot.revenue), grossProfit: num(snapshot.gross_profit) }];
   const bandCounts = PROFIT_BANDS.map((b) => sales.filter((x) => b.test(num(x.profit))).length);
@@ -117,6 +153,22 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
                 items={(time?.byPerson ?? []).map((p) => ({ label: p.person, value: p.hours, color: p.person === 'Alex' ? PRINT.orange : PRINT.blue }))} />
             </View>
           </View>
+          )}
+          {otherRows.length > 0 && (
+            <View style={styles.below}>
+              {otherFits ? (
+                <>
+                  {otherHead('by what was typed')}
+                  <OtherTable rows={otherRows} />
+                </>
+              ) : (
+                <>
+                  {otherHead(`${otherRows.length} different notes`)}
+                  <OtherTable rows={otherRows.slice(0, OTHER_ON_PAGE_ONE - 1)} clip />
+                  <Text style={styles.chartSub}>All {otherRows.length} in full on the last page.</Text>
+                </>
+              )}
+            </View>
           )}
         </Section>
 
@@ -222,6 +274,15 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
                 <Text style={[styles.cell, { width: '16%', textAlign: 'right' }]}>{String(x.tts ?? '')}</Text>
               </View>
             ))}
+          </View>
+        )}
+        {!otherFits && (
+          <View style={{ marginTop: 18 }}>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionLabel}>What “Other” was</Text>
+              <Text style={styles.sectionCaption}>{fmtHours(otherHours)} · biggest first</Text>
+            </View>
+            <OtherTable rows={otherRows} />
           </View>
         )}
         <Footer />
