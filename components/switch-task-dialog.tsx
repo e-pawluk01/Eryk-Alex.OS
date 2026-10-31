@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { WORK_TASKS, WorkSession, sessionLabel, switchSession, taskColor, workedSeconds } from "@/lib/work-sessions";
 
@@ -54,7 +55,9 @@ export function SwitchTaskDialog({ current, parked, formatTime, onClose }: Switc
 
   const fieldLabel = "text-[9px] uppercase tracking-widest font-semibold text-white/30";
 
-  return (
+  // Portalled to <body>: the timer pill uses blur/transform, which would
+  // otherwise trap this fixed overlay inside it.
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-md transition-opacity animate-in fade-in duration-300"
@@ -140,6 +143,7 @@ export function SwitchTaskDialog({ current, parked, formatTime, onClose }: Switc
           </button>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
