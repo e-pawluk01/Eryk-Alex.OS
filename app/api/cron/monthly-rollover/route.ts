@@ -188,7 +188,10 @@ export async function GET(request: Request) {
   // ==========================================
   // PHASE D: CLAUDE'S MONTHLY TAKE (after the PDF)
   // ==========================================
-  try {
+  // Paused: set MONTHLY_TAKE_ENABLED=true to send it again.
+  if (process.env.MONTHLY_TAKE_ENABLED !== 'true') {
+    results.phaseD = "paused";
+  } else try {
     if (results.phaseA.startsWith("failed")) throw new Error("Skipped: the report for last month didn't close.");
     const take = await runMonthlyTake(prevMonthKey, { send: true });
     results.phaseD = take.skipped ? "skipped" : take.failure ? "sent without the written parts" : "success";
