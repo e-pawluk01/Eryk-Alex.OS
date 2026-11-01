@@ -16,8 +16,9 @@ const plainLabel = (text: string) => (
 /**
  * One card frame for tasks and events, so switching pills doesn't move anything:
  * same width and rows, a one-line title that ends in … when too long, date line at the bottom.
+ * Study's deadline cards use it too.
  */
-function UpcomingCard({ onClick, label, when, whenClass, title, left, right, borderClass }: {
+export function UpcomingCard({ onClick, label, when, whenClass, title, left, right, borderClass }: {
   onClick: () => void;
   label: React.ReactNode;
   when: string;
