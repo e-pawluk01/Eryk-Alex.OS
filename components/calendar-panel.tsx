@@ -42,8 +42,8 @@ interface CalendarPanelProps {
   onSelectEvent: (event: Event) => void;
   onAnalyticsToggle?: () => void;
   showAnalytics?: boolean;
-  studyPage?: "deadlines" | "materials" | null;
-  onStudyPageToggle?: (page: "deadlines" | "materials") => void;
+  studyPage?: "analytics" | "deadlines" | "materials" | null;
+  onStudyPageToggle?: (page: "analytics" | "deadlines" | "materials") => void;
 }
 
 export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics, studyPage, onStudyPageToggle }: CalendarPanelProps) {
@@ -111,6 +111,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
         )}
         {currentDomain === "STUDY" && onStudyPageToggle && (
           [
+            { page: "analytics" as const, icon: TrendingUp, label: "Analytics" },
             { page: "deadlines" as const, icon: Flag, label: "Deadlines" },
             { page: "materials" as const, icon: BookMarked, label: "Materials" },
           ].map(({ page, icon: Icon, label }) => (
