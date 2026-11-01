@@ -22,6 +22,7 @@ import { UpcomingStrip } from "@/components/study/upcoming-strip";
 import { DeadlinesView } from "@/components/study/deadlines-view";
 import { MaterialsView, WorkingThrough } from "@/components/study/materials-view";
 import { StudyClock } from "@/components/study/study-clock";
+import { StudyAnalyticsView } from "@/components/study/study-analytics-view";
 import { useMusic } from "@/components/study/use-music";
 import { MusicPlayer } from "@/components/study/music-player";
 import { LectureReminder } from "@/components/study/lecture-reminder";
@@ -57,7 +58,7 @@ export default function Home() {
   
   const [showAnalytics, setShowAnalytics] = useState(false);
   // Which Study page is open from the side tabs (null = Study home).
-  const [studyPage, setStudyPage] = useState<"deadlines" | "materials" | null>(null);
+  const [studyPage, setStudyPage] = useState<"analytics" | "deadlines" | "materials" | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   // Today in Work: both of you side by side, or your own Kanban board.
@@ -324,6 +325,8 @@ export default function Home() {
       <LectureReminder events={events} />
       {currentDomain === "WORK" && showAnalytics ? (
         <AnalyticsView />
+      ) : currentDomain === "STUDY" && studyPage === "analytics" ? (
+        <StudyAnalyticsView study={study} />
       ) : currentDomain === "STUDY" && studyPage === "deadlines" ? (
         <DeadlinesView study={study} />
       ) : currentDomain === "STUDY" && studyPage === "materials" ? (
