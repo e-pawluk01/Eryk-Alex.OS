@@ -110,63 +110,69 @@ export function ActiveSessionWidget({ music, onHoursUpdated }: { music: MusicDat
   const paused = !!activeSession.paused_at;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-4 pl-5 pr-2 py-2 rounded-full bg-zinc-950/80 backdrop-blur-md border border-white/10 shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-300">
-      <div className="flex items-center gap-3">
-        <div className={`w-2 h-2 rounded-full bg-red-500 ${paused ? "" : "animate-pulse"}`} />
-        <span className="text-[9px] uppercase tracking-widest font-bold text-white/50 hidden md:block mt-px">
-          {paused ? "Paused" : sessionLabel(activeSession)}
-        </span>
-        <span className={`text-sm font-semibold tracking-wider font-mono w-[60px] text-center ${paused ? "text-white/40" : "text-white"}`}>
-          {formatTime(elapsedSeconds)}
-        </span>
+    // The session and the music sit in two separate pills, so their pause
+    // buttons can't be mistaken for one another.
+    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 animate-in slide-in-from-bottom-4 fade-in duration-300">
+      <div className="flex items-center gap-4 pl-5 pr-2 py-2 rounded-full bg-zinc-950/80 backdrop-blur-md border border-white/10 shadow-2xl">
+        <div className="flex items-center gap-3">
+          <div className={`w-2 h-2 rounded-full bg-red-500 ${paused ? "" : "animate-pulse"}`} />
+          <span className="text-[9px] uppercase tracking-widest font-bold text-white/50 hidden md:block mt-px">
+            {paused ? "Paused" : sessionLabel(activeSession)}
+          </span>
+          <span className={`text-sm font-semibold tracking-wider font-mono w-[60px] text-center ${paused ? "text-white/40" : "text-white"}`}>
+            {formatTime(elapsedSeconds)}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSwitching(true)}
+            aria-label="Switch task"
+            title="Switch task"
+            className="relative p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
+          >
+            <ArrowLeftRight className="w-4 h-4 text-white/60 group-hover:text-white transition-colors" />
+            {parked.length > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-white text-black text-[10px] font-bold grid place-items-center">
+                {parked.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => togglePauseSession(activeSession)}
+            aria-label={paused ? "Resume" : "Pause"}
+            title={paused ? "Resume" : "Pause"}
+            className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
+          >
+            {paused
+              ? <Play className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />
+              : <Pause className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />}
+          </button>
+
+          <button
+            onClick={() => setCheckingOut(true)}
+            aria-label="Clock out"
+            className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
+          >
+            <Square className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />
+          </button>
+        </div>
       </div>
 
-      {music.current ? (
-        <div className="flex items-center gap-0.5">
-          <MusicControls music={music} size="sm" />
-        </div>
-      ) : (
-        <button
-          onClick={() => music.setOpen(!music.open)}
-          aria-label="Music"
-          className={`p-2.5 rounded-full border transition-colors ${music.open ? "bg-white/10 border-white/20 text-white" : "bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10"}`}
-        >
-          <Music className="w-4 h-4" />
-        </button>
-      )}
-
-      <button
-        onClick={() => setSwitching(true)}
-        aria-label="Switch task"
-        title="Switch task"
-        className="relative p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
-      >
-        <ArrowLeftRight className="w-4 h-4 text-white/60 group-hover:text-white transition-colors" />
-        {parked.length > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-white text-black text-[10px] font-bold grid place-items-center">
-            {parked.length}
-          </span>
+      <div className="flex items-center gap-0.5 p-[9px] rounded-full bg-zinc-950/80 backdrop-blur-md border border-white/10 shadow-2xl">
+        {music.current ? (
+          <MusicControls music={music} size="lg" />
+        ) : (
+          <button
+            onClick={() => music.setOpen(!music.open)}
+            aria-label="Music"
+            className={`p-2.5 rounded-full transition-colors ${music.open ? "bg-white/10 text-white" : "text-white/60 hover:text-white hover:bg-white/10"}`}
+          >
+            <Music className="w-4 h-4" />
+          </button>
         )}
-      </button>
-
-      <button
-        onClick={() => togglePauseSession(activeSession)}
-        aria-label={paused ? "Resume" : "Pause"}
-        title={paused ? "Resume" : "Pause"}
-        className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
-      >
-        {paused
-          ? <Play className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />
-          : <Pause className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />}
-      </button>
-
-      <button 
-        onClick={() => setCheckingOut(true)}
-        aria-label="Clock out"
-        className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
-      >
-        <Square className="w-4 h-4 text-white/60 group-hover:text-white fill-current transition-colors" />
-      </button>
+      </div>
 
       {switching && (
         <SwitchTaskDialog
