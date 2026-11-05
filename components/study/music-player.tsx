@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Pause, Play, X } from "lucide-react";
+import { Pause, Pencil, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatLength, parseVideoId, shortTitle } from "@/lib/music";
 import { MusicData, YTPlayer } from "./use-music";
@@ -96,9 +96,7 @@ export function MusicPlayer({ music }: { music: MusicData }) {
       aria-hidden={!panel}
     >
       <div key="head" className="shrink-0 flex items-center justify-between px-1">
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
-          Music{music.tracks.length > 0 && <span className="text-white/25"> · {music.tracks.length} {music.tracks.length === 1 ? "track" : "tracks"}</span>}
-        </span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Music</span>
         <button onClick={() => music.setOpen(false)} className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10" aria-label="Close music">
           <X className="w-4 h-4" />
         </button>
@@ -116,12 +114,21 @@ export function MusicPlayer({ music }: { music: MusicData }) {
 
 function Playlist({ music }: { music: MusicData }) {
   const [link, setLink] = useState("");
-  const [naming, setNaming] = useState<{ videoId: string; full: string; name: string } | null>(null);
+  const [name, setName] = useState("");
+  // Once you type a name yourself, the YouTube title no longer overwrites it.
+  const nameTyped = useRef(false);
+  const [found, setFound] = useState<{ videoId: string; full: string } | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The track just added: scrolled into view and briefly highlighted.
   const [added, setAdded] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: string; title: string } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const lookupFor = useRef<string | null>(null);
+
+  const videoId = parseVideoId(link);
 
   useEffect(() => {
     if (!added) return;
@@ -130,37 +137,72 @@ function Playlist({ music }: { music: MusicData }) {
     return () => clearTimeout(t);
   }, [added]);
 
-  const lookUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const videoId = parseVideoId(link);
-    if (!videoId) { setError("That doesn't look like a YouTube video link."); return; }
-    if (music.tracks.some(t => t.video_id === videoId)) { setError("That track is already in your playlist."); return; }
-    setBusy(true);
-    setError(null);
-    let full = "";
+  async function fetchTitle(id: string) {
     try {
-      const res = await fetch(`/api/youtube-title?id=${videoId}`);
-      if (res.ok) full = (await res.json()).title ?? "";
+      const res = await fetch(`/api/youtube-title?id=${id}`);
+      if (res.ok) return String((await res.json()).title ?? "");
     } catch { /* name it yourself */ }
-    setBusy(false);
-    setNaming({ videoId, full, name: full ? shortTitle(full) : "" });
+    return "";
+  }
+
+  // Paste a link and the name fills in from YouTube straight away.
+  const changeLink = async (value: string) => {
+    setLink(value);
+    setError(null);
+    const id = parseVideoId(value);
+    if (!id) { lookupFor.current = null; nameTyped.current = false; setName(""); setLookingUp(false); return; }
+    if (id === lookupFor.current) return;
+    lookupFor.current = id;
+    setFound(null);
+    setLookingUp(true);
+    const full = await fetchTitle(id);
+    if (lookupFor.current !== id) return; // the link changed meanwhile
+    setLookingUp(false);
+    setFound({ videoId: id, full });
+    if (!nameTyped.current) setName(full ? shortTitle(full) : "");
+    if (!full) nameRef.current?.focus();
   };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!naming || !naming.name.trim()) return;
+    if (busy) return;
+    if (!videoId) { setError("That doesn't look like a YouTube video link."); return; }
+    if (music.tracks.some(t => t.video_id === videoId)) { setError("That track is already in your playlist."); return; }
     setBusy(true);
+    setError(null);
+    let title = name.trim();
+    if (!title) {
+      const full = found?.videoId === videoId ? found.full : await fetchTitle(videoId);
+      title = full ? shortTitle(full) : "";
+    }
+    if (!title) {
+      setBusy(false);
+      setError("YouTube didn't give a title. Type a name for it.");
+      nameRef.current?.focus();
+      return;
+    }
     try {
-      const track = await music.addTrack(naming.videoId, naming.name.trim());
-      setNaming(null);
+      const track = await music.addTrack(videoId, title);
+      setLink(""); setName(""); setFound(null);
+      nameTyped.current = false;
+      lookupFor.current = null;
       setAdded(track.id);
-      setLink("");
     } catch (err) {
       console.error("Failed to add track:", err);
       setError("Couldn't save that track.");
     }
     setBusy(false);
   };
+
+  const finishRename = () => {
+    if (!editing) return;
+    const title = editing.title.trim();
+    const track = music.tracks.find(t => t.id === editing.id);
+    if (title && track && title !== track.title) music.renameTrack(editing.id, title);
+    setEditing(null);
+  };
+
+  const input = "flex-1 min-w-0 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-white/30 placeholder:text-white/25";
 
   return (
     <>
@@ -170,6 +212,26 @@ function Playlist({ music }: { music: MusicData }) {
       >
         {music.tracks.map(t => {
           const on = music.current?.id === t.id;
+          if (editing?.id === t.id) {
+            return (
+              <div key={t.id} data-track={t.id} className="shrink-0 flex items-center gap-2 px-2 py-1">
+                <span className="w-3 shrink-0" />
+                <input
+                  value={editing.title}
+                  onChange={e => setEditing({ ...editing, title: e.target.value })}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") { e.preventDefault(); finishRename(); }
+                    if (e.key === "Escape") { e.preventDefault(); setEditing(null); }
+                  }}
+                  onBlur={finishRename}
+                  autoFocus
+                  onFocus={e => e.target.select()}
+                  aria-label="Track name"
+                  className="flex-1 min-w-0 bg-black/40 border border-white/20 rounded-md px-2 py-1 text-[13px] text-white outline-none focus:border-white/40"
+                />
+              </div>
+            );
+          }
           return (
             <div
               key={t.id}
@@ -184,11 +246,18 @@ function Playlist({ music }: { music: MusicData }) {
                 {on ? (music.playing ? <Pause className="w-3 h-3 shrink-0 fill-current" /> : <Play className="w-3 h-3 shrink-0 fill-current" />) : <span className="w-3 shrink-0" />}
                 <span className="truncate">{t.title}</span>
               </span>
-              <span className="flex items-center gap-2 shrink-0">
+              <span className="flex items-center gap-1.5 shrink-0">
                 <span className="font-mono text-[11px] text-white/40 tabular-nums">{formatLength(t.seconds)}</span>
                 <button
+                  onClick={e => { e.stopPropagation(); setEditing({ id: t.id, title: t.title }); }}
+                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-white/30 hover:text-white p-0.5 transition-opacity"
+                  aria-label="Rename track"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+                <button
                   onClick={e => { e.stopPropagation(); music.deleteTrack(t.id); }}
-                  className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 p-0.5 transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-white/30 hover:text-red-400 p-0.5 transition-opacity"
                   aria-label="Remove track"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -200,32 +269,33 @@ function Playlist({ music }: { music: MusicData }) {
         {!music.tracks.length && <p className="text-xs text-white/30 italic px-2 py-2">No tracks yet. Paste a YouTube link below.</p>}
       </div>
 
-      {naming ? (
-        <form onSubmit={save} className="shrink-0 flex flex-col gap-2 border-t border-white/[0.06] pt-3">
-          <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Name it</label>
-          <div className="flex gap-2">
-            <input
-              value={naming.name}
-              onChange={e => setNaming({ ...naming, name: e.target.value })}
-              autoFocus
-              onFocus={e => e.target.select()}
-              className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-white/30"
-            />
-            <button disabled={busy || !naming.name.trim()} className="px-3 bg-white text-black rounded-lg text-[10px] uppercase tracking-widest font-bold disabled:opacity-50">Save</button>
-          </div>
-          {naming.full && <span className="text-[11px] text-white/30 truncate">YouTube: {naming.full}</span>}
-        </form>
-      ) : (
-        <form onSubmit={lookUp} className="shrink-0 flex gap-2">
+      <form onSubmit={save} className="shrink-0 flex flex-col gap-2">
+        <div className="flex gap-2">
           <input
             value={link}
-            onChange={e => { setLink(e.target.value); setError(null); }}
+            onChange={e => changeLink(e.target.value)}
             placeholder="Paste a YouTube link"
-            className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-white/30 placeholder:text-white/25"
+            aria-label="YouTube link"
+            className={input}
           />
-          <button disabled={busy || !link.trim()} className="px-3 bg-white text-black rounded-lg text-[10px] uppercase tracking-widest font-bold disabled:opacity-50">Add</button>
-        </form>
-      )}
+          <button disabled={busy || !videoId} className="px-3 bg-white text-black rounded-lg text-[10px] uppercase tracking-widest font-bold disabled:opacity-50">
+            {busy ? "…" : "Add"}
+          </button>
+        </div>
+        {videoId && (
+          <input
+            ref={nameRef}
+            value={name}
+            onChange={e => { setName(e.target.value); nameTyped.current = true; setError(null); }}
+            placeholder={lookingUp ? "Getting the title from YouTube…" : "Name this track"}
+            aria-label="Track name"
+            className={input}
+          />
+        )}
+        {videoId && found?.videoId === videoId && found.full && (
+          <span className="text-[11px] text-white/30 truncate px-1">YouTube: {found.full}</span>
+        )}
+      </form>
       {error && <p className="shrink-0 text-[11px] text-red-400/80 px-1">{error}</p>}
     </>
   );
