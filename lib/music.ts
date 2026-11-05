@@ -7,10 +7,11 @@ export function parseVideoId(link: string): string | null {
   try {
     const url = new URL(s.startsWith("http") ? s : `https://${s}`);
     const host = url.hostname.replace(/^www\.|^m\.|^music\./, "");
-    if (host === "youtu.be") return url.pathname.slice(1, 12) || null;
+    const id = (raw: string | null | undefined) => (raw && /^[\w-]{11}$/.test(raw.slice(0, 11)) ? raw.slice(0, 11) : null);
+    if (host === "youtu.be") return id(url.pathname.slice(1));
     if (host === "youtube.com" || host === "youtube-nocookie.com") {
       const v = url.searchParams.get("v");
-      if (v) return v.slice(0, 11);
+      if (v) return id(v);
       const m = url.pathname.match(/^\/(?:embed|shorts|live|v)\/([\w-]{11})/);
       if (m) return m[1];
     }

@@ -98,12 +98,18 @@ export function useMusic(person: string | null) {
     if (error) console.error("Failed to remove track:", error);
   }, [currentId, stop]);
 
+  const renameTrack = useCallback(async (id: string, title: string) => {
+    setTracks(prev => prev.map(t => t.id === id ? { ...t, title } : t));
+    const { error } = await supabase.from("study_tracks").update({ title }).eq("id", id);
+    if (error) { console.error("Failed to rename track:", error); reload(); }
+  }, [reload]);
+
   const saveLength = useCallback(async (id: string, seconds: number) => {
     setTracks(prev => prev.map(t => t.id === id ? { ...t, seconds } : t));
     await supabase.from("study_tracks").update({ seconds }).eq("id", id);
   }, []);
 
-  return { tracks, current, playing, setPlaying, open, setOpen, play, toggle, stop, next, prev, addTrack, deleteTrack, saveLength, playerRef };
+  return { tracks, current, playing, setPlaying, open, setOpen, play, toggle, stop, next, prev, addTrack, deleteTrack, renameTrack, saveLength, playerRef };
 }
 
 export type MusicData = ReturnType<typeof useMusic>;
