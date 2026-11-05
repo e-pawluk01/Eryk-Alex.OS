@@ -90,18 +90,21 @@ export function MusicPlayer({ music }: { music: MusicData }) {
     <div
       className={cn(
         "fixed z-[55] bg-zinc-950/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/60 flex flex-col w-80 p-4 gap-3",
-        panel ? "right-6 bottom-24 max-w-[calc(100vw-3rem)]" : "-left-[10000px] top-0 pointer-events-none"
+        // Never taller than the window, so the playlist scrolls instead of running off screen.
+        panel ? "right-6 bottom-24 max-w-[calc(100vw-3rem)] max-h-[calc(100dvh-7.5rem)]" : "-left-[10000px] top-0 pointer-events-none"
       )}
       aria-hidden={!panel}
     >
-      <div key="head" className="flex items-center justify-between px-1">
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Music</span>
+      <div key="head" className="shrink-0 flex items-center justify-between px-1">
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
+          Music{music.tracks.length > 0 && <span className="text-white/25"> · {music.tracks.length} {music.tracks.length === 1 ? "track" : "tracks"}</span>}
+        </span>
         <button onClick={() => music.setOpen(false)} className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10" aria-label="Close music">
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      <div key="video" className={cn("relative aspect-video rounded-lg overflow-hidden bg-black border border-border", !music.current && "hidden")}>
+      <div key="video" className={cn("shrink-0 relative aspect-video rounded-lg overflow-hidden bg-black border border-border", !music.current && "hidden")}>
         <div ref={hostRef} className="absolute inset-0 [&>iframe]:w-full [&>iframe]:h-full" />
       </div>
 
@@ -116,6 +119,16 @@ function Playlist({ music }: { music: MusicData }) {
   const [naming, setNaming] = useState<{ videoId: string; full: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The track just added: scrolled into view and briefly highlighted.
+  const [added, setAdded] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!added) return;
+    listRef.current?.querySelector(`[data-track="${added}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const t = setTimeout(() => setAdded(null), 2500);
+    return () => clearTimeout(t);
+  }, [added]);
 
   const lookUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,8 +151,9 @@ function Playlist({ music }: { music: MusicData }) {
     if (!naming || !naming.name.trim()) return;
     setBusy(true);
     try {
-      await music.addTrack(naming.videoId, naming.name.trim());
+      const track = await music.addTrack(naming.videoId, naming.name.trim());
       setNaming(null);
+      setAdded(track.id);
       setLink("");
     } catch (err) {
       console.error("Failed to add track:", err);
@@ -150,14 +164,21 @@ function Playlist({ music }: { music: MusicData }) {
 
   return (
     <>
-      <div className="flex flex-col max-h-60 overflow-y-auto">
+      <div
+        ref={listRef}
+        className="flex flex-col min-h-0 max-h-80 overflow-y-auto overscroll-contain -mr-2 pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.2)_transparent]"
+      >
         {music.tracks.map(t => {
           const on = music.current?.id === t.id;
           return (
             <div
               key={t.id}
+              data-track={t.id}
               onClick={() => (on ? music.toggle() : music.play(t.id))}
-              className={cn("group flex items-center justify-between gap-3 px-2 py-2 rounded-md cursor-pointer", on ? "bg-white/[0.07] text-white" : "hover:bg-white/[0.04] text-white/85")}
+              className={cn(
+                "group shrink-0 flex items-center justify-between gap-3 px-2 py-2 rounded-md cursor-pointer transition-colors duration-700",
+                on ? "bg-white/[0.07] text-white" : added === t.id ? "bg-emerald-400/15 text-white" : "hover:bg-white/[0.04] text-white/85"
+              )}
             >
               <span className="flex items-center gap-2 text-[13px] min-w-0">
                 {on ? (music.playing ? <Pause className="w-3 h-3 shrink-0 fill-current" /> : <Play className="w-3 h-3 shrink-0 fill-current" />) : <span className="w-3 shrink-0" />}
@@ -180,7 +201,7 @@ function Playlist({ music }: { music: MusicData }) {
       </div>
 
       {naming ? (
-        <form onSubmit={save} className="flex flex-col gap-2 border-t border-white/[0.06] pt-3">
+        <form onSubmit={save} className="shrink-0 flex flex-col gap-2 border-t border-white/[0.06] pt-3">
           <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Name it</label>
           <div className="flex gap-2">
             <input
@@ -195,7 +216,7 @@ function Playlist({ music }: { music: MusicData }) {
           {naming.full && <span className="text-[11px] text-white/30 truncate">YouTube: {naming.full}</span>}
         </form>
       ) : (
-        <form onSubmit={lookUp} className="flex gap-2">
+        <form onSubmit={lookUp} className="shrink-0 flex gap-2">
           <input
             value={link}
             onChange={e => { setLink(e.target.value); setError(null); }}
@@ -205,7 +226,7 @@ function Playlist({ music }: { music: MusicData }) {
           <button disabled={busy || !link.trim()} className="px-3 bg-white text-black rounded-lg text-[10px] uppercase tracking-widest font-bold disabled:opacity-50">Add</button>
         </form>
       )}
-      {error && <p className="text-[11px] text-red-400/80 px-1">{error}</p>}
+      {error && <p className="shrink-0 text-[11px] text-red-400/80 px-1">{error}</p>}
     </>
   );
 }
