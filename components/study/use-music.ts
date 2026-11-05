@@ -29,13 +29,22 @@ export function useMusic(person: string | null) {
   const [open, setOpen] = useState(false);
   const playerRef = useRef<YTPlayer | null>(null);
 
-  useEffect(() => {
+  const reload = useCallback(async () => {
     if (!person) return;
-    supabase.from("study_tracks").select("*").eq("person", person).order("created_at").then(({ data, error }) => {
-      if (error) console.error("Failed to load playlist:", error);
-      else setTracks(data as StudyTrack[]);
-    });
+    const { data, error } = await supabase.from("study_tracks").select("*").eq("person", person).order("created_at");
+    if (error) console.error("Failed to load playlist:", error);
+    else setTracks(data as StudyTrack[]);
   }, [person]);
+
+  // Load on login, and again whenever the panel opens or you come back to the
+  // tab, so a track added on another device or tab shows up without a refresh.
+  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { if (open) reload(); }, [open, reload]);
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") reload(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [reload]);
 
   const current = tracks.find(t => t.id === currentId) ?? null;
 
@@ -77,7 +86,9 @@ export function useMusic(person: string | null) {
   const addTrack = useCallback(async (videoId: string, title: string) => {
     const { data, error } = await supabase.from("study_tracks").insert({ person, video_id: videoId, title }).select().single();
     if (error) throw error;
-    setTracks(prev => [...prev, data as StudyTrack]);
+    const track = data as StudyTrack;
+    setTracks(prev => (prev.some(t => t.id === track.id) ? prev : [...prev, track]));
+    return track;
   }, [person]);
 
   const deleteTrack = useCallback(async (id: string) => {
