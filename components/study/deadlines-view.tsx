@@ -1,119 +1,115 @@
 "use client";
 
-import React, { useState } from "react";
-import { Settings2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Plus, Settings2 } from "lucide-react";
+import { addDays, differenceInCalendarDays, format, parseISO, startOfDay, startOfWeek } from "date-fns";
 import { cn } from "@/lib/utils";
-import { byCutoff, daysUntil, hoursText, isCurrent, progressLabel, shortDate, shortTime, urgency, URGENCY_TEXT } from "@/lib/study";
+import { CURRENT_WITHIN_DAYS, daysUntil, urgency } from "@/lib/study";
 import { StudyDeadline } from "@/lib/types";
-import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { StudyData } from "./use-study";
-import { Countdown, ModuleDot, OpenTag, TypeChip } from "./bits";
+import { ModuleDot } from "./bits";
 import { DeadlinePanel } from "./deadline-panel";
 import { DeadlineDialog } from "./deadline-dialog";
 import { ModulesDialog } from "./modules-dialog";
-import { DeadlineProgressDialog, ProgressBar } from "./deadline-progress";
 
-// Same columns on every row so names, types, windows, dates and countdowns line up.
-const ROW = "grid grid-cols-[16px_10px_minmax(0,1fr)_54px] md:grid-cols-[16px_10px_minmax(0,1fr)_96px_100px_96px_54px] gap-3.5 items-center";
+const ZOOM_KEY = "deadlines-zoom";
+const ZOOMS = [{ weeks: 1, label: "Week" }, { weeks: 2, label: "2 weeks" }, { weeks: 4, label: "4 weeks" }] as const;
+type Weeks = (typeof ZOOMS)[number]["weeks"];
+const COL_W = 120; // px per column
+const DAYS_LEFT = ["text-white/75", "text-white", "text-[#e0a33a]", "text-[#e66767]"];
 
-/** Full Deadlines page, opened from the Study side tab. */
+/**
+ * Full Deadlines page, opened from the Study side tab: a Gantt chart from this
+ * week on. Each bar runs from when the deadline opens to its cut-off: solid once
+ * open, pale before. Done and past deadlines don't show.
+ */
 export function DeadlinesView({ study }: { study: StudyData }) {
-  const [tab, setTab] = useState<"upcoming" | "done">("upcoming");
+  const [weeks, setWeeks] = useState<Weeks>(1);
+  useEffect(() => {
+    try { const v = Number(localStorage.getItem(ZOOM_KEY)); if (v === 2 || v === 4) setWeeks(v); } catch { /* optional */ }
+  }, []);
+  const pickWeeks = (w: Weeks) => {
+    setWeeks(w);
+    try { localStorage.setItem(ZOOM_KEY, String(w)); } catch { /* optional */ }
+  };
   const [filter, setFilter] = useState<string>("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [modulesOpen, setModulesOpen] = useState<false | "list" | "add">(false);
+  // The names column fades into the bars once the chart is scrolled sideways.
+  const [scrolled, setScrolled] = useState(false);
 
-  const moduleOf = (d: StudyDeadline) => study.modules.find(m => m.id === d.module_id);
-  const inFilter = (d: StudyDeadline) => filter === "all" || d.module_id === filter;
-  const list = study.deadlines
-    .filter(d => (tab === "done" ? d.done : !d.done) && inFilter(d))
-    .sort((a, b) => (tab === "done" ? -byCutoff(a, b) : byCutoff(a, b)));
-  const thisWeek = tab === "upcoming" ? list.filter(d => daysUntil(d.cutoff_on) <= 7) : [];
-  const later = tab === "upcoming" ? list.filter(d => daysUntil(d.cutoff_on) > 7) : list;
-  const working = study.deadlines.filter(d => isCurrent(d) && inFilter(d)).sort(byCutoff);
-  const [progressId, setProgressId] = useState<string | null>(null);
-  const progressFor = study.deadlines.find(d => d.id === progressId) ?? null;
+  const today = startOfDay(new Date());
+  const monday = startOfWeek(today, { weekStartsOn: 1 });
+  const span = 7 * weeks; // days per column
+  const px = (date: Date) => (differenceInCalendarDays(date, monday) / span) * COL_W;
+
+  const list = study.deadlines.filter(d =>
+    !d.done && daysUntil(d.cutoff_on) >= 0 && (filter === "all" || d.module_id === filter)
+  );
+  const lastCut = list.reduce((a, d) => (parseISO(d.cutoff_on) > a ? parseISO(d.cutoff_on) : a), monday);
+  const cols = Math.max(4, Math.ceil((differenceInCalendarDays(lastCut, monday) + 1) / span) + 1);
+  const trackW = cols * COL_W;
   const open = study.deadlines.find(d => d.id === openId) ?? null;
 
-  const doneCount = (moduleId: string) => {
-    const all = study.deadlines.filter(d => moduleId === "all" || d.module_id === moduleId);
-    return `${all.filter(d => d.done).length}/${all.length}`;
-  };
-
-  const row = (d: StudyDeadline) => {
-    const module = moduleOf(d);
-    const u = d.done ? "text-muted-foreground" : URGENCY_TEXT[urgency(daysUntil(d.cutoff_on))];
+  const bar = (d: StudyDeadline, color: string) => {
+    // No start date: assume the weeks before the cut-off the app already counts as "working on".
+    const start = d.opens_on ? parseISO(d.opens_on) : addDays(parseISO(d.cutoff_on), -CURRENT_WITHIN_DAYS);
+    const notOpen = !!d.opens_on && start > today;
+    // Started before this week: an ordinary rounded bar, just clear of the names column.
+    const x0 = start < monday ? 6 : px(start);
+    const w = Math.max(8, px(addDays(parseISO(d.cutoff_on), 1)) - x0);
+    const days = daysUntil(d.cutoff_on);
+    const background = notOpen ? `${color}38` : d.opens_on ? color : `linear-gradient(90deg, ${color}00, ${color} 60%)`;
     return (
-      <div key={d.id} onClick={() => setOpenId(d.id)} className={cn(ROW, "px-1 py-3 border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.02]")}>
-        <span onClick={e => e.stopPropagation()}>
-          <CustomCheckbox checked={d.done} onChange={checked => study.updateDeadline(d.id, { done: checked })} />
+      <div key={d.id} className="relative h-14">
+        <button
+          type="button"
+          onClick={() => setOpenId(d.id)}
+          title={d.title}
+          className="absolute top-3 h-8 rounded-lg z-[1] hover:brightness-125 transition-[filter]"
+          style={{ left: x0, width: w, background }}
+        />
+        <span
+          className={cn("absolute top-1/2 -translate-y-1/2 font-mono tabular-nums text-xs font-semibold whitespace-nowrap", DAYS_LEFT[urgency(days)])}
+          style={{ left: x0 + w + 8 }}
+        >
+          {days === 0 ? "today" : `${days}d`}
         </span>
-        <ModuleDot module={module} />
-        <span className={cn("text-sm truncate", d.done && "text-white/30 line-through")}>{d.title}</span>
-        <span className="hidden md:flex"><TypeChip type={d.type} module={module} /></span>
-        <span className="hidden md:flex">{d.done ? (d.score ? <span className="text-xs text-muted-foreground">Score {d.score}</span> : null) : <OpenTag deadline={d} />}</span>
-        <span className={cn("hidden md:block text-xs text-right tabular-nums whitespace-nowrap", u)}>{shortDate(d.cutoff_on)}</span>
-        <span className="text-xs text-right font-semibold">{d.done ? <span className="text-muted-foreground">done</span> : <Countdown deadline={d} />}</span>
       </div>
     );
   };
+
+  const groups = study.modules
+    .map(m => ({ module: m, items: list.filter(d => d.module_id === m.id).sort((a, b) => a.cutoff_on.localeCompare(b.cutoff_on)) }))
+    .filter(g => g.items.length > 0);
+
+  const sticky = cn(
+    "sticky left-0 z-[3] bg-background",
+    "after:content-[''] after:absolute after:inset-y-0 after:-right-12 after:w-12 after:pointer-events-none",
+    "after:bg-gradient-to-r after:from-background after:to-transparent after:transition-opacity",
+    scrolled ? "after:opacity-100" : "after:opacity-0"
+  );
 
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between gap-3 flex-wrap border-b border-border pb-2">
         <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Deadlines</h2>
         <div className="flex gap-1.5">
-          {(["upcoming", "done"] as const).map(t => (
+          {ZOOMS.map(z => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={z.weeks}
+              onClick={() => pickWeeks(z.weeks)}
               className={cn(
                 "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border transition-all",
-                tab === t ? "bg-white/15 text-white border-white/30" : "bg-white/[0.03] text-white/40 border-white/10 hover:text-white"
+                weeks === z.weeks ? "bg-white/15 text-white border-white/30" : "bg-white/[0.03] text-white/40 border-white/10 hover:text-white"
               )}
             >
-              {t}
+              {z.label}
             </button>
           ))}
         </div>
       </div>
-
-      {tab === "upcoming" && working.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <span className="text-[10px] uppercase tracking-[0.16em] font-semibold text-muted-foreground">Working on</span>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {working.map(d => {
-              const module = moduleOf(d);
-              return (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => setProgressId(d.id)}
-                  className="bg-card border rounded-lg p-4 flex flex-col gap-3 text-left hover:bg-white/[0.02] transition-colors"
-                  style={{ borderColor: `${module?.color ?? "#262626"}55` }}
-                >
-                  <div className="flex items-center justify-between gap-3 w-full">
-                    <span className="flex items-center gap-2 min-w-0">
-                      <ModuleDot module={module} />
-                      <span className="font-medium text-white truncate">{d.title}</span>
-                      <TypeChip type={d.type} module={module} />
-                    </span>
-                    <Countdown deadline={d} className="text-lg font-semibold" />
-                  </div>
-                  <div className="flex justify-between gap-3 text-[11px] text-muted-foreground w-full">
-                    <span className="truncate min-w-0">
-                      {d.opens_on ? "Open now · cut-off " : ""}{shortDate(d.cutoff_on)}{shortTime(d.cutoff_time) ? ` · ${shortTime(d.cutoff_time)}` : ""}
-                    </span>
-                    <span className="whitespace-nowrap"><span className="text-white/70">{progressLabel(d)}</span> · {hoursText(study.loggedByDeadline[d.id] ?? 0)} logged</span>
-                  </div>
-                  <ProgressBar deadline={d} module={module} />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {[{ id: "all", name: "All" }, ...study.modules].map(m => (
@@ -127,7 +123,6 @@ export function DeadlinesView({ study }: { study: StudyData }) {
           >
             {"color" in m && <ModuleDot module={m} />}
             {m.name}
-            <span className="tabular-nums text-white/30">{doneCount(m.id)}</span>
           </button>
         ))}
         <button onClick={() => setModulesOpen("list")} className="ml-auto p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors" title="Modules">
@@ -135,45 +130,74 @@ export function DeadlinesView({ study }: { study: StudyData }) {
         </button>
       </div>
 
-      <div className="flex flex-col">
-        {list.length > 0 && (
-          <div className={cn(ROW, "px-1 pb-2 border-b border-border text-[9px] uppercase tracking-[0.16em] font-semibold text-white/30")}>
-            <span /><span /><span>Name</span>
-            <span className="hidden md:block">Type</span>
-            <span className="hidden md:block">{tab === "done" ? "Score" : "Window"}</span>
-            <span className="hidden md:block text-right">Cut-off</span>
-            <span className="text-right">Left</span>
+      {groups.length === 0 ? (
+        <p className="text-xs text-white/30 italic py-4">
+          {!study.modules.length ? "Add your modules first, then your deadlines." : "No upcoming deadlines."}
+        </p>
+      ) : (
+        <div className="overflow-x-auto overscroll-x-contain" onScroll={e => setScrolled(e.currentTarget.scrollLeft > 2)}>
+          <div className="grid grid-cols-[140px_max-content] md:grid-cols-[220px_max-content]">
+            {/* Column headings: this week is "Today", then each column's start date */}
+            <div className={sticky} />
+            <div className="relative h-8" style={{ width: trackW }}>
+              {Array.from({ length: cols }, (_, i) => (
+                <span
+                  key={i}
+                  className={cn("absolute inset-y-0 flex items-center pl-2.5 text-[11px] tabular-nums whitespace-nowrap", i === 0 ? "text-white font-semibold" : "text-white/35")}
+                  style={{ left: i * COL_W, width: COL_W }}
+                >
+                  {i === 0 ? "Today" : format(addDays(monday, i * span), "d MMM")}
+                </span>
+              ))}
+            </div>
+
+            {/* Names, grouped by module */}
+            <div className={sticky}>
+              {groups.map(g => (
+                <React.Fragment key={g.module.id}>
+                  <div className="h-10 flex items-end gap-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    <ModuleDot module={g.module} />{g.module.name}
+                  </div>
+                  {g.items.map(d => (
+                    <button key={d.id} type="button" onClick={() => setOpenId(d.id)} className="h-14 w-full flex items-center pr-4 text-sm text-foreground text-left min-w-0">
+                      <span className="truncate" title={d.title}>{d.title}</span>
+                    </button>
+                  ))}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* Bars, with week lines, this week shaded and a line for today */}
+            <div className="relative" style={{ width: trackW }}>
+              <div className="absolute inset-0 pointer-events-none">
+                {Array.from({ length: cols }, (_, i) => (
+                  <span key={i} className="absolute inset-y-0 w-px bg-white/[0.05]" style={{ left: i * COL_W }} />
+                ))}
+                <span className="absolute inset-y-0 bg-white/[0.025]" style={{ left: 0, width: COL_W }} />
+                <span className="absolute inset-y-0 w-0.5 -ml-px bg-white/60 z-[2]" style={{ left: px(today) + COL_W / span / 2 }} />
+              </div>
+              {groups.map(g => (
+                <React.Fragment key={g.module.id}>
+                  <div className="h-10" />
+                  {g.items.map(d => bar(d, g.module.color))}
+                </React.Fragment>
+              ))}
+            </div>
           </div>
-        )}
-        {thisWeek.length > 0 && <span className="pt-4 pb-1 px-1 text-[10px] uppercase tracking-[0.16em] font-semibold text-muted-foreground">Next 7 days</span>}
-        {thisWeek.map(row)}
-        {later.length > 0 && tab === "upcoming" && thisWeek.length > 0 && <span className="pt-4 pb-1 px-1 text-[10px] uppercase tracking-[0.16em] font-semibold text-muted-foreground">Later</span>}
-        {later.map(row)}
-        {!list.length && (
-          <p className="text-xs text-white/30 italic py-4">
-            {!study.modules.length ? "Add your modules first, then your deadlines." : tab === "done" ? "Nothing done yet." : "No upcoming deadlines."}
-          </p>
-        )}
-      </div>
+        </div>
+      )}
 
       <button
         type="button"
         onClick={() => (study.modules.length ? setAdding(true) : setModulesOpen("add"))}
-        className="w-full py-3 border border-dashed border-border rounded-lg text-xs uppercase tracking-widest font-semibold text-muted-foreground hover:text-white hover:border-white/20 transition-colors"
+        aria-label="Add a deadline"
+        title="Add a deadline"
+        className="w-8 h-8 rounded-full border border-dashed border-white/10 hover:border-white/30 hover:bg-white/5 text-white/40 hover:text-white transition-all flex items-center justify-center mx-auto"
       >
-        {study.modules.length ? "+ Add a deadline" : "+ Add a module"}
+        <Plus className="w-4 h-4" />
       </button>
 
       <DeadlinePanel study={study} deadline={open} onClose={() => setOpenId(null)} />
-      {progressFor && (
-        <DeadlineProgressDialog
-          deadline={progressFor}
-          module={moduleOf(progressFor)}
-          onSave={p => study.updateDeadline(progressFor.id, p)}
-          onClose={() => setProgressId(null)}
-          onDetails={() => { setProgressId(null); setOpenId(progressFor.id); }}
-        />
-      )}
       {adding && <DeadlineDialog study={study} onClose={() => setAdding(false)} onNeedModule={() => { setAdding(false); setModulesOpen("add"); }} />}
       {modulesOpen && <ModulesDialog study={study} startAdding={modulesOpen === "add"} onClose={() => setModulesOpen(false)} />}
     </div>
