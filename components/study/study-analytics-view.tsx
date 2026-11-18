@@ -5,21 +5,26 @@ import { endOfMonth, format, isSameDay } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { MetricCard } from "@/components/metric-card";
 import { MetricSection } from "@/components/metric-section";
+import { DetailPanel } from "@/components/analytics-details";
+import { Breakdown } from "@/components/breakdown";
 import { ChartFrame } from "@/components/charts/chart-frame";
 import { ColumnChart } from "@/components/charts/column-chart";
 import { comparisonWindow } from "@/lib/analytics-data";
-import { fetchMonthStudySessions, fetchStudySessions, studiedHours } from "@/lib/study-analytics";
-import { StudySession, STUDY_CHANGED_EVENT, formatDuration, studiedSeconds } from "@/lib/study-sessions";
+import { KINDS, ModuleGroup, fetchMonthStudySessions, fetchStudySessions, moduleGroups, studiedHours } from "@/lib/study-analytics";
+import { StudySession, STUDY_CHANGED_EVENT, formatDuration, studiedSeconds, whatLabel } from "@/lib/study-sessions";
 import { StudyModule } from "@/lib/types";
 import { StudyData } from "./use-study";
 
 const OTHER_COLOR = "#555553";
+// Colours for the items inside a module's breakdown, in turn.
+const ITEM_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#a24bb5", "#2bb3c0", "#d55181", "#8a8f98"];
 
 /** Study analytics, opened from the Study side tab. */
 export function StudyAnalyticsView({ study }: { study: StudyData }) {
   const [loading, setLoading] = useState(true);
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [prevHours, setPrevHours] = useState(0);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const { person } = study;
 
   const load = useCallback(async () => {
@@ -53,6 +58,11 @@ export function StudyAnalyticsView({ study }: { study: StudyData }) {
   const dailyAvg = (totalHours * 3600) / now.getDate();
   const today = sessions.filter((s) => isSameDay(new Date(s.started_at), now)).reduce((acc, s) => acc + studiedSeconds(s), 0);
 
+  // --- Modules -------------------------------------------------------------
+  const groups = moduleGroups(sessions, study.modules);
+  const open = groups.find((g) => g.key === openGroup) ?? null;
+  const share = (hours: number) => (totalHours > 0 ? Math.round((hours / totalHours) * 100) : 0);
+
   // Last month's same days only when there was studying then to compare with.
   const vsLastMonth = (hours: number) => (prevHours > 0 ? `${lastMonth} same days · ${hours.toFixed(1)}h` : undefined);
 
@@ -77,6 +87,24 @@ export function StudyAnalyticsView({ study }: { study: StudyData }) {
           <MetricCard title="Sessions" value={sessions.length}
             sub={sessions.length ? `avg ${formatDuration(avgSession)} each` : undefined} />
           <MetricCard title="Daily Average" compact value={formatDuration(dailyAvg)} sub={`today ${formatDuration(today)}`} />
+        </MetricSection>
+
+        {/* MODULES — the two course modules, self-study and anything else */}
+        <MetricSection
+          title="Modules"
+          loading={loading}
+          chart={<ModuleKindsChart groups={groups} />}
+          detail={open ? <GroupBreakdownPanel group={open} study={study} /> : null}
+        >
+          {groups.map((g) => {
+            const top = itemsOf(g, study)[0];
+            return (
+              <MetricCard key={g.key} title={g.name} value={g.hours.toFixed(1)} suffix="h"
+                sub={g.hours > 0 ? `${share(g.hours)}% · mostly ${top.label}` : "nothing yet"}
+                onClick={g.hours > 0 ? () => setOpenGroup(openGroup === g.key ? null : g.key) : undefined}
+                expanded={openGroup === g.key} />
+            );
+          })}
         </MetricSection>
       </div>
     </div>
@@ -127,6 +155,59 @@ function StudyHoursByWeekChart({ sessions, modules, month }: { sessions: StudySe
             const weekTotal = series.reduce((acc, x) => acc + x.values[c], 0);
             return `${weeks[c].start}–${weeks[c].end} ${mon}\n${series[s].name}: ${series[s].values[c].toFixed(1)}h\nWeek total: ${weekTotal.toFixed(1)}h`;
           }}
+        />
+      )}
+    </ChartFrame>
+  );
+}
+
+// What a box's hours went on (a material, a deadline, revision…), biggest first.
+// Self-study names its module when there's more than one.
+function itemsOf(g: ModuleGroup, study: StudyData) {
+  const selfCount = study.modules.filter((m) => m.kind === "self").length;
+  const totals = new Map<string, number>();
+  g.sessions.forEach((s) => {
+    const what = whatLabel(s, study.materials, study.deadlines);
+    const mod = study.modules.find((m) => m.id === s.module_id);
+    const label = g.key === "self" && selfCount > 1 && mod ? `${mod.name} · ${what}` : what;
+    totals.set(label, (totals.get(label) ?? 0) + studiedSeconds(s) / 3600);
+  });
+  return [...totals.entries()].map(([label, hours]) => ({ label, hours })).sort((a, b) => b.hours - a.hours);
+}
+
+function GroupBreakdownPanel({ group, study }: { group: ModuleGroup; study: StudyData }) {
+  return (
+    <DetailPanel>
+      <Breakdown
+        format={(v) => `${v.toFixed(1)}h`}
+        items={itemsOf(group, study).map((it, i) => ({ label: it.label, value: it.hours, color: ITEM_COLORS[i % ITEM_COLORS.length] }))}
+      />
+    </DetailPanel>
+  );
+}
+
+// MODULES — each box's hours, stacked by what kind of work it was.
+function ModuleKindsChart({ groups }: { groups: ModuleGroup[] }) {
+  const hoursOf = (g: ModuleGroup, kind: StudySession["kind"]) =>
+    g.sessions.filter((s) => s.kind === kind).reduce((acc, s) => acc + studiedSeconds(s), 0) / 3600;
+  const series = KINDS
+    .map((k) => ({ name: k.label, color: k.color, values: groups.map((g) => hoursOf(g, k.kind)) }))
+    .filter((s) => s.values.some((v) => v > 0));
+
+  return (
+    <ChartFrame
+      title="Hours by module, by type of work"
+      legend={series.map((s) => ({ label: s.name, color: s.color }))}
+      empty={groups.every((g) => g.hours === 0) ? "No study logged this month." : undefined}
+    >
+      {(width) => (
+        <ColumnChart
+          width={width}
+          stacked
+          categories={groups.map((g) => g.name)}
+          series={series}
+          axisFormat={(v) => `${v}h`}
+          tip={(c, s) => `${groups[c].name}\n${series[s].name}: ${series[s].values[c].toFixed(1)}h\nTotal: ${groups[c].hours.toFixed(1)}h`}
         />
       )}
     </ChartFrame>
