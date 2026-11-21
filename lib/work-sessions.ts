@@ -15,6 +15,7 @@ export const WORK_TASKS = [
   "Engagement",
   "Strategy",
   "Operations",
+  "Design",
   "Development",
   "Admin",
   "Other",
@@ -35,6 +36,7 @@ export const TASK_COLORS: Record<string, string> = {
   "Operations": "#a87b4f",
   "Content": "#9085e9",
   "Engagement": "#e8c547",
+  "Design": "#d946c8",
   "Development": "#e66767",
   "Other": "#555553",
 };
