@@ -51,7 +51,7 @@ function IconSwitch({ icon: Icon, label, on, onToggle }: { icon: React.ElementTy
 export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: TaskDetailsPanelProps) {
   const { userEmail } = useGlobalContext();
   const userContextName = (userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk") as ContextType;
-  const allowedContexts: ContextType[] = [userContextName, "Reselling", "Drink idea"];
+  const allowedContexts: ContextType[] = [userContextName, "Reselling"];
 
   const [titleDraft, setTitleDraft] = useState("");
   const [descDraft, setDescDraft] = useState("");

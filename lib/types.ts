@@ -1,16 +1,7 @@
 export type ContextType = 
   | "Eryk"
   | "Alex"
-  | "Reselling"
-  | "Drink idea";
-
-export interface Goal {
-  id: string;
-  title: string;
-  year: number;
-  context: string;
-  status: "active" | "completed";
-}
+  | "Reselling";
 
 export interface Task {
   id: string;
