@@ -18,7 +18,6 @@ const contextDotColors: Record<ContextType, string> = {
   Eryk: "bg-blue-400",
   Alex: "bg-purple-400",
   Reselling: "bg-amber-400",
-  "Drink idea": "bg-emerald-400",
 };
 
 const domainPillColors: Record<DomainType, string> = {
