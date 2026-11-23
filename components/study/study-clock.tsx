@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { openSessionOf, openSessionsOf, notifySessionsChanged, sessionLabel, WorkSession } from "@/lib/work-sessions";
 import {
   StudySession, STUDY_CHANGED_EVENT, START_TASK_EVENT, StartTaskDetail, OTHER, TASK,
-  missingText, moduleName, openStudySessionsOf, sessionFields, startRinging, studiedSeconds, switchStudySession, togglePause, whatLabel, minutesLeft, taskSessionFields,
+  missingText, moduleName, openStudySessionsOf, sessionFields, startRinging, studiedSeconds, switchStudySession, togglePause, whatLabel, minutesLeft, taskSessionFields, taskBeginArgs,
 } from "@/lib/study-sessions";
 import { Task } from "@/lib/types";
 import { WorkClockOut } from "@/components/session-form-dialog";
@@ -147,7 +147,8 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
     } else if (open) {
       togglePause(open);
     } else {
-      begin(d.moduleId ?? OTHER, d.moduleId ? d.what ?? "revision" : "", d.title, d.minutes, "", d.taskId);
+      const a = taskBeginArgs({ title: d.title, study_module_id: d.moduleId, study_what: d.what });
+      begin(a.moduleId, a.what, a.text, d.minutes, "", d.taskId);
     }
   };
   useEffect(() => {
@@ -358,7 +359,7 @@ function StartStudyDialog({ study, music, initialModule, tasks, onClose, onBegin
     if (timer > 0 && "Notification" in window && Notification.permission === "default") {
       try { await Notification.requestPermission(); } catch { /* optional */ }
     }
-    if (onTask && task) await onBegin(task.study_module_id ?? OTHER, task.study_module_id ? task.study_what ?? "revision" : "", task.title, timer > 0 ? timer : null, trackId, task.id);
+    if (onTask && task) { const a = taskBeginArgs(task); await onBegin(a.moduleId, a.what, a.text, timer > 0 ? timer : null, trackId, task.id); }
     else await onBegin(moduleId, what, otherText, timer > 0 ? timer : null, trackId);
     setStarting(false);
   };

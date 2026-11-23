@@ -126,14 +126,27 @@ export async function switchStudySession(current: StudySession, to: StudySwitchT
   return {};
 }
 
+// A timed task's typed "what you're doing" (Other, or Something else in a module) is
+// saved in study_what with this prefix.
+export const TASK_TEXT = "custom:";
+
 /**
- * The session columns for a timed task: its module and "On what" when set,
- * else "Other" with the task's name. "Something else" uses the task's name too.
+ * The session columns for a timed task: its module and "On what", or Other /
+ * Something else with what you typed (the task's name if nothing was typed).
  */
 export function taskSessionFields(task: { title: string; study_module_id?: string | null; study_what?: string | null }) {
-  return task.study_module_id
-    ? sessionFields(task.study_module_id, task.study_what ?? "revision", task.title)
-    : sessionFields(OTHER, "", task.title);
+  const typed = task.study_what?.startsWith(TASK_TEXT) ? task.study_what.slice(TASK_TEXT.length) : null;
+  if (!task.study_module_id) return sessionFields(OTHER, "", typed || task.title);
+  if (typed !== null) return sessionFields(task.study_module_id, CUSTOM, typed || task.title);
+  return sessionFields(task.study_module_id, task.study_what ?? "revision", task.title);
+}
+
+/** A timed task's session as the clock's begin() arguments: module, what, typed text. */
+export function taskBeginArgs(task: { title: string; study_module_id?: string | null; study_what?: string | null }) {
+  const f = taskSessionFields(task);
+  if (!f.module_id) return { moduleId: OTHER, what: "", text: f.note ?? task.title };
+  if (f.kind === "other") return { moduleId: f.module_id, what: CUSTOM, text: f.note ?? task.title };
+  return { moduleId: f.module_id, what: task.study_what ?? "revision", text: "" };
 }
 
 /** A timed task's minutes still to go (at least 1). */

@@ -44,10 +44,12 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
   const [studyModule, setStudyModule] = useState<{ moduleId: string | null; what: string | null }>({ moduleId: null, what: null });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const timed = domain === "STUDY" && limitOn;
+  // Other (or Something else) on a timed task needs what you're doing typed, like the clock.
+  const missingWhat = timed && !studyModule.what;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || isSubmitting || (timed && !limitMinutes)) return;
+    if (!title.trim() || isSubmitting || (timed && !limitMinutes) || missingWhat) return;
 
     setIsSubmitting(true);
     try {
@@ -288,7 +290,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
               <div className="mt-2 flex justify-end">
                 <button 
                   type="submit"
-                  disabled={!title.trim() || isSubmitting || (timed && !limitMinutes)}
+                  disabled={!title.trim() || isSubmitting || (timed && !limitMinutes) || missingWhat}
                   className="px-6 py-2.5 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-full hover:bg-white/90 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100"
                 >
                   Create

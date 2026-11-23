@@ -9,7 +9,7 @@ import { TimeField } from "@/components/ui/time-field";
 import { DatePills } from "@/components/ui/date-pills";
 import { StudyDeadline, StudyMaterial, Task } from "@/lib/types";
 import {
-  StudySession, OTHER, CUSTOM, TASK, STUDY_CHANGED_EVENT, addTaskTime, untickIfShort, firstWhat, missingText, formatDuration, minutesLeft, notifyStudyChanged, sessionFields, whatLabel, whatOptions,
+  StudySession, OTHER, CUSTOM, TASK, TASK_TEXT, STUDY_CHANGED_EVENT, addTaskTime, untickIfShort, firstWhat, missingText, formatDuration, minutesLeft, notifyStudyChanged, sessionFields, whatLabel, whatOptions,
 } from "@/lib/study-sessions";
 import { StudyData, useStudy } from "./use-study";
 import { ProgressFields, progressOf } from "./deadline-progress";
@@ -61,7 +61,7 @@ export function useTodaysTimedTasks(person: string | null) {
  * Module pills plus "Task" (when there are timed tasks today) and "Other",
  * then "On what": the module's dropdown, today's tasks, or a text box for Other.
  */
-export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWhat, onOtherText, tasks, taskId, onTask, noText }: {
+export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWhat, onOtherText, tasks, taskId, onTask }: {
   study: StudyData;
   moduleId: string;
   what: string;
@@ -72,8 +72,6 @@ export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWh
   tasks?: Task[];
   taskId?: string | null;
   onTask?: (task: Task) => void;
-  // No text box for Other / Something else (a task uses its own name).
-  noText?: boolean;
 }) {
   const pick = (id: string) => {
     onModule(id);
@@ -111,11 +109,11 @@ export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWh
             ))}
           </div>
         </div>
-      ) : noText && moduleId === OTHER ? null : (
+      ) : (
       <div className="flex flex-col gap-2">
         <FieldLabel>On what</FieldLabel>
         {moduleId !== OTHER && <WhatSelect study={study} moduleId={moduleId} value={what} onChange={onWhat} />}
-        {!noText && (moduleId === OTHER || what === CUSTOM) && (
+        {(moduleId === OTHER || what === CUSTOM) && (
           <input
             type="text"
             value={otherText}
@@ -133,7 +131,8 @@ export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWh
 
 /**
  * A timed task's Module and On what: the time it's clocked for is logged there.
- * Other (no module) logs it as Other with the task's name.
+ * Other (and "Something else" in a module) asks what you're doing, like the clock.
+ * Saved as study_what "custom:<what you typed>".
  */
 export function TaskModuleFields({ person, moduleId, what, onChange }: {
   person: string;
@@ -142,17 +141,19 @@ export function TaskModuleFields({ person, moduleId, what, onChange }: {
   onChange: (moduleId: string | null, what: string | null) => void;
 }) {
   const study = useStudy(person);
+  const typed = what?.startsWith(TASK_TEXT) ? what.slice(TASK_TEXT.length) : "";
   const [mod, setMod] = useState(moduleId ?? OTHER);
-  const [wh, setWh] = useState(what ?? "");
+  const [wh, setWh] = useState(moduleId ? (what?.startsWith(TASK_TEXT) ? CUSTOM : what ?? "") : "");
+  const [text, setText] = useState(typed);
   // Picking a module sets both at once, so report after they settle.
   useEffect(() => {
     const m = mod === OTHER ? null : mod;
-    const w = mod === OTHER ? null : wh || null;
+    const needsText = mod === OTHER || wh === CUSTOM;
+    const w = needsText ? (text.trim() ? TASK_TEXT + text.trim() : null) : wh || null;
     if (m !== (moduleId ?? null) || w !== (what ?? null)) onChange(m, w);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mod, wh]);
-  if (!study.modules.length) return null;
-  return <ModuleAndWhat study={study} moduleId={mod} what={wh} otherText="" onModule={setMod} onWhat={setWh} onOtherText={() => {}} noText />;
+  }, [mod, wh, text]);
+  return <ModuleAndWhat study={study} moduleId={mod} what={wh} otherText={text} onModule={setMod} onWhat={setWh} onOtherText={setText} />;
 }
 
 /** The first module (or Other when there are none) and its first "what". */
