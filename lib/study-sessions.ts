@@ -7,7 +7,7 @@ export interface StudySession {
   id: string;
   person: string;
   module_id: string | null; // null for "Other"
-  kind: "general" | "material" | "deadline" | "revision" | "practice" | "other"; // "general" only on early sessions
+  kind: "general" | "material" | "deadline" | "revision" | "practice" | "preparation" | "other"; // "general" only on early sessions
   note: string | null; // what you were doing, typed (for "Other", or "Something else" in a module)
   material_id: string | null;
   deadline_id: string | null;
@@ -29,7 +29,7 @@ export function notifyStudyChanged() {
 
 // A task panel's play button asks the Study clock to start on that task.
 export const START_TASK_EVENT = "study-start-task";
-export interface StartTaskDetail { taskId: string; title: string; minutes: number }
+export interface StartTaskDetail { taskId: string; title: string; minutes: number; moduleId?: string | null; what?: string | null }
 export function startTaskTimer(detail: StartTaskDetail) {
   window.dispatchEvent(new CustomEvent<StartTaskDetail>(START_TASK_EVENT, { detail }));
 }
@@ -70,19 +70,81 @@ export async function untickIfShort(taskId: string) {
   }
 }
 
-export async function openStudySessionOf(person: string): Promise<StudySession | null> {
+/**
+ * Every open study session: the current one first, then the ones switched
+ * away from (paused), most recently paused first.
+ */
+export async function openStudySessionsOf(person: string): Promise<StudySession[]> {
   const { data } = await supabase
     .from("study_sessions")
     .select("*")
     .eq("person", person)
     .is("ended_at", null)
-    .order("started_at", { ascending: false })
-    .limit(1);
-  return (data?.[0] as StudySession) ?? null;
+    .order("started_at", { ascending: false });
+  const pausedAt = (s: StudySession) => (s.paused_at ? new Date(s.paused_at).getTime() : Infinity);
+  return ((data as StudySession[]) ?? []).sort((a, b) => pausedAt(b) - pausedAt(a));
+}
+
+/** The current study session, if clocked in. */
+export async function openStudySessionOf(person: string): Promise<StudySession | null> {
+  return (await openStudySessionsOf(person))[0] ?? null;
+}
+
+/** What to switch to: a paused session to pick back up, or a new one. */
+export type StudySwitchTarget =
+  | { resume: StudySession }
+  | { fields: ReturnType<typeof sessionFields>; taskId?: string | null; timerMinutes?: number | null };
+
+/**
+ * Pause the current session and resume or start another. The paused one
+ * stays open, so its time keeps counting when you switch back.
+ */
+export async function switchStudySession(current: StudySession, to: StudySwitchTarget): Promise<{ error?: string }> {
+  const now = new Date();
+  if (!current.paused_at) {
+    const { error } = await supabase.from("study_sessions").update({ paused_at: now.toISOString() }).eq("id", current.id);
+    if (error) return { error: error.message };
+  }
+  const { error } = "resume" in to
+    ? await supabase.from("study_sessions").update({
+        paused_at: null,
+        paused_seconds: (to.resume.paused_seconds ?? 0) + (to.resume.paused_at ? Math.round((now.getTime() - new Date(to.resume.paused_at).getTime()) / 1000) : 0),
+      }).eq("id", to.resume.id)
+    : await supabase.from("study_sessions").insert({
+        person: current.person,
+        ...to.fields,
+        task_id: to.taskId ?? null,
+        timer_minutes: to.timerMinutes ?? null,
+        started_at: now.toISOString(),
+      });
+  if (error) {
+    // Undo the pause so you're not left with nothing running.
+    if (!current.paused_at) await supabase.from("study_sessions").update({ paused_at: null }).eq("id", current.id);
+    return { error: error.message };
+  }
+  notifyStudyChanged();
+  return {};
+}
+
+/**
+ * The session columns for a timed task: its module and "On what" when set,
+ * else "Other" with the task's name. "Something else" uses the task's name too.
+ */
+export function taskSessionFields(task: { title: string; study_module_id?: string | null; study_what?: string | null }) {
+  return task.study_module_id
+    ? sessionFields(task.study_module_id, task.study_what ?? "revision", task.title)
+    : sessionFields(OTHER, "", task.title);
+}
+
+/** A timed task's minutes still to go (at least 1). */
+export function minutesLeft(task: { time_limit_minutes?: number | null; time_spent_seconds?: number }) {
+  return Math.max(1, Math.ceil(((task.time_limit_minutes ?? 0) * 60 - (task.time_spent_seconds ?? 0)) / 60));
 }
 
 // The "Other" choice in the module pills (sessions with no module).
 export const OTHER = "other";
+// The "Task" choice in the module pills: one of today's timed tasks.
+export const TASK = "task";
 // "Something else" in a module's dropdown: you type what it is.
 export const CUSTOM = "custom";
 
@@ -111,6 +173,7 @@ export function sessionFields(moduleId: string, what: string, otherText: string)
   if (what.startsWith("deadline:")) return { module_id: moduleId, kind: "deadline", material_id: null, deadline_id: what.slice(9), note: null };
   if (what === CUSTOM) return { module_id: moduleId, kind: "other", material_id: null, deadline_id: null, note: otherText.trim() };
   if (what === "practice") return { module_id: moduleId, kind: "practice", material_id: null, deadline_id: null, note: null };
+  if (what === "preparation") return { module_id: moduleId, kind: "preparation", material_id: null, deadline_id: null, note: null };
   return { module_id: moduleId, kind: "revision", material_id: null, deadline_id: null, note: null };
 }
 
@@ -123,6 +186,7 @@ export function missingText(moduleId: string, what: string, otherText: string) {
 export function whatLabel(s: Pick<StudySession, "kind" | "material_id" | "deadline_id" | "note">, materials: StudyMaterial[], deadlines: StudyDeadline[]) {
   if (s.kind === "other") return s.note || "Other";
   if (s.kind === "practice") return "Practice questions";
+  if (s.kind === "preparation") return "Preparation";
   if (s.kind === "material") return materials.find(m => m.id === s.material_id)?.title ?? "Material";
   if (s.kind === "deadline") return deadlines.find(d => d.id === s.deadline_id)?.title ?? "Deadline";
   return s.kind === "revision" ? "Revision" : "General";

@@ -6,8 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { useGlobalContext } from "./global-context";
 import { WORK_TASKS, partnerOf, openSessionOf, sessionLabel } from "@/lib/work-sessions";
 import { SessionFormDialog } from "./session-form-dialog";
-import { openStudySessionOf, StudySession } from "@/lib/study-sessions";
-import { PromptDialog, StudyClockOutDialog } from "./study/study-clock-dialogs";
+import { openStudySessionsOf, StudySession } from "@/lib/study-sessions";
+import { PromptDialog, StudyClockOutAll } from "./study/study-clock-dialogs";
 
 const TASKS = WORK_TASKS;
 
@@ -29,8 +29,9 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
   // Logging forgotten time instead, starting from the task and Together picked here.
   const [addingMissed, setAddingMissed] = useState(false);
   // Clocked into Study: ask, then clock out of Study before Work starts.
-  const [studyClash, setStudyClash] = useState<StudySession | null>(null);
-  const [studyCheckout, setStudyCheckout] = useState<StudySession | null>(null);
+  // Every open study session (the current one and any switched away from).
+  const [studyClash, setStudyClash] = useState<StudySession[] | null>(null);
+  const [studyCheckout, setStudyCheckout] = useState<StudySession[] | null>(null);
   const { userEmail } = useGlobalContext();
 
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
@@ -45,8 +46,8 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting || missingNote) return;
-    const studying = await openStudySessionOf(userContextName);
-    if (studying) { setStudyClash(studying); return; }
+    const studying = await openStudySessionsOf(userContextName);
+    if (studying.length) { setStudyClash(studying); return; }
     startWork();
   };
 
@@ -185,8 +186,8 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
       )}
 
       {studyCheckout && (
-        <StudyClockOutDialog
-          session={studyCheckout}
+        <StudyClockOutAll
+          sessions={studyCheckout}
           onClose={() => setStudyCheckout(null)}
           onSaved={() => { setStudyCheckout(null); startWork(); }}
         />

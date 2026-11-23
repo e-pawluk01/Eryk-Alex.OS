@@ -10,6 +10,7 @@ import { ConfirmDialog } from "./ui/confirm-dialog";
 import { TagPicker } from "./tags/tags";
 import { ContextTag } from "./ui/context-tag";
 import { TaskTimer, TimeLimitFields } from "./task-timer";
+import { TaskModuleFields } from "./study/study-clock-dialogs";
 
 interface TaskDetailsPanelProps {
   task: Task | null;
@@ -224,6 +225,15 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
               onChange={m => onUpdate(task.id, { time_limit_minutes: m })}
             />
           )}
+          {timed && (
+            <TaskModuleFields
+              key={`module-${task.id}`}
+              person={task.context}
+              moduleId={task.study_module_id ?? null}
+              what={task.study_what ?? null}
+              onChange={(m, w) => onUpdate(task.id, { study_module_id: m, study_what: w })}
+            />
+          )}
 
           {/* Extra Options (hidden for timed tasks: the time bar shows progress) */}
           {!timed && (
@@ -242,7 +252,7 @@ export function TaskDetailsPanel({ task, isOpen, onClose, onUpdate, onDelete }: 
           
           {/* Bottom Actions: play, time bar and delete for a timed task; just delete otherwise */}
           <div className={cn("flex items-center gap-2.5", timed && task.time_limit_minutes ? "justify-between" : "justify-end")}>
-            {timed && !!task.time_limit_minutes && <TaskTimer task={task} person={userContextName} />}
+            {timed && !!task.time_limit_minutes && <TaskTimer task={task} person={userContextName} showTime />}
 
             <button 
               onClick={() => setIsDeleteDialogOpen(true)} 

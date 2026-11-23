@@ -5,26 +5,33 @@ import { Pause, Play } from "lucide-react";
 import { Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
-  StudySession, STUDY_CHANGED_EVENT, openStudySessionOf, startTaskTimer, studiedSeconds, togglePause,
+  StudySession, STUDY_CHANGED_EVENT, minutesLeft, openStudySessionsOf, startTaskTimer, studiedSeconds, togglePause,
 } from "@/lib/study-sessions";
 
-/** The running Study session (if any), kept fresh as sessions start and stop. */
-function useOpenStudySession(person: string) {
-  const [session, setSession] = useState<StudySession | null>(null);
+const clock = (total: number) => {
+  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+};
+
+/** The open Study sessions (current first), kept fresh as sessions start, switch and stop. */
+function useOpenStudySessions(person: string) {
+  const [sessions, setSessions] = useState<StudySession[]>([]);
   useEffect(() => {
     let alive = true;
-    const load = () => openStudySessionOf(person).then(s => { if (alive) setSession(s); });
+    const load = () => openStudySessionsOf(person).then(s => { if (alive) setSessions(s); });
     load();
     window.addEventListener(STUDY_CHANGED_EVENT, load);
     return () => { alive = false; window.removeEventListener(STUDY_CHANGED_EVENT, load); };
   }, [person]);
-  return session;
+  return sessions;
 }
 
 /** Play / pause and the time bar for a timed Study task (the bar looks like Track Progress's). */
-export function TaskTimer({ task, person }: { task: Task; person: string }) {
-  const session = useOpenStudySession(person);
-  const running = !!session && session.task_id === task.id;
+export function TaskTimer({ task, person, showTime }: { task: Task; person: string; showTime?: boolean }) {
+  const sessions = useOpenStudySessions(person);
+  // This task's open session: the current one, or one switched away from (paused).
+  const session = sessions.find(s => s.task_id === task.id) ?? null;
+  const running = !!session;
   const paused = running && !!session!.paused_at;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -39,10 +46,14 @@ export function TaskTimer({ task, person }: { task: Task; person: string }) {
   const pct = task.status === "done" ? 100 : limit ? Math.min(100, (spent / limit) * 100) : 0;
   const done = task.status === "done";
 
-  // Play starts (or resumes); pause pauses. Clocking out is on the Study clock.
+  // Play starts or resumes it (switching away from whatever else is running); pause pauses.
+  // Clocking out is on the Study clock.
   const press = () => {
-    if (running) { togglePause(session!); return; }
-    startTaskTimer({ taskId: task.id, title: task.title, minutes: Math.max(1, Math.ceil((limit - spent) / 60)) });
+    if (running && !paused) { togglePause(session!); return; }
+    startTaskTimer({
+      taskId: task.id, title: task.title, moduleId: task.study_module_id ?? null, what: task.study_what ?? null,
+      minutes: minutesLeft({ time_limit_minutes: task.time_limit_minutes, time_spent_seconds: Math.floor(spent) }),
+    });
   };
 
   return (
@@ -62,6 +73,7 @@ export function TaskTimer({ task, person }: { task: Task; person: string }) {
       <div className="flex-1 min-w-0 h-1.5 bg-white/10 rounded-full relative">
         <div className="absolute left-0 top-0 bottom-0 rounded-full bg-white transition-all duration-300" style={{ width: `${pct}%` }} />
       </div>
+      {showTime && <span className="text-xs font-mono tabular-nums text-white/70 shrink-0">{clock(Math.floor(spent))}</span>}
     </>
   );
 }
