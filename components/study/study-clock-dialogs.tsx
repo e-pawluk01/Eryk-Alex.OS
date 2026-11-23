@@ -111,7 +111,7 @@ export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWh
             ))}
           </div>
         </div>
-      ) : (
+      ) : noText && moduleId === OTHER ? null : (
       <div className="flex flex-col gap-2">
         <FieldLabel>On what</FieldLabel>
         {moduleId !== OTHER && <WhatSelect study={study} moduleId={moduleId} value={what} onChange={onWhat} />}
