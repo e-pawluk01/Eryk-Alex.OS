@@ -51,14 +51,15 @@ export function MetricCard({ title, value, prefix, suffix, className, sub, compa
           )}
         />
       )}
-      <div className="flex items-baseline gap-1 mt-1 min-w-0">
+      {/* w-full: inside a <button> the lines don't always stretch, so long text would run past the edge. */}
+      <div className="flex items-baseline gap-1 mt-1 min-w-0 w-full">
         {prefix && <span className="text-sm text-muted-foreground/50 font-medium">{prefix}</span>}
         <span className={cn("font-semibold tracking-tight text-white truncate", compact ? "text-xl" : "text-2xl")}>{value}</span>
         {suffix && <span className="text-sm text-muted-foreground/50 font-medium">{suffix}</span>}
       </div>
       
       {sub && (
-        <div className="mt-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50 truncate">{sub}</div>
+        <div className="w-full mt-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50 truncate">{sub}</div>
       )}
       {badge && <EarlyBadge label={badge} className="self-start mt-1.5" />}
     </Tag>

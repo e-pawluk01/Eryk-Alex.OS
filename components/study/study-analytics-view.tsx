@@ -11,9 +11,11 @@ import { ChartFrame } from "@/components/charts/chart-frame";
 import { ColumnChart } from "@/components/charts/column-chart";
 import { comparisonWindow } from "@/lib/analytics-data";
 import { KINDS, ModuleGroup, fetchMonthStudySessions, fetchStudySessions, moduleGroups, studiedHours } from "@/lib/study-analytics";
-import { StudySession, STUDY_CHANGED_EVENT, formatDuration, studiedSeconds, whatLabel } from "@/lib/study-sessions";
+import { StudySession, STUDY_CHANGED_EVENT, choiceOf, formatDuration, studiedSeconds, whatLabel } from "@/lib/study-sessions";
 import { StudyModule } from "@/lib/types";
 import { StudyData } from "./use-study";
+import { StudySessionsPanel } from "./study-sessions-panel";
+import { StudyMissedDialog } from "./study-clock-dialogs";
 
 const OTHER_COLOR = "#555553";
 // Colours for the items inside a module's breakdown, in turn.
@@ -25,6 +27,8 @@ export function StudyAnalyticsView({ study }: { study: StudyData }) {
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [prevHours, setPrevHours] = useState(0);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [editing, setEditing] = useState<StudySession | null>(null);
   const { person } = study;
 
   const load = useCallback(async () => {
@@ -81,8 +85,10 @@ export function StudyAnalyticsView({ study }: { study: StudyData }) {
           title="Time"
           loading={loading}
           chart={<StudyHoursByWeekChart sessions={sessions} modules={study.modules} month={now} />}
+          detail={sessionsOpen ? <StudySessionsPanel sessions={sessions} groups={groups} study={study} onEdit={setEditing} /> : null}
         >
-          <MetricCard title="Total Hours" value={totalHours.toFixed(1)} suffix="h" sub={vsLastMonth(prevHours)} />
+          <MetricCard title="Total Hours" value={totalHours.toFixed(1)} suffix="h" sub={vsLastMonth(prevHours)}
+            onClick={() => setSessionsOpen(!sessionsOpen)} expanded={sessionsOpen} />
           <MetricCard title="Hours / Week" value={hoursPerWeek.toFixed(1)} suffix="h" sub={vsLastMonth(prevPerWeek)} />
           <MetricCard title="Sessions" value={sessions.length}
             sub={sessions.length ? `avg ${formatDuration(avgSession)} each` : undefined} />
@@ -107,6 +113,14 @@ export function StudyAnalyticsView({ study }: { study: StudyData }) {
           })}
         </MetricSection>
       </div>
+
+      {editing && (() => {
+        const choice = choiceOf(editing);
+        return (
+          <StudyMissedDialog study={study} session={editing} initialModule={choice.moduleId} initialWhat={choice.what}
+            initialOther={choice.otherText} onClose={() => setEditing(null)} />
+        );
+      })()}
     </div>
   );
 }
