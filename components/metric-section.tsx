@@ -12,6 +12,8 @@ interface MetricSectionProps {
   detail?: React.ReactNode;
   // When given, the heading gets grid/chart icons that swap the cards for this.
   chart?: React.ReactNode;
+  // Colour key shown above the cards when they share colours (e.g. work types).
+  legend?: { label: string; color: string }[];
 }
 
 const storageKey = (title: string) => `analytics-view:${title}`;
@@ -19,7 +21,7 @@ const storageKey = (title: string) => `analytics-view:${title}`;
 // Shared wrapper for a titled block of MetricCards on the analytics dashboard.
 // Matches the existing heading + 2x4 grid pattern; first section sits flush,
 // the rest are separated by mt-8.
-export function MetricSection({ title, loading, children, detail, chart }: MetricSectionProps) {
+export function MetricSection({ title, loading, children, detail, chart, legend }: MetricSectionProps) {
   const [showChart, setShowChart] = useState(false);
 
   // Each section remembers numbers vs chart on this device.
@@ -59,6 +61,15 @@ export function MetricSection({ title, loading, children, detail, chart }: Metri
         chart
       ) : (
         <>
+          {legend && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+              {legend.map((l) => (
+                <span key={l.label} className="flex items-center gap-1.5">
+                  <i className="w-2 h-2 rounded-full" style={{ background: l.color }} />{l.label}
+                </span>
+              ))}
+            </div>
+          )}
           <div
             className={`grid grid-cols-2 md:grid-cols-4 gap-4 transition-opacity duration-300 ${
               loading ? "opacity-50" : "opacity-100"
