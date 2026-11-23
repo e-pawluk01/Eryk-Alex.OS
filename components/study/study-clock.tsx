@@ -2,18 +2,19 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Clock, History, Music, Pause, Play, SkipBack, SkipForward, Square } from "lucide-react";
+import { ArrowLeftRight, Clock, History, Music, Pause, Play, SkipBack, SkipForward, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { openSessionOf, openSessionsOf, notifySessionsChanged, sessionLabel, WorkSession } from "@/lib/work-sessions";
 import {
-  StudySession, STUDY_CHANGED_EVENT, START_TASK_EVENT, StartTaskDetail, OTHER,
-  missingText, moduleName, openStudySessionOf, sessionFields, startRinging, studiedSeconds, togglePause, whatLabel,
+  StudySession, STUDY_CHANGED_EVENT, START_TASK_EVENT, StartTaskDetail, OTHER, TASK,
+  missingText, moduleName, openStudySessionsOf, sessionFields, startRinging, studiedSeconds, switchStudySession, togglePause, whatLabel, minutesLeft, taskSessionFields,
 } from "@/lib/study-sessions";
+import { Task } from "@/lib/types";
 import { WorkClockOut } from "@/components/session-form-dialog";
 import { StudyData } from "./use-study";
 import { MusicData } from "./use-music";
 import { FieldLabel, primaryButton, StudyModal } from "./bits";
-import { ModuleAndWhat, PromptDialog, StudyClockOutDialog, StudyMissedDialog, initialChoice } from "./study-clock-dialogs";
+import { ModuleAndWhat, PromptDialog, StudyClockOutAll, StudyClockOutDialog, StudyMissedDialog, initialChoice, useTodaysTimedTasks } from "./study-clock-dialogs";
 
 const formatTime = (total: number) => {
   const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
@@ -34,7 +35,12 @@ const markRung = (id: string) => { try { localStorage.setItem(rungKey(id), "1");
  */
 export function StudyClock({ study, music, visible }: { study: StudyData; music: MusicData; visible: boolean }) {
   const person = study.person;
-  const [active, setActive] = useState<StudySession | null>(null);
+  // The current session first, then any switched away from (open but paused).
+  const [sessions, setSessions] = useState<StudySession[]>([]);
+  const active = sessions[0] ?? null;
+  const parked = sessions.slice(1);
+  const [switching, setSwitching] = useState(false);
+  const todaysTasks = useTodaysTimedTasks(person);
   const [loaded, setLoaded] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [starting, setStarting] = useState(false);
@@ -45,12 +51,10 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
   const [checkingOut, setCheckingOut] = useState<null | "stop" | "switch">(null);
   const [missed, setMissed] = useState<{ module: string; what: string; other: string } | null>(null);
   const stopRinging = useRef<() => void>(() => {});
-  // A task's play button pressed while another session was running: starts once that one is clocked out.
-  const pendingTask = useRef<StartTaskDetail | null>(null);
 
   const refresh = useCallback(async () => {
     if (!person) return;
-    setActive(await openStudySessionOf(person));
+    setSessions(await openStudySessionsOf(person));
     setLoaded(true);
   }, [person]);
 
@@ -118,7 +122,7 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
         started_at: new Date().toISOString(),
         timer_minutes: timerMinutes,
       });
-      if (error) { console.error("Failed to start studying:", error); return; }
+      if (error) { console.error("Failed to start studying:", error); alert(`Couldn't start studying: ${error.message}`); return; }
       if (trackId && music.current?.id !== trackId) music.play(trackId);
       setStarting(false);
       refresh();
@@ -129,28 +133,35 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
   };
 
   // A timed task's play button: logged as "Other" with the task's name, timer set to the time left.
-  const beginTaskRef = useRef<(d: StartTaskDetail) => void>(() => {});
-  beginTaskRef.current = d => { begin(OTHER, "", d.title, d.minutes, "", d.taskId); };
+  // Already open (switched away from): picked back up. Something else running: switched away from.
+  const startTaskRef = useRef<(d: StartTaskDetail) => void>(() => {});
+  startTaskRef.current = async d => {
+    const open = sessions.find(s => s.task_id === d.taskId);
+    if (open && open.id === active?.id) { if (open.paused_at) togglePause(open); return; }
+    const to = open
+      ? { resume: open }
+      : { fields: taskSessionFields({ title: d.title, study_module_id: d.moduleId, study_what: d.what }), taskId: d.taskId, timerMinutes: d.minutes };
+    if (active) {
+      const { error } = await switchStudySession(active, to);
+      if (error) alert(`Couldn't switch: ${error}`);
+    } else if (open) {
+      togglePause(open);
+    } else {
+      begin(d.moduleId ?? OTHER, d.moduleId ? d.what ?? "revision" : "", d.title, d.minutes, "", d.taskId);
+    }
+  };
   useEffect(() => {
-    const beginTask = (d: StartTaskDetail) => beginTaskRef.current(d);
-    const onStart = (e: Event) => {
-      const d = (e as CustomEvent<StartTaskDetail>).detail;
-      if (active) { pendingTask.current = d; setCheckingOut("stop"); }
-      else beginTask(d);
-    };
+    const onStart = (e: Event) => startTaskRef.current((e as CustomEvent<StartTaskDetail>).detail);
     window.addEventListener(START_TASK_EVENT, onStart);
     return () => window.removeEventListener(START_TASK_EVENT, onStart);
-  }, [active]);
+  }, []);
 
   const afterClockOut = () => {
     const mode = checkingOut;
     const mod = active ? active.module_id ?? OTHER : null;
     setCheckingOut(null);
-    setActive(null);
-    const next = pendingTask.current;
-    pendingTask.current = null;
-    if (next) beginTaskRef.current(next);
-    else if (mode === "switch") { setStartModule(mod); setStarting(true); }
+    refresh();
+    if (mode === "switch") { setStartModule(mod); setStarting(true); }
   };
 
   if (!person || !loaded) return null;
@@ -198,6 +209,19 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => setSwitching(true)}
+                  aria-label="Switch task"
+                  title="Switch task"
+                  className="relative p-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group"
+                >
+                  <ArrowLeftRight className="w-4 h-4 text-white/60 group-hover:text-white transition-colors" />
+                  {parked.length > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-white text-black text-[10px] font-bold grid place-items-center">
+                      {parked.length}
+                    </span>
+                  )}
+                </button>
+                <button
                   onClick={() => togglePause(active)}
                   aria-label={paused ? "Resume" : "Pause"}
                   title={paused ? "Resume" : "Pause"}
@@ -239,6 +263,7 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
           study={study}
           music={music}
           initialModule={startModule}
+          tasks={todaysTasks}
           onClose={() => setStarting(false)}
           onBegin={begin}
           onAddMissed={(mod, what, other) => { setStarting(false); setMissed({ module: mod, what, other }); }}
@@ -280,8 +305,15 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
         />
       )}
 
-      {checkingOut && active && (
-        <StudyClockOutDialog session={active} onClose={() => { pendingTask.current = null; setCheckingOut(null); }} onSaved={afterClockOut} />
+      {checkingOut === "switch" && active && (
+        <StudyClockOutDialog session={active} onClose={() => setCheckingOut(null)} onSaved={afterClockOut} />
+      )}
+      {checkingOut === "stop" && sessions.length > 0 && (
+        <StudyClockOutAll sessions={sessions} onClose={() => { setCheckingOut(null); refresh(); }} onSaved={afterClockOut} />
+      )}
+
+      {switching && active && (
+        <StudySwitchDialog study={study} current={active} parked={parked} tasks={todaysTasks} onClose={() => setSwitching(false)} />
       )}
 
       {missed && <StudyMissedDialog study={study} initialModule={missed.module} initialWhat={missed.what} initialOther={missed.other} onClose={() => setMissed(null)} />}
@@ -289,12 +321,13 @@ export function StudyClock({ study, music, visible }: { study: StudyData; music:
   );
 }
 
-function StartStudyDialog({ study, music, initialModule, onClose, onBegin, onAddMissed }: {
+function StartStudyDialog({ study, music, initialModule, tasks, onClose, onBegin, onAddMissed }: {
   study: StudyData;
   music: MusicData;
   initialModule: string | null;
+  tasks: Task[];
   onClose: () => void;
-  onBegin: (moduleId: string, what: string, otherText: string, timerMinutes: number | null, trackId: string) => Promise<void>;
+  onBegin: (moduleId: string, what: string, otherText: string, timerMinutes: number | null, trackId: string, taskId?: string | null) => Promise<void>;
   onAddMissed: (moduleId: string, what: string, otherText: string) => void;
 }) {
   const start = initialChoice(study, initialModule);
@@ -305,17 +338,28 @@ function StartStudyDialog({ study, music, initialModule, onClose, onBegin, onAdd
   const [minutes, setMinutes] = useState("");
   const [starting, setStarting] = useState(false);
   const [trackId, setTrackId] = useState(music.current?.id ?? "");
+  const [task, setTask] = useState<Task | null>(null);
   const timer = (parseInt(hours) || 0) * 60 + (parseInt(minutes) || 0);
+  const onTask = moduleId === TASK;
+  // Picking a task sets the timer to the time it has left.
+  const pickTask = (t: Task) => {
+    setTask(t);
+    const left = minutesLeft(t);
+    setHours(String(Math.floor(left / 60)));
+    setMinutes(String(left % 60));
+  };
+  const missing = onTask ? !task : missingText(moduleId, what, otherText);
 
   const handleBegin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (starting || missingText(moduleId, what, otherText)) return;
+    if (starting || missing) return;
     setStarting(true);
     // Ask for notification permission now, while it's a direct click.
     if (timer > 0 && "Notification" in window && Notification.permission === "default") {
       try { await Notification.requestPermission(); } catch { /* optional */ }
     }
-    await onBegin(moduleId, what, otherText, timer > 0 ? timer : null, trackId);
+    if (onTask && task) await onBegin(task.study_module_id ?? OTHER, task.study_module_id ? task.study_what ?? "revision" : "", task.title, timer > 0 ? timer : null, trackId, task.id);
+    else await onBegin(moduleId, what, otherText, timer > 0 ? timer : null, trackId);
     setStarting(false);
   };
 
@@ -324,9 +368,9 @@ function StartStudyDialog({ study, music, initialModule, onClose, onBegin, onAdd
   return createPortal(
     <StudyModal title="Start Study Session" onClose={onClose}>
       <form onSubmit={handleBegin} className="flex flex-col gap-6">
-        <ModuleAndWhat study={study} moduleId={moduleId} what={what} otherText={otherText} onModule={setModuleId} onWhat={setWhat} onOtherText={setOtherText} />
+        <ModuleAndWhat study={study} moduleId={moduleId} what={what} otherText={otherText} onModule={setModuleId} onWhat={setWhat} onOtherText={setOtherText} tasks={tasks} taskId={task?.id} onTask={pickTask} />
         <div className="flex flex-col gap-2">
-          <FieldLabel>Timer · optional</FieldLabel>
+          <FieldLabel>{onTask ? "Timer" : "Timer · optional"}</FieldLabel>
           <div className="flex items-center gap-2">
             <input type="text" inputMode="numeric" placeholder="0" value={hours} onChange={e => setHours(e.target.value.replace(/\D/g, "").slice(0, 2))} className={numberBox} aria-label="Timer hours" />
             <span className="text-xs text-muted-foreground">h</span>
@@ -347,16 +391,105 @@ function StartStudyDialog({ study, music, initialModule, onClose, onBegin, onAdd
           </select>
         </div>
         <div className="flex flex-col gap-2 pt-2">
-          <button type="submit" disabled={starting || missingText(moduleId, what, otherText)} className={primaryButton}>{starting ? "Starting..." : "Begin Session"}</button>
+          <button type="submit" disabled={starting || missing} className={primaryButton}>{starting ? "Starting..." : "Begin Session"}</button>
           <button
             type="button"
-            onClick={() => onAddMissed(moduleId, what, otherText)}
+            onClick={() => onAddMissed(onTask ? OTHER : moduleId, what, onTask ? task?.title ?? "" : otherText)}
             className="w-full py-3 flex items-center justify-center gap-2 bg-white/[0.03] hover:bg-white/10 text-white/75 hover:text-white border border-white/10 font-bold uppercase tracking-widest text-[10px] rounded-lg transition-colors"
           >
             <History className="w-3.5 h-3.5" />
             Add Missed Session
           </button>
         </div>
+      </form>
+    </StudyModal>,
+    document.body
+  );
+}
+
+/** Pause what you're on and pick up a paused session, or start another. Like Work's Switch Task. */
+function StudySwitchDialog({ study, current, parked, tasks, onClose }: {
+  study: StudyData;
+  current: StudySession;
+  parked: StudySession[];
+  tasks: Task[];
+  onClose: () => void;
+}) {
+  const start = initialChoice(study, current.module_id ?? null);
+  const [moduleId, setModuleId] = useState(start.moduleId);
+  const [what, setWhat] = useState(start.what);
+  const [otherText, setOtherText] = useState("");
+  // Tasks already open are resumed from Paused Tasks; the one you're on can't be picked.
+  const openTaskIds = new Set([current, ...parked].map(s => s.task_id).filter(Boolean));
+  const choices = tasks.filter(t => !openTaskIds.has(t.id));
+  const [task, setTask] = useState<Task | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [, setTick] = useState(0);
+
+  // Keep the current session's time moving while the dialog is open.
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const label = (s: StudySession) => `${moduleName(s.module_id, study.modules)} · ${whatLabel(s, study.materials, study.deadlines)}`;
+  const dot = (s: StudySession) => study.modules.find(m => m.id === s.module_id)?.color ?? "#555";
+  const onTask = moduleId === TASK;
+  const missing = onTask ? !task : missingText(moduleId, what, otherText);
+
+  const go = async (to: Parameters<typeof switchStudySession>[1]) => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const result = await switchStudySession(current, to);
+    setBusy(false);
+    if (result.error) { setError(result.error); return; }
+    onClose();
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (missing) return;
+    if (onTask && task) go({ fields: taskSessionFields(task), taskId: task.id, timerMinutes: minutesLeft(task) });
+    else go({ fields: sessionFields(moduleId, what, otherText) });
+  };
+
+  return createPortal(
+    <StudyModal title="Switch Task" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <div className="flex items-center gap-2.5 bg-black/40 border border-white/10 rounded-lg px-3 py-3">
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dot(current) }} />
+          <span className="flex-1 min-w-0 truncate text-sm text-white/90">{label(current)}</span>
+          <span className="text-sm text-white/90 tabular-nums">{formatTime(Math.floor(studiedSeconds(current)))}</span>
+        </div>
+
+        {parked.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Paused Tasks</FieldLabel>
+            {parked.map(s => (
+              <div key={s.id} className="flex items-center gap-2.5 border border-white/10 rounded-lg pl-3 pr-1.5 py-1.5">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dot(s) }} />
+                <span className="flex-1 min-w-0 truncate text-sm text-white/90">{label(s)}</span>
+                <span className="text-xs text-white/50 tabular-nums">{formatTime(Math.floor(studiedSeconds(s)))}</span>
+                <button
+                  type="button"
+                  onClick={() => go({ resume: s })}
+                  disabled={busy}
+                  className="px-3 py-2 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-md hover:bg-white/90 transition-colors disabled:opacity-50"
+                >
+                  Resume
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <ModuleAndWhat study={study} moduleId={moduleId} what={what} otherText={otherText} onModule={setModuleId} onWhat={setWhat} onOtherText={setOtherText} tasks={choices} taskId={task?.id} onTask={setTask} />
+
+        {error && <p className="text-xs text-red-400 -mt-2">{error}</p>}
+
+        <button type="submit" disabled={busy || missing} className={primaryButton}>{busy ? "Switching..." : "Switch"}</button>
       </form>
     </StudyModal>,
     document.body

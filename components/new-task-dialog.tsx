@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { DatePicker } from "./ui/date-picker";
 import { TagPicker } from "./tags/tags";
 import { TimeLimitFields } from "./task-timer";
+import { TaskModuleFields } from "./study/study-clock-dialogs";
 
 const COLORS = [
   { name: "Purple", class: "bg-purple-500" },
@@ -39,6 +40,8 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
   // Study only: a time to work on it for, then it ticks itself off.
   const [limitOn, setLimitOn] = useState(false);
   const [limitMinutes, setLimitMinutes] = useState<number | null>(null);
+  // Timed Study tasks: the module and "On what" their time is logged on.
+  const [studyModule, setStudyModule] = useState<{ moduleId: string | null; what: string | null }>({ moduleId: null, what: null });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const timed = domain === "STUDY" && limitOn;
 
@@ -64,6 +67,8 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
         is_joint: domain === "WORK" ? isJoint : false,
         domain: domain || "WORK",
         tag_id: tagId,
+        // Only sent for timed tasks, so other tasks don't need these columns.
+        ...(timed ? { study_module_id: studyModule.moduleId, study_what: studyModule.what } : {}),
       };
 
       const { data, error } = await supabase.from("tasks").insert([newTask]).select().single();
@@ -80,6 +85,7 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
       setTagId(null);
       setLimitOn(false);
       setLimitMinutes(null);
+      setStudyModule({ moduleId: null, what: null });
     } catch (err) {
       console.error(err);
     } finally {
@@ -218,6 +224,14 @@ export function NewTaskDialog({ contextName, selectedDateString, onTaskAdded, do
                   </div>
                 )}
                 {timed && <TimeLimitFields minutes={limitMinutes} onChange={setLimitMinutes} />}
+                {timed && (
+                  <TaskModuleFields
+                    person={contextName}
+                    moduleId={studyModule.moduleId}
+                    what={studyModule.what}
+                    onChange={(moduleId, what) => setStudyModule({ moduleId, what })}
+                  />
+                )}
 
                 {/* Progress Toggle (hidden for timed tasks) */}
                 {!timed && (
