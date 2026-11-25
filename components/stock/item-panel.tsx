@@ -1,17 +1,24 @@
 "use client";
 
-// The item panel (mockup: slide()). Built so far for orders: Paid and In transit.
-// Tabs: Overview (what's next + notes + price strip), Photos, Details (+ history).
-import { Fragment, useEffect, useState } from "react";
+// The item panel (mockup: slide()). Built so far: Paid, In transit, To check (Damaged / Kept / Ready),
+// Prep (job ticks + measuring form) and Photos. Tabs: Overview, Photos, Details (+ history).
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Calendar, Ship, Truck, Package, Tag, History, Camera } from "lucide-react";
-import { StockData, StockItem, LogEntry, saveNotes, itemHistory, logLine, trackingUrl, gbp } from "@/lib/stock";
-import { StatusChip, BatchPill, FloorIcon, cx, dateLabel } from "./ui";
+import { X, Calendar, Ship, Truck, Package, Tag, History, Camera, ChevronDown, Check, Wind, Scissors, Ruler } from "lucide-react";
+import { StockData, StockItem, LogEntry, Needs, Job, saveNotes, itemHistory, logLine, trackingUrl, gbp, checkItems, setJobDone, updateItem } from "@/lib/stock";
+import { StatusChip, BatchPill, FloorIcon, ModalHead, cx, dateLabel } from "./ui";
+import { NeedTicks } from "./batches";
 import s from "./stock.module.css";
 
 type Tab = "overview" | "photos" | "details";
 
-export function ItemPanel({ item, data, onClose }: { item: StockItem; data: StockData; onClose: () => void }) {
+export function ItemPanel({ item, data, onClose, onChanged }: {
+  item: StockItem;
+  data: StockData;
+  onClose: () => void;
+  /** Something was saved: refresh, and show the message if there is one. */
+  onChanged: (msg?: string) => void;
+}) {
   const [tab, setTab] = useState<Tab>("overview");
   const [notes, setNotes] = useState(item.notes ?? "");
   const [histOpen, setHistOpen] = useState(false);
@@ -19,6 +26,17 @@ export function ItemPanel({ item, data, onClose }: { item: StockItem; data: Stoc
   const batch = item.batch_id ? data.batches.find((b) => b.id === item.batch_id) : undefined;
   const category = data.categories.find((c) => c.id === item.category_id)?.name;
   const isOrder = ["paid", "in_transit", "to_check"].includes(item.status);
+  const [pop, setPop] = useState<null | "ready" | "kept">(null);
+  const [busy, setBusy] = useState(false);
+
+  // To check, one item at a time (mockup ic-dam / ic-kept / ic-ready)
+  const check = async (o: Parameters<typeof checkItems>[2] extends Map<string, infer O> ? O : never, msg: string) => {
+    if (!batch || busy) return;
+    setBusy(true);
+    try { await checkItems(batch, data, new Map([[item.id, o]])); setPop(null); onChanged(msg); }
+    catch (e: any) { onChanged(e?.message || "Couldn't save it."); }
+    finally { setBusy(false); }
+  };
 
   useEffect(() => { setNotes(item.notes ?? ""); }, [item.id, item.notes]);
   useEffect(() => { setTab("overview"); setHistOpen(false); setHist(null); }, [item.id]);
@@ -81,11 +99,15 @@ export function ItemPanel({ item, data, onClose }: { item: StockItem; data: Stoc
                   {batch.carrier && <div className={s.irow}><Truck className="w-4 h-4" /><span>{batch.carrier}</span></div>}
                 </div>
               )}
-              <label className={s.notes}>
-                <span className={s.lbl}>Notes</span>
-                <textarea className={s.inp} rows={3} aria-label="Notes" value={notes}
-                  onChange={(e) => setNotes(e.target.value)} onBlur={saveNotesIfChanged} />
-              </label>
+              {item.status === "prep" ? (
+                <PrepForm item={item} data={data} notes={notes} setNotes={setNotes} saveNotes={saveNotesIfChanged} onChanged={onChanged} />
+              ) : (
+                <label className={s.notes}>
+                  <span className={s.lbl}>Notes</span>
+                  <textarea className={s.inp} rows={3} aria-label="Notes" value={notes}
+                    onChange={(e) => setNotes(e.target.value)} onBlur={saveNotesIfChanged} />
+                </label>
+              )}
               <div className={s.strip}>
                 {cells.map(([ic, t, v]) => <div key={t} title={t}>{ic}<span className={s.sr}>{t}</span><span>{v}</span></div>)}
               </div>
@@ -132,8 +154,160 @@ export function ItemPanel({ item, data, onClose }: { item: StockItem; data: Stoc
             <a className={cx(s.btn)} href={trackingUrl(batch.tracking)} target="_blank" rel="noreferrer">Track parcel ↗</a>
           </div>
         )}
+        {item.status === "to_check" && (
+          <div className={s.foot}>
+            <button className={s.btn} disabled={busy} onClick={() => check({ out: "damaged", refund: null }, "Marked damaged")}>Damaged</button>
+            <button className={s.btn} disabled={busy} onClick={() => setPop("kept")}>Kept</button>
+            <button className={s.btnw} disabled={busy} onClick={() => setPop("ready")}>Ready</button>
+          </div>
+        )}
       </aside>
+      {pop === "ready" && <ReadyDialog item={item} busy={busy} onClose={() => setPop(null)}
+        onSave={(n) => check({ out: "ready", needs: n }, n.steam || n.repair || n.measure ? "Ready. Moved to Prep" : "Ready. Moved to Photos")} />}
+      {pop === "kept" && <KeptDialog item={item} busy={busy} onClose={() => setPop(null)}
+        onPick={(by) => check({ out: "kept", by }, `Kept by ${by}`)} />}
     </div>,
     document.body,
+  );
+}
+
+/** The item at the top of a small pop-up (mockup itemHead). */
+function ItemHead({ item }: { item: StockItem }) {
+  return <div className={s.mitem}><span className={s.mono}>{item.code}{item.sku ? ` · ${item.sku}` : ""}</span><span className={s.mname}>{item.name}</span></div>;
+}
+
+/** Ready (mockup 'ready'): what it needs, then Save. */
+function ReadyDialog({ item, busy, onClose, onSave }: { item: StockItem; busy: boolean; onClose: () => void; onSave: (n: Needs) => void }) {
+  const [n, setN] = useState<Needs>({ steam: item.needs_steam, repair: item.needs_repair, measure: item.needs_measure });
+  return createPortal(
+    <div className={s.root}>
+      <div className={s.scrim} onClick={onClose} />
+      <div className={cx(s.modal, s.gapsm)} role="dialog" aria-modal="true" aria-label="Ready">
+        <ModalHead title="Ready" onClose={onClose} />
+        <ItemHead item={item} />
+        <NeedTicks value={n} onChange={setN} />
+        <button className={s.btnw} disabled={busy} onClick={() => onSave(n)}>Save</button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Kept (mockup 'kept'): who kept it. */
+function KeptDialog({ item, busy, onClose, onPick }: { item: StockItem; busy: boolean; onClose: () => void; onPick: (by: "Eryk" | "Alex") => void }) {
+  return createPortal(
+    <div className={s.root}>
+      <div className={s.scrim} onClick={onClose} />
+      <div className={cx(s.modal, s.gapsm)} role="dialog" aria-modal="true" aria-label="Kept by">
+        <ModalHead title="Kept by" onClose={onClose} />
+        <ItemHead item={item} />
+        <div className={s.mf}>
+          {(["Eryk", "Alex"] as const).map((w) => <button key={w} className={s.btn} disabled={busy} onClick={() => onPick(w)}>{w}</button>)}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** A dropdown in the app's style (mockup dd): the list floats above everything, under its button. */
+function Dropdown({ label, value, options, onPick }: { label: string; value: string | null; options: { v: string; t: string }[]; onPick: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => { if (!(e.target as Element).closest?.("[data-ddm]") && !btn.current?.contains(e.target as Node)) setOpen(false); };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("scroll", close, true);
+    return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("scroll", close, true); };
+  }, [open]);
+  const toggle = () => {
+    if (open) return setOpen(false);
+    const r = btn.current!.getBoundingClientRect();
+    const h = Math.min(260, options.length * 38 + 8);
+    const up = r.bottom + 6 + h > window.innerHeight - 8;
+    setPos({ top: up ? r.top - 6 - h : r.bottom + 6, left: r.left, width: r.width });
+    setOpen(true);
+  };
+  const shown = options.find((o) => o.v === value)?.t;
+  return (
+    <div className={s.dd}>
+      <button type="button" ref={btn} className={cx(s.inp, s.ddb)} aria-haspopup="listbox" aria-expanded={open} aria-label={label} onClick={toggle}>
+        <span className={shown ? "" : s.ddph}>{shown ?? label}</span><ChevronDown className="w-[14px] h-[14px]" />
+      </button>
+      {open && pos && createPortal(
+        <div className={s.root} style={{ display: "contents" }}>
+          <div className={s.ddm} data-ddm role="listbox" aria-label={label} style={pos}>
+            {options.map((o) => (
+              <button key={o.v} type="button" role="option" aria-selected={o.v === value} onClick={() => { onPick(o.v); setOpen(false); }}>
+                <span>{o.t}</span>{o.v === value && <Check className="w-[14px] h-[14px]" />}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+const JOBS: { key: Job; label: string; Icon: typeof Wind }[] = [
+  { key: "steam", label: "Steam", Icon: Wind },
+  { key: "repair", label: "Repair", Icon: Scissors },
+  { key: "measure", label: "Measure", Icon: Ruler },
+];
+
+/** Prep (mockup actionFor 'Prep'): tick each job when it's done, and the measuring form under them. */
+function PrepForm({ item, data, notes, setNotes, saveNotes, onChanged }: {
+  item: StockItem; data: StockData; notes: string; setNotes: (v: string) => void; saveNotes: () => void; onChanged: (msg?: string) => void;
+}) {
+  const [size, setSize] = useState(item.size ?? "");
+  const [meas, setMeas] = useState<Record<string, string>>(item.measurements ?? {});
+  useEffect(() => { setSize(item.size ?? ""); setMeas(item.measurements ?? {}); }, [item.id, item.size, item.measurements]);
+  const cat = data.categories.find((c) => c.id === item.category_id);
+  const fits = cat?.measurements ?? [];
+  const done: Record<Job, boolean> = { steam: item.steam_done, repair: item.repair_done, measure: item.measure_done };
+  const save = (patch: Parameters<typeof updateItem>[1]) => updateItem(item.id, patch).then(() => onChanged()).catch((e) => onChanged(e?.message || "Couldn't save it."));
+
+  return (
+    <div className={s.ov} style={{ gap: 14 }}>
+      <span className={s.lbl}>Stage</span>
+      <div className={s.jobs}>
+        {JOBS.map(({ key, label, Icon }) => (
+          <button key={key} type="button" className={s.tick} aria-pressed={done[key]} aria-label={`${label}${done[key] ? " done" : ""}`} title={label}
+            onClick={async () => {
+              try { const moved = await setJobDone(item, key, !done[key]); onChanged(moved ? "Prep done. Moved to Photos" : undefined); }
+              catch (e: any) { onChanged(e?.message || "Couldn't save it."); }
+            }}>
+            <Icon className="w-[18px] h-[18px]" strokeWidth={2} /><span className={s.box} />
+          </button>
+        ))}
+      </div>
+      <div className={s.mform}>
+        <div className={s.g2}>
+          <Dropdown label="Category" value={item.category_id} options={data.categories.filter((c) => c.active || c.id === item.category_id).map((c) => ({ v: c.id, t: c.name }))}
+            onPick={(v) => save({ category_id: v })} />
+          <label className={s.fi}><span>Size</span><input className={s.inp} aria-label="Size" value={size} onChange={(e) => setSize(e.target.value)}
+            onBlur={() => { if (size !== (item.size ?? "")) save({ size: size.trim() || null }); }} /></label>
+        </div>
+        <Dropdown label="Condition" value={item.condition} options={data.settings.conditions.map((c) => ({ v: c, t: c }))} onPick={(v) => save({ condition: v })} />
+        {fits.length > 0 && (
+          <div className={s.g2}>
+            {fits.map((m) => (
+              <label key={m} className={s.fi}><span>{m} (in)</span>
+                <input className={s.inp} inputMode="decimal" aria-label={`${m} in inches`} value={meas[m] ?? ""}
+                  onChange={(e) => setMeas((p) => ({ ...p, [m]: e.target.value }))}
+                  onBlur={() => {
+                    const next = Object.fromEntries(Object.entries(meas).filter(([, v]) => v.trim() !== ""));
+                    if (JSON.stringify(next) !== JSON.stringify(item.measurements ?? {})) save({ measurements: next });
+                  }} />
+              </label>
+            ))}
+          </div>
+        )}
+        <textarea className={s.inp} rows={2} placeholder="Notes" aria-label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={saveNotes} />
+      </div>
+    </div>
   );
 }

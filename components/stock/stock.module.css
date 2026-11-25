@@ -195,3 +195,22 @@
 .modal.gapsm { gap: 20px; }
 .modal.gapsm .g2 { gap: 8px; }
 .modal.gapsm > .btnw { flex: none; }
+
+/* arrival check (mockup .chkrow) */
+.chkhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; flex: none; }
+.btn.sm { flex: none; min-height: 28px; padding: 4px 10px; }
+.modal .fill { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.chkrow { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-bottom: 1px solid var(--line2); }
+.chkrow:last-child { border-bottom: 0; }
+.ct { display: flex; gap: 10px; align-items: baseline; font-size: 13px; min-width: 0; }
+.ct .bn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* prep: job ticks and the measuring form (mockup .mform) */
+.mform { display: flex; flex-direction: column; gap: 10px; }
+.mitem { display: flex; flex-direction: column; gap: 6px; }
+.mname { font-size: 16px; font-weight: 500; color: #fff; line-height: 1.3; }
+.jobi { display: inline-flex; gap: 10px; align-items: center; }
+.jobi span { display: inline-flex; color: #7a7a7a; }
+.jobi span.on { color: #199e70; }
+.foot .btnw { flex: 1; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.mform textarea { resize: none; font-family: inherit; line-height: 1.5; }
+.ct .mono { flex: none; white-space: nowrap; }
