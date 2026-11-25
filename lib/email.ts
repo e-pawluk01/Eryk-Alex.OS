@@ -77,3 +77,22 @@ export async function sendListingEmail(subject: string, html: string) {
     return { error };
   }
 }
+
+// A kept item's invoice (PDF), to whoever kept it.
+export async function sendInvoiceEmail(to: string, code: string, name: string, total: string, pdf: Buffer) {
+  const transport = getTransport();
+  if (!transport) return { error: 'Gmail email not configured (missing GMAIL_USER / GMAIL_APP_PASSWORD).' };
+  try {
+    const info = await transport.sendMail({
+      from: `Task OS <${GMAIL_USER}>`,
+      to,
+      subject: `Invoice ${code}: ${name}`,
+      text: `The invoice for ${name} (${code}) is attached: ${total}.`,
+      attachments: [{ filename: `Invoice_${code}.pdf`, content: pdf }],
+    });
+    return { data: info };
+  } catch (error) {
+    console.error('Failed to send invoice email:', error);
+    return { error };
+  }
+}

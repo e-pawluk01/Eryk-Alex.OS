@@ -5,8 +5,8 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Calendar, Ship, Truck, Package, Tag, History, Camera, ChevronDown, Check, Wind, Scissors, Ruler } from "lucide-react";
-import { StockData, StockItem, LogEntry, Needs, Job, saveNotes, itemHistory, logLine, trackingUrl, gbp, checkItems, setJobDone, updateItem } from "@/lib/stock";
-import { StatusChip, BatchPill, FloorIcon, ModalHead, cx, dateLabel } from "./ui";
+import { StockData, StockItem, LogEntry, Needs, Job, saveNotes, itemHistory, logLine, trackingUrl, gbp, checkItems, setJobDone, updateItem, landedCosts, sendInvoice } from "@/lib/stock";
+import { StatusChip, BatchPill, FloorIcon, ModalHead, Confirmation, cx, dateLabel } from "./ui";
 import { NeedTicks } from "./batches";
 import s from "./stock.module.css";
 
@@ -27,6 +27,7 @@ export function ItemPanel({ item, data, onClose, onChanged }: {
   const category = data.categories.find((c) => c.id === item.category_id)?.name;
   const isOrder = ["paid", "in_transit", "to_check"].includes(item.status);
   const [pop, setPop] = useState<null | "ready" | "kept">(null);
+  const [sent, setSent] = useState<{ cost: number; to: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   // To check, one item at a time (mockup ic-dam / ic-kept / ic-ready)
@@ -165,7 +166,20 @@ export function ItemPanel({ item, data, onClose, onChanged }: {
       {pop === "ready" && <ReadyDialog item={item} busy={busy} onClose={() => setPop(null)}
         onSave={(n) => check({ out: "ready", needs: n }, n.steam || n.repair || n.measure ? "Ready. Moved to Prep" : "Ready. Moved to Photos")} />}
       {pop === "kept" && <KeptDialog item={item} busy={busy} onClose={() => setPop(null)}
-        onPick={(by) => check({ out: "kept", by }, `Kept by ${by}`)} />}
+        onPick={async (by) => {
+          // Kept: save it, then email the invoice (a PDF) to whoever kept it.
+          if (!batch || busy) return;
+          setBusy(true);
+          try {
+            const cost = landedCosts(batch, data.items, data.settings.floorMarkup).get(item.id)?.item_cost ?? 0;
+            await checkItems(batch, data, new Map([[item.id, { out: "kept", by }]]));
+            setPop(null);
+            try { await sendInvoice(item.id); setSent({ cost, to: by }); onChanged(); }
+            catch (e: any) { onChanged(`Kept by ${by}. Invoice not sent: ${e?.message}`); }
+          } catch (e: any) { onChanged(e?.message || "Couldn't save it."); }
+          finally { setBusy(false); }
+        }} />}
+      {sent && <Confirmation label="Invoice sent" value={gbp(sent.cost)} line={`Emailed to ${sent.to}`} onClose={() => setSent(null)} />}
     </div>,
     document.body,
   );
@@ -268,13 +282,15 @@ function PrepForm({ item, data, notes, setNotes, saveNotes, onChanged }: {
   const cat = data.categories.find((c) => c.id === item.category_id);
   const fits = cat?.measurements ?? [];
   const done: Record<Job, boolean> = { steam: item.steam_done, repair: item.repair_done, measure: item.measure_done };
+  const need: Record<Job, boolean> = { steam: item.needs_steam, repair: item.needs_repair, measure: item.needs_measure };
   const save = (patch: Parameters<typeof updateItem>[1]) => updateItem(item.id, patch).then(() => onChanged()).catch((e) => onChanged(e?.message || "Couldn't save it."));
 
   return (
     <div className={s.ov} style={{ gap: 14 }}>
       <span className={s.lbl}>Stage</span>
       <div className={s.jobs}>
-        {JOBS.map(({ key, label, Icon }) => (
+        {/* Only the jobs ticked at the check are shown (Eryk, 25 Nov). */}
+        {JOBS.filter(({ key }) => need[key]).map(({ key, label, Icon }) => (
           <button key={key} type="button" className={s.tick} aria-pressed={done[key]} aria-label={`${label}${done[key] ? " done" : ""}`} title={label}
             onClick={async () => {
               try { const moved = await setJobDone(item, key, !done[key]); onChanged(moved ? "Prep done. Moved to Photos" : undefined); }

@@ -376,3 +376,18 @@ export async function updateItem(id: string, patch: Partial<Pick<StockItem, "siz
   const { error } = await supabase.from("stock_items").update(patch).eq("id", id);
   if (error) throw error;
 }
+
+// ---------- invoices ----------
+
+/** Emails a kept item's invoice (a PDF) to whoever kept it. Returns who it went to. */
+export async function sendInvoice(itemId: string): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  const res = await fetch("/api/stock/invoice", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token ?? ""}` },
+    body: JSON.stringify({ itemId }),
+  });
+  const out = await res.json().catch(() => null);
+  if (!res.ok || !out?.ok) throw new Error(out?.error || `Invoice not sent (${res.status})`);
+  return out.to as string;
+}
