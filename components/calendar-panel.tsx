@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Task, Event } from "@/lib/types";
 import { DomainType } from "./global-context";
-import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Tag, Flag, BookMarked, Shirt } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Tag, Flag, BookMarked, FileText } from "lucide-react";
 import { 
   startOfMonth, endOfMonth, eachDayOfInterval, format, 
   isSameDay, isToday, addMonths, subMonths, parseISO, startOfDay
@@ -107,7 +107,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
             className="p-3 py-4 hover:bg-white/10 transition-colors"
             title="Stock"
           >
-            {showStock ? <X className="w-5 h-5 text-white/80" /> : <Shirt className="w-5 h-5 text-white/80" />}
+            {showStock ? <X className="w-5 h-5 text-white/80" /> : <Tag className="w-5 h-5 text-white/80" />}
           </button>
         )}
         {currentDomain === "WORK" && (
@@ -116,7 +116,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
             className="p-3 py-4 hover:bg-white/10 transition-colors"
             title="Listings"
           >
-            <Tag className="w-5 h-5 text-white/80" />
+            <FileText className="w-5 h-5 text-white/80" />
           </button>
         )}
         {currentDomain === "STUDY" && onStudyPageToggle && (
