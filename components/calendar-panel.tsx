@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Task, Event } from "@/lib/types";
 import { DomainType } from "./global-context";
-import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Tag, Flag, BookMarked } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Tag, Flag, BookMarked, Shirt } from "lucide-react";
 import { 
   startOfMonth, endOfMonth, eachDayOfInterval, format, 
   isSameDay, isToday, addMonths, subMonths, parseISO, startOfDay
@@ -41,11 +41,13 @@ interface CalendarPanelProps {
   onSelectEvent: (event: Event) => void;
   onAnalyticsToggle?: () => void;
   showAnalytics?: boolean;
+  onStockToggle?: () => void;
+  showStock?: boolean;
   studyPage?: "analytics" | "deadlines" | "materials" | null;
   onStudyPageToggle?: (page: "analytics" | "deadlines" | "materials") => void;
 }
 
-export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics, studyPage, onStudyPageToggle }: CalendarPanelProps) {
+export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTask, onAddEvent, onSelectTask, onSelectEvent, onAnalyticsToggle, showAnalytics, onStockToggle, showStock, studyPage, onStudyPageToggle }: CalendarPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isListingsOpen, setIsListingsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
@@ -97,6 +99,15 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
             className="p-3 py-4 hover:bg-white/10 transition-colors"
           >
             {showAnalytics ? <X className="w-5 h-5 text-white/80" /> : <TrendingUp className="w-5 h-5 text-white/80" />}
+          </button>
+        )}
+        {currentDomain === "WORK" && onStockToggle && (
+          <button
+            onClick={onStockToggle}
+            className="p-3 py-4 hover:bg-white/10 transition-colors"
+            title="Stock"
+          >
+            {showStock ? <X className="w-5 h-5 text-white/80" /> : <Shirt className="w-5 h-5 text-white/80" />}
           </button>
         )}
         {currentDomain === "WORK" && (
