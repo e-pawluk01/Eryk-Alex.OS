@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Calendar, Ship, Package, Wind, Scissors, Ruler } from "lucide-react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
-import { StockBatch, StockData, StockItem, batchTotals, batchSince, trackingUrl, shipBatch, arriveBatch, checkItems, CheckOutcome, Needs, gbp } from "@/lib/stock";
+import { StockBatch, StockData, StockItem, batchTotals, batchSince, trackingUrl, shipBatch, arriveBatch, checkItems, CheckOutcome, Needs, gbp, sendInvoice } from "@/lib/stock";
 import { BatchPill, BatchChip, StatusChip, ModalHead, cx, dateLabel } from "./ui";
 import { DatePicker } from "@/components/ui/date-picker";
 import s from "./stock.module.css";
@@ -285,8 +285,11 @@ export function CheckDialog({ batch, data, onClose, onSaved }: {
         return [i.id, x.out === "ready" ? { out: "ready", needs: x.needs } : x.out === "kept" ? { out: "kept", by: x.by } : { out: "damaged", refund: money(x.refund) }];
       }));
       await checkItems(batch, data, outcomes);
-      const kept = its.filter((i) => get(i.id).out === "kept").length;
-      onSaved(`Check saved. Costs and floor prices final${kept ? ` · ${kept} kept` : ""}`);
+      // Kept items: email each one's invoice (a PDF) to whoever kept it.
+      const kept = its.filter((i) => get(i.id).out === "kept");
+      const failed: string[] = [];
+      for (const i of kept) { try { await sendInvoice(i.id); } catch { failed.push(i.code); } }
+      onSaved(`Check saved. Costs and floor prices final${kept.length ? ` · invoice emailed for ${kept.length - failed.length} kept` : ""}${failed.length ? ` · not sent: ${failed.join(", ")}` : ""}`);
     } catch (e: any) {
       setError(e?.message || "Couldn't save it.");
       setSaving(false);
@@ -296,32 +299,38 @@ export function CheckDialog({ batch, data, onClose, onSaved }: {
   return createPortal(
     <div className={s.root}>
       <div className={s.scrim} onClick={onClose} />
-      <div className={cx(s.modal, s.gapsm)} role="dialog" aria-modal="true" aria-label={`Batch ${batch.number} arrival check`}>
+      {/* Reworked 25 Nov (mockup v122): wide, one fixed size, one line per item with its outcome on the right, and a
+          second line under the name that's always there, so picking an outcome never moves anything. */}
+      <div className={cx(s.modal, s.gapsm, s.wide, s.chkm)} role="dialog" aria-modal="true" aria-label={`Batch ${batch.number} arrival check`}>
         <ModalHead title={`Batch ${batch.number} · arrival check`} onClose={onClose} />
         <div className={s.chkhead}>
           <span className={s.sub}>{done} of {its.length} checked</span>
           <button className={cx(s.btn, s.sm)} onClick={() => setD((p) => Object.fromEntries(its.map((i) => [i.id, { ...(p[i.id] ?? blank), out: p[i.id]?.out ?? "ready" }])))}>All ready</button>
         </div>
-        <div className={cx(s.list, s.fill)}>
+        <div className={cx(s.chklist, s.fill)}>
           {its.map((i) => {
             const x = get(i.id);
             return (
-              <div key={i.id} className={s.chkrow}>
-                <div className={s.ct}><span className={s.mono}>{i.code}</span><span className={s.bn}>{i.name}</span></div>
-                <div className={s.seg} role="group" aria-label={`Outcome for ${i.name}`}>
-                  {(["ready", "kept", "damaged"] as const).map((o) => (
-                    <button key={o} className={x.out === o ? s.on : undefined} onClick={() => put(i.id, { out: o })}>{o[0].toUpperCase() + o.slice(1)}</button>
-                  ))}
-                </div>
-                {x.out === "ready" && <NeedTicks value={x.needs} onChange={(n) => put(i.id, { needs: n })} />}
-                {x.out === "kept" && (
-                  <div className={s.seg} role="group" aria-label="Kept by">
-                    {(["Eryk", "Alex"] as const).map((w) => <button key={w} className={x.by === w ? s.on : undefined} onClick={() => put(i.id, { by: w })}>{w}</button>)}
+              <div key={i.id} className={s.chk2}>
+                <div className={s.chkl}>
+                  <span className={s.mono}>{i.code}</span><span className={s.bn}>{i.name}</span>
+                  <div className={s.seg} role="group" aria-label={`Outcome for ${i.name}`}>
+                    {(["ready", "kept", "damaged"] as const).map((o) => (
+                      <button key={o} className={x.out === o ? s.on : undefined} onClick={() => put(i.id, { out: o })}>{o[0].toUpperCase() + o.slice(1)}</button>
+                    ))}
                   </div>
-                )}
-                {x.out === "damaged" && (
-                  <label className={s.fi}><span>Refund £</span><input className={s.inp} inputMode="decimal" value={x.refund} onChange={(e) => put(i.id, { refund: e.target.value })} aria-label="Refund" /></label>
-                )}
+                </div>
+                <div className={s.chkx}>
+                  {x.out === "ready" && <NeedTicks value={x.needs} onChange={(n) => put(i.id, { needs: n })} />}
+                  {x.out === "kept" && (
+                    <div className={s.seg} role="group" aria-label="Kept by">
+                      {(["Eryk", "Alex"] as const).map((w) => <button key={w} className={x.by === w ? s.on : undefined} onClick={() => put(i.id, { by: w })}>{w}</button>)}
+                    </div>
+                  )}
+                  {x.out === "damaged" && (
+                    <label className={cx(s.fi, s.chkref)}><span>Refund £</span><input className={s.inp} inputMode="decimal" value={x.refund} onChange={(e) => put(i.id, { refund: e.target.value })} aria-label="Refund" /></label>
+                  )}
+                </div>
               </div>
             );
           })}
