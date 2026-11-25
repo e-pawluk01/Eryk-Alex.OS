@@ -192,9 +192,10 @@ export async function addItem(n: NewItem): Promise<string> {
 export function batchTotals(b: StockBatch, items: StockItem[]) {
   const its = items.filter((i) => i.batch_id === b.id);
   const sum = (f: (i: StockItem) => number | null) => its.reduce((a, i) => a + (f(i) ?? 0), 0);
-  const prices = sum((i) => i.paid), bankFees = sum((i) => (i.non_gbp_fee ?? 0) + (i.purchase_fee ?? 0));
+  const prices = sum((i) => i.paid), nonGbpFees = sum((i) => i.non_gbp_fee), purchaseFees = sum((i) => i.purchase_fee);
+  const bankFees = nonGbpFees + purchaseFees;
   const shipping = (b.shipping_paid ?? 0) + (b.shipping_non_gbp_fee ?? 0) + (b.shipping_purchase_fee ?? 0);
-  return { count: its.length, prices, bankFees, total: prices + bankFees + shipping };
+  return { count: its.length, prices, nonGbpFees, purchaseFees, total: prices + bankFees + shipping };
 }
 
 /** The date a batch's current status started (for the Since column). */

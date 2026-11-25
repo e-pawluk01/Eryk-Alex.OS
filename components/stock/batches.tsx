@@ -93,8 +93,12 @@ export function BatchPanel({ batch, data, onClose, onOpenItem, onShip }: {
           <div className={s.kvg}>
             <span className={s.lbl}>Costs</span>
             {row("Items", gbp(t.prices))}
-            {row("Bank fees", gbp(t.bankFees))}
-            {shipped && row("Shipping", `${gbp(batch.shipping_paid ?? 0)} + ${gbp((batch.shipping_non_gbp_fee ?? 0) + (batch.shipping_purchase_fee ?? 0))} fees`)}
+            {/* The bank's lines, never merged (Eryk, 25 Nov). */}
+            {row("Non-GBP fees", gbp(t.nonGbpFees))}
+            {row("Purchase fees", gbp(t.purchaseFees))}
+            {shipped && row("Shipping", gbp(batch.shipping_paid ?? 0))}
+            {shipped && row("Shipping non-GBP fee", gbp(batch.shipping_non_gbp_fee ?? 0))}
+            {shipped && row("Shipping purchase fee", gbp(batch.shipping_purchase_fee ?? 0))}
           </div>
           {shipped && (batch.carrier || batch.tracking) && (
             <div className={s.kvg}>
