@@ -6,27 +6,14 @@ import { Plus, Search, Check } from "lucide-react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import {
-  loadStock, StockData, StockItem, GROUPS, GroupKey, STATUS_LABEL, STATUS_COLOUR, EXITS,
-  inStock, batchColour, gbp,
+  loadStock, StockData, StockItem, StockBatch, GROUPS, GroupKey, STATUS_LABEL, inStock, gbp,
 } from "@/lib/stock";
 import { AddStockDialog } from "./add-stock-dialog";
+import { BatchList, BatchPanel, ShipDialog } from "./batches";
+import { ItemPanel } from "./item-panel";
+import { StatusChip, BatchPill, cx } from "./ui";
 import s from "./stock.module.css";
 
-const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
-
-export function StatusChip({ status }: { status: StockItem["status"] }) {
-  const solid = status === "paid";
-  const hollow = EXITS.includes(status) && status !== "sold";
-  return (
-    <span className={cx(s.chip, solid && s.solid, hollow && s.hollow)} style={{ "--c": STATUS_COLOUR[status] } as React.CSSProperties}>
-      {STATUS_LABEL[status]}
-    </span>
-  );
-}
-
-export function BatchPill({ n }: { n: number }) {
-  return <span className={s.chip} style={{ "--c": batchColour(n) } as React.CSSProperties}>{n}</span>;
-}
 
 /** The price shown in the list: an order's rough price (site price + bank fee), or what it cost. */
 function priceOf(it: StockItem): string | null {
@@ -46,6 +33,10 @@ export function StockView() {
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // Open panels / pop-ups, by id so they always show the latest data.
+  const [openItem, setOpenItem] = useState<string | null>(null);
+  const [openBatch, setOpenBatch] = useState<string | null>(null);
+  const [shipping, setShipping] = useState<string | null>(null);
   const findRef = useRef<HTMLInputElement>(null);
 
   // ⌘K jumps to the search box.
@@ -106,6 +97,10 @@ export function StockView() {
         </div>
       </div>
 
+      {filter === "Orders" && !q && data && data.batches.length > 0 && (
+        <BatchList data={data} onOpen={(b) => setOpenBatch(b.id)} onShip={(b) => setShipping(b.id)} />
+      )}
+
       <div className={s.list}>
         <div className={s.rowh}>
           <span /><span className={s.lbl}>ID / SKU</span><span className={s.lbl}>Item</span><span className={s.lbl}>Status</span>
@@ -124,7 +119,7 @@ export function StockView() {
           const since = differenceInCalendarDays(today, parseISO(it.status_since));
           const price = priceOf(it);
           return (
-            <div key={it.id} className={s.r}>
+            <div key={it.id} className={cx(s.r, s.click)} role="button" tabIndex={0} onClick={() => setOpenItem(it.id)} onKeyDown={(e) => { if (e.key === "Enter") setOpenItem(it.id); }}>
               <span />
               <span className={cx(s.mono, s.id)}>{it.sku || it.code}</span>
               <span className={s.nm}>{it.name}</span>
@@ -148,6 +143,23 @@ export function StockView() {
           <Plus className="w-[18px] h-[18px]" strokeWidth={2} />
         </button>
       </div>
+
+      {data && openBatch && (() => {
+        const b = data.batches.find((x) => x.id === openBatch);
+        return b ? <BatchPanel batch={b} data={data} onClose={() => setOpenBatch(null)}
+          onOpenItem={(id) => { setOpenBatch(null); setOpenItem(id); }} onShip={(x: StockBatch) => setShipping(x.id)} /> : null;
+      })()}
+
+      {data && openItem && (() => {
+        const it = data.items.find((x) => x.id === openItem);
+        return it ? <ItemPanel item={it} data={data} onClose={() => setOpenItem(null)} /> : null;
+      })()}
+
+      {data && shipping && (() => {
+        const b = data.batches.find((x) => x.id === shipping);
+        return b ? <ShipDialog batch={b} onClose={() => setShipping(null)}
+          onShipped={(next) => { setShipping(null); setToast(`Batch ${b.number} shipped. Batch ${next} is collecting`); refresh(); }} /> : null;
+      })()}
 
       {adding && data && (
         <AddStockDialog

@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronDown, Check, Wind, Scissors, Ruler } from "lucide-react";
 import { addItem, StockData, Source, STATUS_COLOUR } from "@/lib/stock";
-import { BatchPill } from "./stock-view";
+import { BatchPill } from "./ui";
 import s from "./stock.module.css";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
