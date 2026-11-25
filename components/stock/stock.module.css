@@ -54,15 +54,15 @@
   .r .info { grid-column: 1 / 3; grid-row: 3; }
 }
 
-/* floating dock: search + add */
-.dock { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 24px)); z-index: 35; width: min(428px, calc(100% - 140px)); display: flex; gap: 8px; align-items: center; }
+/* floating dock: search + add. Its middle lines up with the timer and music pills (56px tall, 24px up): 24 + (56 - 40) / 2 = 32px. */
+.dock { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(32px, calc(env(safe-area-inset-bottom, 0px) + 32px)); z-index: 35; width: min(428px, calc(100% - 140px)); display: flex; gap: 8px; align-items: center; }
 .findbar { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 14px; min-height: 40px; border-radius: 999px; background: rgba(23,23,23,.55); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 .findbar input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; font-size: 13px; color: var(--fg); }
 .findbar .k { font-family: var(--mono); font-size: 11px; color: var(--dim); padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,.06); }
 .addbtn { flex: none; width: 40px; height: 40px; border-radius: 999px; display: grid; place-items: center; color: var(--fg); background: rgba(23,23,23,.55); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 .addbtn:hover { background: rgba(40,40,40,.7); color: #fff; }
 
-.toast { flex-direction: row; position: fixed; bottom: max(84px, calc(env(safe-area-inset-bottom, 0px) + 84px)); left: 0; right: 0; margin: 0 auto; width: max-content; max-width: calc(100% - 32px); z-index: 120; display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 12px; border-radius: 999px; font-size: 13px; color: #fff; background: rgba(23,23,23,.7); border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); box-shadow: 0 10px 30px rgba(0,0,0,.5); animation: enter .3s ease; --eo: 0; --ey: .5rem; }
+.toast { flex-direction: row; position: fixed; bottom: max(92px, calc(env(safe-area-inset-bottom, 0px) + 92px)); left: 0; right: 0; margin: 0 auto; width: max-content; max-width: calc(100% - 32px); z-index: 120; display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 12px; border-radius: 999px; font-size: 13px; color: #fff; background: rgba(23,23,23,.7); border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); box-shadow: 0 10px 30px rgba(0,0,0,.5); animation: enter .3s ease; --eo: 0; --ey: .5rem; }
 .toast svg { color: var(--ok); flex: none; }
 
 /* pop-ups */
