@@ -21,11 +21,11 @@ const NEEDS = [
 
 type Form = {
   name: string; brand: string; category_id: string | null;
-  bank_fee: string; bought_on: string; site_price: string; link: string; item_cost: string;
+  paid: string; non_gbp_fee: string; purchase_fee: string; bought_on: string; link: string; item_cost: string;
   needs: { steam: boolean; repair: boolean; measure: boolean };
 };
 const EMPTY: Form = {
-  name: "", brand: "", category_id: null, bank_fee: "", bought_on: "", site_price: "", link: "", item_cost: "",
+  name: "", brand: "", category_id: null, paid: "", non_gbp_fee: "", purchase_fee: "", bought_on: "", link: "", item_cost: "",
   needs: { steam: false, repair: false, measure: false },
 };
 /** "£6.58", "6.58" or "" → 6.58 / null */
@@ -97,7 +97,7 @@ export function AddStockDialog({ data, onClose, onAdded }: {
     try {
       const code = await addItem({
         source: src, name: f.name, brand: f.brand, category_id: f.category_id,
-        bank_fee: money(f.bank_fee), site_price: money(f.site_price), bought_on: f.bought_on, link: f.link,
+        paid: money(f.paid), non_gbp_fee: money(f.non_gbp_fee), purchase_fee: money(f.purchase_fee), bought_on: f.bought_on, link: f.link,
         item_cost: money(f.item_cost), needs: f.needs,
       });
       onAdded(code, another);
@@ -163,8 +163,9 @@ export function AddStockDialog({ data, onClose, onAdded }: {
       </div>
       {field("Name", "name", live)}
       <div className={s.g2}>{catSel(live)}{field("Brand", "brand", live)}</div>
-      {field("Bank fee £", "bank_fee", live, "decimal")}
-      <div className={s.g2}>{field("Marketplace", "bought_on", live)}{field("Site price £", "site_price", live, "decimal")}</div>
+      {/* The bank's three lines: the purchase, then its two fees (Eryk, 25 Nov). */}
+      <div className={s.g2}>{field("Marketplace", "bought_on", live)}{field("Paid £", "paid", live, "decimal")}</div>
+      <div className={s.g2}>{field("Non-GBP fee £", "non_gbp_fee", live, "decimal")}{field("Purchase fee £", "purchase_fee", live, "decimal")}</div>
       {field("Link", "link", live)}
     </>
   ) : which === "online" ? (

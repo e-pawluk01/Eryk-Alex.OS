@@ -94,7 +94,7 @@ export function BatchPanel({ batch, data, onClose, onOpenItem, onShip }: {
             <span className={s.lbl}>Costs</span>
             {row("Items", gbp(t.prices))}
             {row("Bank fees", gbp(t.bankFees))}
-            {shipped && row("Shipping", `${gbp(batch.shipping_paid ?? 0)} + ${gbp(batch.shipping_bank_fee ?? 0)} fees`)}
+            {shipped && row("Shipping", `${gbp(batch.shipping_paid ?? 0)} + ${gbp((batch.shipping_non_gbp_fee ?? 0) + (batch.shipping_purchase_fee ?? 0))} fees`)}
           </div>
           {shipped && (batch.carrier || batch.tracking) && (
             <div className={s.kvg}>
@@ -131,7 +131,7 @@ export function ShipDialog({ batch, onClose, onShipped }: {
   onClose: () => void;
   onShipped: (next: number) => void;
 }) {
-  const [f, setF] = useState({ shipped_on: todayIso(), carrier: "", shipping_paid: "", shipping_bank_fee: "", tracking: "" });
+  const [f, setF] = useState({ shipped_on: todayIso(), carrier: "", shipping_paid: "", shipping_non_gbp_fee: "", shipping_purchase_fee: "", tracking: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
@@ -149,7 +149,7 @@ export function ShipDialog({ batch, onClose, onShipped }: {
     try {
       const next = await shipBatch(batch, {
         shipped_on: f.shipped_on, carrier: f.carrier, tracking: f.tracking,
-        shipping_paid: money(f.shipping_paid), shipping_bank_fee: money(f.shipping_bank_fee),
+        shipping_paid: money(f.shipping_paid), shipping_non_gbp_fee: money(f.shipping_non_gbp_fee), shipping_purchase_fee: money(f.shipping_purchase_fee),
       });
       onShipped(next);
     } catch (e: any) {
@@ -167,9 +167,11 @@ export function ShipDialog({ batch, onClose, onShipped }: {
           <label className={s.fi}><span>Shipped</span><input className={s.inp} type="date" value={f.shipped_on} onChange={set("shipped_on")} aria-label="Ship date" /></label>
           <label className={s.fi}><span>Carrier</span><input className={s.inp} value={f.carrier} onChange={set("carrier")} aria-label="Carrier" /></label>
         </div>
+        {/* The bank's three lines for the shipping payment: the charge, then its two fees. */}
+        <label className={s.fi}><span>Shipping £</span><input className={s.inp} inputMode="decimal" value={f.shipping_paid} onChange={set("shipping_paid")} aria-label="Shipping paid" /></label>
         <div className={s.g2}>
-          <label className={s.fi}><span>Shipping £</span><input className={s.inp} inputMode="decimal" value={f.shipping_paid} onChange={set("shipping_paid")} aria-label="Shipping paid" /></label>
-          <label className={s.fi}><span>Bank fees £</span><input className={s.inp} inputMode="decimal" value={f.shipping_bank_fee} onChange={set("shipping_bank_fee")} aria-label="Shipping bank fees" /></label>
+          <label className={s.fi}><span>Non-GBP fee £</span><input className={s.inp} inputMode="decimal" value={f.shipping_non_gbp_fee} onChange={set("shipping_non_gbp_fee")} aria-label="Shipping non-GBP fee" /></label>
+          <label className={s.fi}><span>Purchase fee £</span><input className={s.inp} inputMode="decimal" value={f.shipping_purchase_fee} onChange={set("shipping_purchase_fee")} aria-label="Shipping non-GBP purchase fee" /></label>
         </div>
         <label className={s.fi}><span>Tracking</span><input className={s.inp} value={f.tracking} onChange={set("tracking")} aria-label="Tracking number" /></label>
         {error && <div className={s.err}>{error}</div>}
