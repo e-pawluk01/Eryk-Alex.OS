@@ -35,9 +35,9 @@ export function ItemPanel({ item, data, onClose }: { item: StockItem; data: Stoc
   };
   const saveNotesIfChanged = () => { if (notes !== (item.notes ?? "")) saveNotes(item.id, notes).catch(() => {}); };
 
-  // The headline: an order shows its rough price so far (site price + bank fee), marked "~".
-  const rough = (item.site_price ?? 0) + (item.bank_fee ?? 0);
-  const headline = isOrder && (item.site_price != null || item.bank_fee != null)
+  // The headline: an order shows its rough price so far (paid + its two bank fees), marked "~".
+  const rough = (item.paid ?? 0) + (item.non_gbp_fee ?? 0) + (item.purchase_fee ?? 0);
+  const headline = isOrder && (item.paid != null || item.non_gbp_fee != null || item.purchase_fee != null)
     ? <span className={s.hl}><b className={s.muted}>{item.item_cost != null ? gbp(item.item_cost) : "~" + gbp(rough)}</b></span>
     : null;
 
@@ -46,7 +46,7 @@ export function ItemPanel({ item, data, onClose }: { item: StockItem; data: Stoc
 
   const cells: [React.ReactNode, string, string][] = [
     [<Package key="i" className="w-4 h-4" />, "Final landing cost", item.item_cost != null && !isOrder ? gbp(item.item_cost) : "—"],
-    [<Tag key="i" className="w-4 h-4" />, "Item's price", item.source === "imported" ? (item.site_price != null ? gbp(item.site_price) : "—") : (item.item_cost != null ? gbp(item.item_cost) : "—")],
+    [<Tag key="i" className="w-4 h-4" />, "Item's price", item.source === "imported" ? (item.paid != null ? gbp(item.paid) : "—") : (item.item_cost != null ? gbp(item.item_cost) : "—")],
     [<FloorIcon key="i" />, "Floor price", item.floor_price != null && !isOrder ? gbp(item.floor_price) : "—"],
     [<Calendar key="i" className="w-4 h-4" />, "Date added", item.date_added ? dateLabel(item.date_added) : "—"],
   ];
@@ -100,7 +100,8 @@ export function ItemPanel({ item, data, onClose }: { item: StockItem; data: Stoc
             <div className={s.kvwrap}>
               {item.source === "imported" && group("Order", [
                 row("Batch", batch ? String(batch.number) : null), row("Proxy", batch?.proxy), row("Bought on", item.bought_on),
-                row("Site price", item.site_price != null ? gbp(item.site_price) : null), row("Bank fee", item.bank_fee != null ? gbp(item.bank_fee) : null),
+                row("Paid", item.paid != null ? gbp(item.paid) : null),
+                row("Non-GBP fee", item.non_gbp_fee != null ? gbp(item.non_gbp_fee) : null), row("Purchase fee", item.purchase_fee != null ? gbp(item.purchase_fee) : null),
               ])}
               {group("Dates", [row("Added", item.date_added ? dateLabel(item.date_added) : null)])}
               {group("Item", [

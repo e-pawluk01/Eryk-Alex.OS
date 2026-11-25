@@ -19,11 +19,12 @@ export interface StockBatch {
   arrived_on: string | null;
   lost_on: string | null;
   shipping_paid: number | null;
-  shipping_bank_fee: number | null;
+  shipping_non_gbp_fee: number | null;
+  shipping_purchase_fee: number | null;
   carrier: string | null;
   tracking: string | null;
 }
-const BATCH_COLS = "id, number, proxy, status, started_on, shipped_on, arrived_on, lost_on, shipping_paid, shipping_bank_fee, carrier, tracking";
+const BATCH_COLS = "id, number, proxy, status, started_on, shipped_on, arrived_on, lost_on, shipping_paid, shipping_non_gbp_fee, shipping_purchase_fee, carrier, tracking";
 
 export interface StockCategory {
   id: string;
@@ -47,8 +48,12 @@ export interface StockItem {
   notes: string | null;
   date_added: string | null;
   floor_price: number | null;
-  site_price: number | null;
-  bank_fee: number | null;
+  /** What the bank charged for it in £ (the purchase line), not the price shown on the site. */
+  paid: number | null;
+  /** The bank's "non-GBP" fee line (2.99%). */
+  non_gbp_fee: number | null;
+  /** The bank's "non-GBP purchase fee" line (50p). */
+  purchase_fee: number | null;
   item_cost: number | null;
   current_price: number | null;
   status: ItemStatus;
@@ -101,7 +106,7 @@ export interface StockData {
 
 export async function loadStock(): Promise<StockData> {
   const [items, batches, categories, log] = await Promise.all([
-    supabase.from("stock_items").select("id, code, sku, source, batch_id, name, brand, category_id, bought_on, link, notes, date_added, floor_price, site_price, bank_fee, item_cost, current_price, status, created_at").order("created_at", { ascending: false }),
+    supabase.from("stock_items").select("id, code, sku, source, batch_id, name, brand, category_id, bought_on, link, notes, date_added, floor_price, paid, non_gbp_fee, purchase_fee, item_cost, current_price, status, created_at").order("created_at", { ascending: false }),
     supabase.from("stock_batches").select(BATCH_COLS).order("number"),
     supabase.from("stock_categories").select("id, name, sku_code, measurements, active").order("name"),
     supabase.from("stock_log").select("item_id, created_at").eq("what", "status").not("item_id", "is", null).order("created_at", { ascending: false }),
@@ -143,8 +148,9 @@ export interface NewItem {
   brand: string;
   category_id: string | null;
   // Imported
-  bank_fee?: number | null;
-  site_price?: number | null;
+  paid?: number | null;
+  non_gbp_fee?: number | null;
+  purchase_fee?: number | null;
   bought_on?: string;
   link?: string;
   // Bought online
@@ -164,7 +170,7 @@ export async function addItem(n: NewItem): Promise<string> {
 
   const blank = (s?: string) => (s && s.trim() ? s.trim() : null);
   const row = n.source === "imported"
-    ? { status: "paid", batch_id: batch!.id, bank_fee: n.bank_fee ?? null, site_price: n.site_price ?? null, bought_on: blank(n.bought_on), link: blank(n.link) }
+    ? { status: "paid", batch_id: batch!.id, paid: n.paid ?? null, non_gbp_fee: n.non_gbp_fee ?? null, purchase_fee: n.purchase_fee ?? null, bought_on: blank(n.bought_on), link: blank(n.link) }
     : {
         status: "prep",
         item_cost: n.source === "donated" ? 0 : n.item_cost ?? null,
@@ -182,12 +188,12 @@ export async function addItem(n: NewItem): Promise<string> {
 
 // ---------- batches ----------
 
-/** What a batch has cost so far: its items' site prices and bank fees, plus shipping once shipped. */
+/** What a batch has cost so far: what was paid for its items and their bank fees, plus shipping and its fees once shipped. */
 export function batchTotals(b: StockBatch, items: StockItem[]) {
   const its = items.filter((i) => i.batch_id === b.id);
   const sum = (f: (i: StockItem) => number | null) => its.reduce((a, i) => a + (f(i) ?? 0), 0);
-  const prices = sum((i) => i.site_price), bankFees = sum((i) => i.bank_fee);
-  const shipping = (b.shipping_paid ?? 0) + (b.shipping_bank_fee ?? 0);
+  const prices = sum((i) => i.paid), bankFees = sum((i) => (i.non_gbp_fee ?? 0) + (i.purchase_fee ?? 0));
+  const shipping = (b.shipping_paid ?? 0) + (b.shipping_non_gbp_fee ?? 0) + (b.shipping_purchase_fee ?? 0);
   return { count: its.length, prices, bankFees, total: prices + bankFees + shipping };
 }
 
@@ -202,7 +208,8 @@ export interface ShipForm {
   shipped_on: string;
   carrier: string;
   shipping_paid: number | null;
-  shipping_bank_fee: number | null;
+  shipping_non_gbp_fee: number | null;
+  shipping_purchase_fee: number | null;
   tracking: string;
 }
 
@@ -211,7 +218,7 @@ export async function shipBatch(b: StockBatch, f: ShipForm): Promise<number> {
   const blank = (s: string) => (s.trim() ? s.trim() : null);
   const { error } = await supabase.from("stock_batches").update({
     status: "shipped", shipped_on: f.shipped_on, carrier: blank(f.carrier), tracking: blank(f.tracking),
-    shipping_paid: f.shipping_paid, shipping_bank_fee: f.shipping_bank_fee,
+    shipping_paid: f.shipping_paid, shipping_non_gbp_fee: f.shipping_non_gbp_fee, shipping_purchase_fee: f.shipping_purchase_fee,
   }).eq("id", b.id).eq("status", "collecting");
   if (error) throw error;
   const { error: itemsErr } = await supabase.from("stock_items").update({ status: "in_transit" }).eq("batch_id", b.id).eq("status", "paid");
@@ -237,8 +244,8 @@ export async function itemHistory(itemId: string): Promise<LogEntry[]> {
 }
 
 const FIELD_LABEL: Record<string, string> = {
-  status: "Status", notes: "Notes", name: "Name", brand: "Brand", category_id: "Category", site_price: "Site price",
-  bank_fee: "Bank fee", item_cost: "Item cost", floor_price: "Floor price", bought_on: "Bought on", link: "Link",
+  status: "Status", notes: "Notes", name: "Name", brand: "Brand", category_id: "Category", paid: "Paid",
+  non_gbp_fee: "Non-GBP fee", purchase_fee: "Purchase fee", item_cost: "Item cost", floor_price: "Floor price", bought_on: "Bought on", link: "Link",
   batch_id: "Batch", needs_steam: "Steam", needs_repair: "Repair", needs_measure: "Measure",
 };
 

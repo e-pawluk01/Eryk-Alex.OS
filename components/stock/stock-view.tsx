@@ -15,12 +15,12 @@ import { StatusChip, BatchPill, cx } from "./ui";
 import s from "./stock.module.css";
 
 
-/** The price shown in the list: an order's rough price (site price + bank fee), or what it cost. */
+/** The price shown in the list: an order's rough price (paid + its two bank fees), or what it cost. */
 function priceOf(it: StockItem): string | null {
   if (["paid", "in_transit", "to_check"].includes(it.status)) {
     if (it.item_cost != null) return gbp(it.item_cost);
-    if (it.site_price == null && it.bank_fee == null) return null;
-    return "~" + gbp((it.site_price ?? 0) + (it.bank_fee ?? 0));
+    if (it.paid == null && it.non_gbp_fee == null && it.purchase_fee == null) return null;
+    return "~" + gbp((it.paid ?? 0) + (it.non_gbp_fee ?? 0) + (it.purchase_fee ?? 0));
   }
   if (["live", "taken_down"].includes(it.status) && it.current_price != null) return gbp(it.current_price);
   return null;
