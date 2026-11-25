@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Task, Event } from "@/lib/types";
 import { DomainType } from "./global-context";
-import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Tag, Flag, BookMarked } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Plus, Calendar, TrendingUp, Tag, Flag, BookMarked, FileText } from "lucide-react";
 import { 
   startOfMonth, endOfMonth, eachDayOfInterval, format, 
   isSameDay, isToday, addMonths, subMonths, parseISO, startOfDay
@@ -13,16 +13,6 @@ import { ContextType } from "@/lib/types";
 import { NewCalendarItemDialog } from "./new-calendar-item-dialog";
 import { TagChip } from "./tags/tags";
 import { ListingsView } from "./listings-view";
-
-/** The Stock tab's icon: a dress, drawn in lucide's line style (lucide has none). */
-function DressIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d="M9 2v3" /><path d="M15 2v3" /><path d="M9 5c1.5 1.5 4.5 1.5 6 0" />
-      <path d="M9 5 8 8l1.5 3L5 21h14l-4.5-10L16 8l-1-3" /><path d="M9.5 11h5" />
-    </svg>
-  );
-}
 
 const contextDotColors: Record<ContextType, string> = {
   Eryk: "bg-blue-400",
@@ -117,7 +107,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
             className="p-3 py-4 hover:bg-white/10 transition-colors"
             title="Stock"
           >
-            {showStock ? <X className="w-5 h-5 text-white/80" /> : <DressIcon className="w-5 h-5 text-white/80" />}
+            {showStock ? <X className="w-5 h-5 text-white/80" /> : <Tag className="w-5 h-5 text-white/80" />}
           </button>
         )}
         {currentDomain === "WORK" && (
@@ -126,7 +116,7 @@ export function CalendarPanel({ tasks, events, currentDomain, userEmail, onAddTa
             className="p-3 py-4 hover:bg-white/10 transition-colors"
             title="Listings"
           >
-            <Tag className="w-5 h-5 text-white/80" />
+            <FileText className="w-5 h-5 text-white/80" />
           </button>
         )}
         {currentDomain === "STUDY" && onStudyPageToggle && (
