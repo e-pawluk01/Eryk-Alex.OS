@@ -41,7 +41,8 @@ export function AddStockDialog({ data, onClose, onAdded }: {
   const [catOpen, setCatOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [added, setAdded] = useState<string | null>(null);
+  // After Add: the new code, and the batch it went into (imported only).
+  const [added, setAdded] = useState<{ code: string; batch: number | null } | null>(null);
   const [height, setHeight] = useState<number | null>(null);
   const [more, setMore] = useState(false);
 
@@ -102,7 +103,7 @@ export function AddStockDialog({ data, onClose, onAdded }: {
       });
       onAdded(code, another);
       if (another) { setF(EMPTY); scrollRef.current?.scrollTo({ top: 0 }); }
-      else setAdded(code);
+      else setAdded({ code, batch: src === "imported" ? batchNo : null });
     } catch (e: any) {
       setError(e?.message || "Couldn't add it.");
     } finally {
@@ -206,9 +207,23 @@ export function AddStockDialog({ data, onClose, onAdded }: {
     <div className={s.root}>
       <div className={s.scrim} onClick={onClose} />
       {added ? (
-        <div className={s.modal} role="dialog" aria-modal="true" aria-label="Added">
-          {head("Added")}
-          <div className={s.bigid}><span className={s.mono}>{added}</span></div>
+        // Same as the app's own save confirmation (Listing saved / Generated SKU).
+        <div className="fixed inset-0 z-[101] flex items-center justify-center pointer-events-none">
+          <div role="dialog" aria-modal="true" aria-label="Added"
+            className="pointer-events-auto relative bg-zinc-950/80 backdrop-blur-3xl border border-white/5 rounded-2xl w-[90%] max-w-sm shadow-2xl shadow-black/50 animate-in fade-in zoom-in-[0.98] duration-300 slide-in-from-bottom-4 p-6 flex flex-col items-center gap-3 text-center">
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-t-2xl" />
+            <span className="text-[9px] uppercase tracking-widest text-emerald-400/80 font-semibold">Added</span>
+            <span className="text-3xl font-mono text-white tracking-wider">{added.code}</span>
+            {added.batch != null && (
+              <span className="text-[10px] text-white/40 flex items-center justify-center gap-1">
+                <Check className="w-3 h-3" /> Batch {added.batch} · Collecting
+              </span>
+            )}
+            <button onClick={onClose} style={{ color: "#000" }}
+              className="w-full py-2.5 bg-white text-black font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-white/90 transition-all mt-2">
+              Got it
+            </button>
+          </div>
         </div>
       ) : (
         <div className={s.modal} role="dialog" aria-modal="true" aria-label="Add stock" style={height ? { height: `min(${height}px, calc(100dvh - 48px))` } : undefined}
