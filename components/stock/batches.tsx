@@ -7,6 +7,7 @@ import { X, Calendar, Ship, Package, Wind, Scissors, Ruler } from "lucide-react"
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { StockBatch, StockData, StockItem, batchTotals, batchSince, trackingUrl, shipBatch, arriveBatch, checkItems, CheckOutcome, Needs, gbp } from "@/lib/stock";
 import { BatchPill, BatchChip, StatusChip, ModalHead, cx, dateLabel } from "./ui";
+import { DatePicker } from "@/components/ui/date-picker";
 import s from "./stock.module.css";
 
 const ACTIVE: StockBatch["status"][] = ["collecting", "shipped", "arrived"];
@@ -171,10 +172,10 @@ export function ShipDialog({ batch, onClose, onShipped }: {
   return createPortal(
     <div className={s.root}>
       <div className={s.scrim} style={{ zIndex: 100 }} onClick={onClose} />
-      <div className={cx(s.modal, s.gapsm)} role="dialog" aria-modal="true" aria-label={`Ship batch ${batch.number}`}>
+      <div className={cx(s.modal, s.gapsm, s.ovis)} role="dialog" aria-modal="true" aria-label={`Ship batch ${batch.number}`}>
         <ModalHead title={`Ship batch ${batch.number}`} onClose={onClose} />
         <div className={s.g2}>
-          <label className={s.fi}><span>Shipped</span><input className={s.inp} type="date" value={f.shipped_on} onChange={set("shipped_on")} aria-label="Ship date" /></label>
+          <div className={s.fi}><span>Shipped</span><div className={s.dp}><DatePicker value={f.shipped_on || null} onChange={(d) => setF((p) => ({ ...p, shipped_on: d ?? "" }))} placeholder="Pick a date" /></div></div>
           <label className={s.fi}><span>Carrier</span><input className={s.inp} value={f.carrier} onChange={set("carrier")} aria-label="Carrier" /></label>
         </div>
         {/* The bank's three lines for the shipping payment: the charge, then its two fees. */}
@@ -220,9 +221,9 @@ export function ArriveDialog({ batch, onClose, onArrived }: {
   return createPortal(
     <div className={s.root}>
       <div className={s.scrim} onClick={onClose} />
-      <div className={cx(s.modal, s.gapsm)} role="dialog" aria-modal="true" aria-label={`Batch ${batch.number} arrived`}>
+      <div className={cx(s.modal, s.gapsm, s.ovis)} role="dialog" aria-modal="true" aria-label={`Batch ${batch.number} arrived`}>
         <ModalHead title={`Batch ${batch.number} arrived`} onClose={onClose} />
-        <label className={s.fi}><span>Arrived</span><input className={s.inp} type="date" value={f.arrived_on} onChange={set("arrived_on")} aria-label="Arrival date" /></label>
+        <div className={s.fi}><span>Arrived</span><div className={s.dp}><DatePicker value={f.arrived_on || null} onChange={(d) => setF((p) => ({ ...p, arrived_on: d ?? "" }))} placeholder="Pick a date" /></div></div>
         <div className={s.g2}>
           <label className={s.fi}><span>Customs £</span><input className={s.inp} inputMode="decimal" value={f.customs} onChange={set("customs")} aria-label="Customs" /></label>
           <label className={s.fi}><span>Other £</span><input className={s.inp} inputMode="decimal" value={f.other_costs} onChange={set("other_costs")} aria-label="Other costs" /></label>
