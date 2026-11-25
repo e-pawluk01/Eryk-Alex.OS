@@ -23,8 +23,10 @@ export interface StockBatch {
   shipping_purchase_fee: number | null;
   carrier: string | null;
   tracking: string | null;
+  customs: number | null;
+  other_costs: number | null;
 }
-const BATCH_COLS = "id, number, proxy, status, started_on, shipped_on, arrived_on, lost_on, shipping_paid, shipping_non_gbp_fee, shipping_purchase_fee, carrier, tracking";
+const BATCH_COLS = "id, number, proxy, status, started_on, shipped_on, arrived_on, lost_on, shipping_paid, shipping_non_gbp_fee, shipping_purchase_fee, carrier, tracking, customs, other_costs";
 
 export interface StockCategory {
   id: string;
@@ -56,6 +58,17 @@ export interface StockItem {
   purchase_fee: number | null;
   item_cost: number | null;
   current_price: number | null;
+  needs_steam: boolean; steam_done: boolean;
+  needs_repair: boolean; repair_done: boolean;
+  needs_measure: boolean; measure_done: boolean;
+  size: string | null;
+  condition: string | null;
+  /** {"Pit to pit": "46", ...} in inches, as typed */
+  measurements: Record<string, string>;
+  kept_by: "Eryk" | "Alex" | null;
+  damaged_where: "warehouse" | "arrival" | null;
+  refund: number | null;
+  exit_date: string | null;
   status: ItemStatus;
   created_at: string;
   /** When it last changed status (from the log), for the Since column. */
@@ -102,16 +115,18 @@ export interface StockData {
   items: StockItem[];
   batches: StockBatch[];
   categories: StockCategory[];
+  settings: { floorMarkup: number; conditions: string[] };
 }
 
 export async function loadStock(): Promise<StockData> {
-  const [items, batches, categories, log] = await Promise.all([
-    supabase.from("stock_items").select("id, code, sku, source, batch_id, name, brand, category_id, bought_on, link, notes, date_added, floor_price, paid, non_gbp_fee, purchase_fee, item_cost, current_price, status, created_at").order("created_at", { ascending: false }),
+  const [items, batches, categories, log, settings] = await Promise.all([
+    supabase.from("stock_items").select("id, code, sku, source, batch_id, name, brand, category_id, bought_on, link, notes, date_added, floor_price, paid, non_gbp_fee, purchase_fee, item_cost, current_price, status, created_at, needs_steam, steam_done, needs_repair, repair_done, needs_measure, measure_done, size, condition, measurements, kept_by, damaged_where, refund, exit_date").order("created_at", { ascending: false }),
     supabase.from("stock_batches").select(BATCH_COLS).order("number"),
     supabase.from("stock_categories").select("id, name, sku_code, measurements, active").order("name"),
     supabase.from("stock_log").select("item_id, created_at").eq("what", "status").not("item_id", "is", null).order("created_at", { ascending: false }),
+    supabase.from("stock_settings").select("key, value").in("key", ["floor_markup", "conditions"]),
   ]);
-  const err = items.error || batches.error || categories.error || log.error;
+  const err = items.error || batches.error || categories.error || log.error || settings.error;
   if (err) throw err;
 
   const lastChange = new Map<string, string>();
@@ -121,6 +136,10 @@ export async function loadStock(): Promise<StockData> {
     items: (items.data ?? []).map((it) => ({ ...it, status_since: lastChange.get(it.id) ?? it.created_at }) as StockItem),
     batches: (batches.data ?? []) as StockBatch[],
     categories: (categories.data ?? []) as StockCategory[],
+    settings: {
+      floorMarkup: Number(settings.data?.find((r) => r.key === "floor_markup")?.value ?? 0.3),
+      conditions: (settings.data?.find((r) => r.key === "conditions")?.value as string[]) ?? ["New with tags", "Like new", "Very good", "Good"],
+    },
   };
 }
 
@@ -247,7 +266,9 @@ export async function itemHistory(itemId: string): Promise<LogEntry[]> {
 const FIELD_LABEL: Record<string, string> = {
   status: "Status", notes: "Notes", name: "Name", brand: "Brand", category_id: "Category", paid: "Paid",
   non_gbp_fee: "Non-GBP fee", purchase_fee: "Purchase fee", item_cost: "Item cost", floor_price: "Floor price", bought_on: "Bought on", link: "Link",
-  batch_id: "Batch", needs_steam: "Steam", needs_repair: "Repair", needs_measure: "Measure",
+  batch_id: "Batch", needs_steam: "Needs steam", needs_repair: "Needs repair", needs_measure: "Needs measuring",
+  steam_done: "Steamed", repair_done: "Repaired", measure_done: "Measured", size: "Size", condition: "Condition",
+  measurements: "Measurements", kept_by: "Kept by", refund: "Refund", customs: "Customs", other_costs: "Other costs",
 };
 
 /** One history line in plain words, e.g. "Paid → In transit". */
@@ -256,8 +277,102 @@ export function logLine(e: LogEntry): string {
   if (e.what === "sale.created") return "Sold";
   const label = FIELD_LABEL[e.what] ?? e.what.replace(/^sale\./, "Sale ").replace(/_/g, " ");
   if (e.what === "status") return `${STATUS_LABEL[e.from_value as ItemStatus] ?? e.from_value} → ${STATUS_LABEL[e.to_value as ItemStatus] ?? e.to_value}`;
-  if (e.what === "notes") return "Notes changed";
+  if (e.what === "notes" || e.what === "measurements") return `${label} changed`;
+  if (e.to_value === "true" || e.to_value === "false") return `${label}: ${e.to_value === "true" ? "yes" : "no"}`;
   if (e.from_value == null) return `${label} set to ${e.to_value}`;
   if (e.to_value == null) return `${label} cleared`;
   return `${label}: ${e.from_value} → ${e.to_value}`;
+}
+
+// ---------- arrival and check ----------
+
+export interface ArriveForm { arrived_on: string; customs: number | null; other_costs: number | null }
+
+/** Arrived: the batch gets its arrival date and any customs / other costs; its items go To check. */
+export async function arriveBatch(b: StockBatch, f: ArriveForm) {
+  const { error } = await supabase.from("stock_batches").update({
+    status: "arrived", arrived_on: f.arrived_on, customs: f.customs, other_costs: f.other_costs,
+  }).eq("id", b.id).eq("status", "shipped");
+  if (error) throw error;
+  const { error: itemsErr } = await supabase.from("stock_items").update({ status: "to_check" }).eq("batch_id", b.id).eq("status", "in_transit");
+  if (itemsErr) throw itemsErr;
+}
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Each item's final cost: what was paid + its two bank fees + its share of the batch's
+ * shipping, shipping fees, customs and other costs, shared by what was paid (as the sheet does).
+ * Items damaged at the warehouse never shipped, so they take no share.
+ */
+export function landedCosts(b: StockBatch, items: StockItem[], floorMarkup: number) {
+  const shipped = items.filter((i) => i.batch_id === b.id && i.damaged_where !== "warehouse");
+  const base = shipped.reduce((a, i) => a + (i.paid ?? 0), 0);
+  const extras = (b.shipping_paid ?? 0) + (b.shipping_non_gbp_fee ?? 0) + (b.shipping_purchase_fee ?? 0) + (b.customs ?? 0) + (b.other_costs ?? 0);
+  const out = new Map<string, { item_cost: number; floor_price: number }>();
+  for (const i of shipped) {
+    const own = (i.paid ?? 0) + (i.non_gbp_fee ?? 0) + (i.purchase_fee ?? 0);
+    const cost = r2(own + (base > 0 ? extras * (i.paid ?? 0) / base : 0));
+    out.set(i.id, { item_cost: cost, floor_price: r2(cost * (1 + floorMarkup)) });
+  }
+  return out;
+}
+
+export type Needs = { steam: boolean; repair: boolean; measure: boolean };
+export type CheckOutcome =
+  | { out: "ready"; needs: Needs }
+  | { out: "kept"; by: "Eryk" | "Alex" }
+  | { out: "damaged"; refund: number | null };
+
+/** Prep if anything needs doing, otherwise straight to Photos. */
+export const afterReady = (n: Needs): ItemStatus => (n.steam || n.repair || n.measure ? "prep" : "photos");
+
+/**
+ * The arrival check for one or more items of a batch. Sets each item's final cost (and floor price),
+ * then Ready → Prep (or Photos), Kept → out of stock with who kept it, Damaged → out of stock with any refund.
+ * The batch turns Checked once none of its items are left to check.
+ */
+export async function checkItems(b: StockBatch, data: StockData, outcomes: Map<string, CheckOutcome>) {
+  const costs = landedCosts(b, data.items, data.settings.floorMarkup);
+  const day = new Date().toLocaleDateString("en-CA");
+  for (const [id, o] of outcomes) {
+    const c = costs.get(id);
+    const base = { item_cost: c?.item_cost ?? null, date_added: day };
+    const patch = o.out === "ready"
+      ? { ...base, floor_price: c?.floor_price ?? null, status: afterReady(o.needs),
+          needs_steam: o.needs.steam, needs_repair: o.needs.repair, needs_measure: o.needs.measure }
+      : o.out === "kept"
+        ? { ...base, status: "kept", kept_by: o.by, exit_date: day, exit_reason: "kept", invoice_paid: false }
+        : { ...base, status: "damaged", damaged_where: "arrival", exit_date: day, exit_reason: "damaged", refund: o.refund };
+    const { error } = await supabase.from("stock_items").update(patch).eq("id", id).eq("status", "to_check");
+    if (error) throw error;
+  }
+  const { count, error } = await supabase.from("stock_items").select("id", { count: "exact", head: true }).eq("batch_id", b.id).eq("status", "to_check");
+  if (error) throw error;
+  if (!count) {
+    const { error: bErr } = await supabase.from("stock_batches").update({ status: "checked" }).eq("id", b.id).eq("status", "arrived");
+    if (bErr) throw bErr;
+  }
+}
+
+// ---------- prep and measuring ----------
+
+export type Job = "steam" | "repair" | "measure";
+
+/** Tick a job done (or not). Once every job it needs is done, it moves on to Photos. */
+export async function setJobDone(it: StockItem, job: Job, done: boolean): Promise<boolean> {
+  const next = { steam: it.steam_done, repair: it.repair_done, measure: it.measure_done, [job]: done };
+  const finished = (!it.needs_steam || next.steam) && (!it.needs_repair || next.repair) && (!it.needs_measure || next.measure)
+    && (it.needs_steam || it.needs_repair || it.needs_measure || done);
+  const { error } = await supabase.from("stock_items").update({
+    [`${job}_done`]: done, ...(finished && it.status === "prep" ? { status: "photos" } : {}),
+  }).eq("id", it.id);
+  if (error) throw error;
+  return finished && it.status === "prep";
+}
+
+/** Save measuring-form fields (size, condition, measurements, category, notes). */
+export async function updateItem(id: string, patch: Partial<Pick<StockItem, "size" | "condition" | "measurements" | "category_id" | "notes">>) {
+  const { error } = await supabase.from("stock_items").update(patch).eq("id", id);
+  if (error) throw error;
 }

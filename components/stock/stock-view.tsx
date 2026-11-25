@@ -2,18 +2,35 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Search, Check } from "lucide-react";
+import { Plus, Search, Check, Wind, Scissors, Ruler } from "lucide-react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import {
   loadStock, StockData, StockItem, StockBatch, GROUPS, GroupKey, STATUS_LABEL, inStock, gbp,
 } from "@/lib/stock";
 import { AddStockDialog } from "./add-stock-dialog";
-import { BatchList, BatchPanel, ShipDialog } from "./batches";
+import { BatchList, BatchPanel, ShipDialog, ArriveDialog, CheckDialog, batchAction } from "./batches";
 import { ItemPanel } from "./item-panel";
 import { StatusChip, BatchPill, cx } from "./ui";
 import s from "./stock.module.css";
 
+
+/** The list's info column (mockup infoFor): the batch for orders, the jobs for Prep, "Measured · category" for Photos. */
+function infoFor(it: StockItem, batchNo: number | undefined, category: string | undefined) {
+  if (["paid", "in_transit", "to_check"].includes(it.status)) return batchNo ? <BatchPill n={batchNo} /> : null;
+  if (it.status === "prep") {
+    const jobs = [["Steam", Wind, it.steam_done], ["Repair", Scissors, it.repair_done], ["Measure", Ruler, it.measure_done]] as const;
+    return (
+      <span className={s.jobi}>
+        {jobs.map(([k, Icon, done]) => (
+          <span key={k} className={done ? s.on : undefined} title={`${k}${done ? " done" : ""}`} aria-label={`${k}${done ? " done" : " to do"}`}><Icon className="w-[15px] h-[15px]" /></span>
+        ))}
+      </span>
+    );
+  }
+  if (it.status === "photos") return `Measured · ${category ?? "—"}`;
+  return null;
+}
 
 /** The price shown in the list: an order's rough price (paid + its two bank fees), or what it cost. */
 function priceOf(it: StockItem): string | null {
@@ -37,6 +54,13 @@ export function StockView() {
   const [openItem, setOpenItem] = useState<string | null>(null);
   const [openBatch, setOpenBatch] = useState<string | null>(null);
   const [shipping, setShipping] = useState<string | null>(null);
+  const [arriving, setArriving] = useState<string | null>(null);
+  const [checking, setChecking] = useState<string | null>(null);
+  // The batch's next step: Ship, Arrived or Check.
+  const batchStep = (b: StockBatch) => {
+    const a = batchAction(b);
+    if (a === "Ship") setShipping(b.id); else if (a === "Arrived") setArriving(b.id); else if (a === "Check") setChecking(b.id);
+  };
   const findRef = useRef<HTMLInputElement>(null);
 
   // ⌘K jumps to the search box.
@@ -98,7 +122,7 @@ export function StockView() {
       </div>
 
       {filter === "Orders" && !q && data && data.batches.length > 0 && (
-        <BatchList data={data} onOpen={(b) => setOpenBatch(b.id)} onShip={(b) => setShipping(b.id)} />
+        <BatchList data={data} onOpen={(b) => setOpenBatch(b.id)} onAction={batchStep} />
       )}
 
       <div className={s.list}>
@@ -124,7 +148,7 @@ export function StockView() {
               <span className={cx(s.mono, s.id)}>{it.sku || it.code}</span>
               <span className={s.nm}>{it.name}</span>
               <span className={s.st}><StatusChip status={it.status} /></span>
-              <span className={s.info}>{batch ? <BatchPill n={batch.number} /> : null}</span>
+              <span className={s.info}>{infoFor(it, batch?.number, data.categories.find((c) => c.id === it.category_id)?.name)}</span>
               <span className={s.since} title={`${since} days in ${STATUS_LABEL[it.status]}`}>{since}d</span>
               <span className={s.pr}>{price ?? <span className={s.dash}>—</span>}</span>
               <span className={s.plat}><span className={s.dash}>—</span></span>
@@ -147,18 +171,31 @@ export function StockView() {
       {data && openBatch && (() => {
         const b = data.batches.find((x) => x.id === openBatch);
         return b ? <BatchPanel batch={b} data={data} onClose={() => setOpenBatch(null)}
-          onOpenItem={(id) => { setOpenBatch(null); setOpenItem(id); }} onShip={(x: StockBatch) => setShipping(x.id)} /> : null;
+          onOpenItem={(id) => { setOpenBatch(null); setOpenItem(id); }} onAction={batchStep} /> : null;
       })()}
 
       {data && openItem && (() => {
         const it = data.items.find((x) => x.id === openItem);
-        return it ? <ItemPanel item={it} data={data} onClose={() => setOpenItem(null)} /> : null;
+        return it ? <ItemPanel item={it} data={data} onClose={() => setOpenItem(null)} onChanged={(msg) => { if (msg) setToast(msg); refresh(); }} /> : null;
       })()}
 
       {data && shipping && (() => {
         const b = data.batches.find((x) => x.id === shipping);
         return b ? <ShipDialog batch={b} onClose={() => setShipping(null)}
           onShipped={(next) => { setShipping(null); setToast(`Batch ${b.number} shipped. Batch ${next} is collecting`); refresh(); }} /> : null;
+      })()}
+
+      {data && arriving && (() => {
+        const b = data.batches.find((x) => x.id === arriving);
+        // As in the mockup: once it's arrived, the arrival check opens straight away.
+        return b ? <ArriveDialog batch={b} onClose={() => setArriving(null)}
+          onArrived={async () => { setArriving(null); setToast(`Batch ${b.number} arrived`); await refresh(); setChecking(b.id); }} /> : null;
+      })()}
+
+      {data && checking && (() => {
+        const b = data.batches.find((x) => x.id === checking);
+        return b ? <CheckDialog batch={b} data={data} onClose={() => setChecking(null)}
+          onSaved={(msg) => { setChecking(null); setToast(msg); refresh(); }} /> : null;
       })()}
 
       {adding && data && (

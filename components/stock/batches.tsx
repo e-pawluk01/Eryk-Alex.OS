@@ -3,18 +3,23 @@
 // Batches on the Orders filter, the batch panel, and the Ship pop-up (mockup: batches(), batchSlide(), modal 'ship').
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Calendar, Ship, Package } from "lucide-react";
+import { X, Calendar, Ship, Package, Wind, Scissors, Ruler } from "lucide-react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
-import { StockBatch, StockData, batchTotals, batchSince, trackingUrl, shipBatch, gbp } from "@/lib/stock";
+import { StockBatch, StockData, StockItem, batchTotals, batchSince, trackingUrl, shipBatch, arriveBatch, checkItems, CheckOutcome, Needs, gbp } from "@/lib/stock";
 import { BatchPill, BatchChip, StatusChip, ModalHead, cx, dateLabel } from "./ui";
+import { DatePicker } from "@/components/ui/date-picker";
 import s from "./stock.module.css";
 
 const ACTIVE: StockBatch["status"][] = ["collecting", "shipped", "arrived"];
 
-export function BatchList({ data, onOpen, onShip }: {
+/** The one thing to do next with a batch (mockup bAct): Ship, then Arrived, then Check. */
+export const batchAction = (b: StockBatch) =>
+  b.status === "collecting" ? "Ship" : b.status === "shipped" ? "Arrived" : b.status === "arrived" ? "Check" : null;
+
+export function BatchList({ data, onOpen, onAction }: {
   data: StockData;
   onOpen: (b: StockBatch) => void;
-  onShip: (b: StockBatch) => void;
+  onAction: (b: StockBatch) => void;
 }) {
   const today = new Date();
   const row = (b: StockBatch) => {
@@ -27,8 +32,8 @@ export function BatchList({ data, onOpen, onShip }: {
         <span className={s.sub}>{t.count}</span>
         <span className={s.pr}>{gbp(t.total)}</span>
         <span className={s.sub}>{differenceInCalendarDays(today, parseISO(batchSince(b)))}d</span>
-        {b.status === "collecting"
-          ? <button className={s.btn} onClick={(e) => { e.stopPropagation(); onShip(b); }}>Ship</button>
+        {batchAction(b)
+          ? <button className={s.btn} onClick={(e) => { e.stopPropagation(); onAction(b); }}>{batchAction(b)}</button>
           : <span />}
       </div>
     );
@@ -54,12 +59,12 @@ export function BatchList({ data, onOpen, onShip }: {
   );
 }
 
-export function BatchPanel({ batch, data, onClose, onOpenItem, onShip }: {
+export function BatchPanel({ batch, data, onClose, onOpenItem, onAction }: {
   batch: StockBatch;
   data: StockData;
   onClose: () => void;
   onOpenItem: (id: string) => void;
-  onShip: (b: StockBatch) => void;
+  onAction: (b: StockBatch) => void;
 }) {
   const t = batchTotals(batch, data.items);
   const its = data.items.filter((i) => i.batch_id === batch.id).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
@@ -99,6 +104,8 @@ export function BatchPanel({ batch, data, onClose, onOpenItem, onShip }: {
             {shipped && row("Shipping", gbp(batch.shipping_paid ?? 0))}
             {shipped && row("Shipping non-GBP fee", gbp(batch.shipping_non_gbp_fee ?? 0))}
             {shipped && row("Shipping purchase fee", gbp(batch.shipping_purchase_fee ?? 0))}
+            {batch.arrived_on && row("Customs", gbp(batch.customs ?? 0))}
+            {batch.arrived_on && row("Other costs", gbp(batch.other_costs ?? 0))}
           </div>
           {shipped && (batch.carrier || batch.tracking) && (
             <div className={s.kvg}>
@@ -118,8 +125,8 @@ export function BatchPanel({ batch, data, onClose, onOpenItem, onShip }: {
             </div>
           )}
         </div>
-        {batch.status === "collecting" && (
-          <div className={s.foot}><button className={s.btn} onClick={() => onShip(batch)}>Ship</button></div>
+        {batchAction(batch) && (
+          <div className={s.foot}><button className={s.btn} onClick={() => onAction(batch)}>{batchAction(batch)}</button></div>
         )}
       </aside>
     </div>,
@@ -165,10 +172,10 @@ export function ShipDialog({ batch, onClose, onShipped }: {
   return createPortal(
     <div className={s.root}>
       <div className={s.scrim} style={{ zIndex: 100 }} onClick={onClose} />
-      <div className={cx(s.modal, s.gapsm)} role="dialog" aria-modal="true" aria-label={`Ship batch ${batch.number}`}>
+      <div className={cx(s.modal, s.gapsm, s.ovis)} role="dialog" aria-modal="true" aria-label={`Ship batch ${batch.number}`}>
         <ModalHead title={`Ship batch ${batch.number}`} onClose={onClose} />
         <div className={s.g2}>
-          <label className={s.fi}><span>Shipped</span><input className={s.inp} type="date" value={f.shipped_on} onChange={set("shipped_on")} aria-label="Ship date" /></label>
+          <div className={s.fi}><span>Shipped</span><div className={s.dp}><DatePicker value={f.shipped_on || null} onChange={(d) => setF((p) => ({ ...p, shipped_on: d ?? "" }))} placeholder="Pick a date" /></div></div>
           <label className={s.fi}><span>Carrier</span><input className={s.inp} value={f.carrier} onChange={set("carrier")} aria-label="Carrier" /></label>
         </div>
         {/* The bank's three lines for the shipping payment: the charge, then its two fees. */}
@@ -184,4 +191,153 @@ export function ShipDialog({ batch, onClose, onShipped }: {
     </div>,
     document.body,
   );
+}
+
+/** Arrived (mockup 'arrive'): arrival date, customs, other costs. Its items go To check. */
+export function ArriveDialog({ batch, onClose, onArrived }: {
+  batch: StockBatch;
+  onClose: () => void;
+  onArrived: () => void;
+}) {
+  const [f, setF] = useState({ arrived_on: todayIso(), customs: "", other_costs: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
+  useEscape(onClose);
+
+  const save = async () => {
+    if (saving || !f.arrived_on) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await arriveBatch(batch, { arrived_on: f.arrived_on, customs: money(f.customs), other_costs: money(f.other_costs) });
+      onArrived();
+    } catch (e: any) {
+      setError(e?.message || "Couldn't save it.");
+      setSaving(false);
+    }
+  };
+
+  return createPortal(
+    <div className={s.root}>
+      <div className={s.scrim} onClick={onClose} />
+      <div className={cx(s.modal, s.gapsm, s.ovis)} role="dialog" aria-modal="true" aria-label={`Batch ${batch.number} arrived`}>
+        <ModalHead title={`Batch ${batch.number} arrived`} onClose={onClose} />
+        <div className={s.fi}><span>Arrived</span><div className={s.dp}><DatePicker value={f.arrived_on || null} onChange={(d) => setF((p) => ({ ...p, arrived_on: d ?? "" }))} placeholder="Pick a date" /></div></div>
+        <div className={s.g2}>
+          <label className={s.fi}><span>Customs £</span><input className={s.inp} inputMode="decimal" value={f.customs} onChange={set("customs")} aria-label="Customs" /></label>
+          <label className={s.fi}><span>Other £</span><input className={s.inp} inputMode="decimal" value={f.other_costs} onChange={set("other_costs")} aria-label="Other costs" /></label>
+        </div>
+        {error && <div className={s.err}>{error}</div>}
+        <button className={s.btnw} disabled={saving || !f.arrived_on} onClick={save}>Save</button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+type Draft = { out?: "ready" | "kept" | "damaged"; needs: Needs; by: "Eryk" | "Alex"; refund: string };
+const NEED_TICKS = [
+  { key: "steam", label: "Steam", Icon: Wind },
+  { key: "repair", label: "Repair", Icon: Scissors },
+  { key: "measure", label: "Measure", Icon: Ruler },
+] as const;
+
+/** The three icon ticks (Steam · Repair · Measure), as in Add stock. */
+export function NeedTicks({ value, onChange }: { value: Needs; onChange: (n: Needs) => void }) {
+  return (
+    <div className={s.jobs}>
+      {NEED_TICKS.map(({ key, label, Icon }) => (
+        <button key={key} type="button" className={s.tick} aria-pressed={value[key]} aria-label={label} title={label}
+          onClick={() => onChange({ ...value, [key]: !value[key] })}>
+          <Icon className="w-[18px] h-[18px]" strokeWidth={2} /><span className={s.box} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The whole-batch arrival check (mockup 'check'): All ready in one tap, then the exceptions. */
+export function CheckDialog({ batch, data, onClose, onSaved }: {
+  batch: StockBatch;
+  data: StockData;
+  onClose: () => void;
+  onSaved: (msg: string) => void;
+}) {
+  const its: StockItem[] = data.items.filter((i) => i.batch_id === batch.id && i.status === "to_check")
+    .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+  const blank: Draft = { needs: { steam: false, repair: false, measure: false }, by: "Alex", refund: "" };
+  const [d, setD] = useState<Record<string, Draft>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const get = (id: string) => d[id] ?? blank;
+  const put = (id: string, patch: Partial<Draft>) => setD((p) => ({ ...p, [id]: { ...(p[id] ?? blank), ...patch } }));
+  const done = its.filter((i) => get(i.id).out).length;
+  useEscape(onClose);
+
+  const save = async () => {
+    if (saving || done < its.length) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const outcomes = new Map<string, CheckOutcome>(its.map((i) => {
+        const x = get(i.id);
+        return [i.id, x.out === "ready" ? { out: "ready", needs: x.needs } : x.out === "kept" ? { out: "kept", by: x.by } : { out: "damaged", refund: money(x.refund) }];
+      }));
+      await checkItems(batch, data, outcomes);
+      const kept = its.filter((i) => get(i.id).out === "kept").length;
+      onSaved(`Check saved. Costs and floor prices final${kept ? ` · ${kept} kept` : ""}`);
+    } catch (e: any) {
+      setError(e?.message || "Couldn't save it.");
+      setSaving(false);
+    }
+  };
+
+  return createPortal(
+    <div className={s.root}>
+      <div className={s.scrim} onClick={onClose} />
+      <div className={cx(s.modal, s.gapsm)} role="dialog" aria-modal="true" aria-label={`Batch ${batch.number} arrival check`}>
+        <ModalHead title={`Batch ${batch.number} · arrival check`} onClose={onClose} />
+        <div className={s.chkhead}>
+          <span className={s.sub}>{done} of {its.length} checked</span>
+          <button className={cx(s.btn, s.sm)} onClick={() => setD((p) => Object.fromEntries(its.map((i) => [i.id, { ...(p[i.id] ?? blank), out: p[i.id]?.out ?? "ready" }])))}>All ready</button>
+        </div>
+        <div className={cx(s.list, s.fill)}>
+          {its.map((i) => {
+            const x = get(i.id);
+            return (
+              <div key={i.id} className={s.chkrow}>
+                <div className={s.ct}><span className={s.mono}>{i.code}</span><span className={s.bn}>{i.name}</span></div>
+                <div className={s.seg} role="group" aria-label={`Outcome for ${i.name}`}>
+                  {(["ready", "kept", "damaged"] as const).map((o) => (
+                    <button key={o} className={x.out === o ? s.on : undefined} onClick={() => put(i.id, { out: o })}>{o[0].toUpperCase() + o.slice(1)}</button>
+                  ))}
+                </div>
+                {x.out === "ready" && <NeedTicks value={x.needs} onChange={(n) => put(i.id, { needs: n })} />}
+                {x.out === "kept" && (
+                  <div className={s.seg} role="group" aria-label="Kept by">
+                    {(["Eryk", "Alex"] as const).map((w) => <button key={w} className={x.by === w ? s.on : undefined} onClick={() => put(i.id, { by: w })}>{w}</button>)}
+                  </div>
+                )}
+                {x.out === "damaged" && (
+                  <label className={s.fi}><span>Refund £</span><input className={s.inp} inputMode="decimal" value={x.refund} onChange={(e) => put(i.id, { refund: e.target.value })} aria-label="Refund" /></label>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {error && <div className={s.err}>{error}</div>}
+        <button className={s.btnw} disabled={saving || done < its.length} onClick={save}>Save</button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function useEscape(onClose: () => void) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 }
