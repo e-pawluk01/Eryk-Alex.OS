@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -331,16 +332,8 @@ export function SessionFormDialog({ mode, session, person, initialTask, initialN
                     )}
                   >
                     <span className="w-2 h-2 rounded-full" style={{ background: taskColor(p.task) }} />
-                    <select
-                      value={p.task}
-                      onChange={(e) => updatePart(i, { task: e.target.value })}
-                      aria-label={`Task ${i + 1}`}
-                      className={selectClass}
-                    >
-                      {WORK_TASKS.map((t) => (
-                        <option key={t} value={t} className="bg-zinc-900">{t}</option>
-                      ))}
-                    </select>
+                    <Select value={p.task} onChange={(v) => updatePart(i, { task: v })} aria-label={`Task ${i + 1}`} className={selectClass}
+                      options={WORK_TASKS.map((t) => ({ value: t, label: t }))} />
                     {split && i === 0 && (
                       <>
                         <span className="text-sm text-white tabular-nums pl-3" title="Gets whatever time is left">

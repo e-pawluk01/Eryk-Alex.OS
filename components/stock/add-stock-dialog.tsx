@@ -26,7 +26,7 @@ type Form = {
 };
 const EMPTY: Form = {
   name: "", brand: "", category_id: null, paid: "", non_gbp_fee: "", purchase_fee: "", bought_on: "", link: "", item_cost: "",
-  needs: { steam: false, repair: false, measure: false },
+  needs: { steam: false, repair: false, measure: true }, // Measure ticked by default (Eryk, 26 Nov)
 };
 /** "£6.58", "6.58" or "" → 6.58 / null */
 const money = (v: string) => { const n = parseFloat(v.replace(/[£,\s]/g, "")); return Number.isFinite(n) ? n : null; };

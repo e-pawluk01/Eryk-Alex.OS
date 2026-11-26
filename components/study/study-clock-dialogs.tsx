@@ -14,6 +14,7 @@ import {
 import { StudyData, useStudy } from "./use-study";
 import { ProgressFields, progressOf } from "./deadline-progress";
 import { FieldLabel, ModuleDot, OptionPill, primaryButton, StudyModal } from "./bits";
+import { Select } from "@/components/ui/select";
 
 const hhmm = (d: Date) => format(d, "HH:mm");
 const atTime = (day: Date, time: string) => {
@@ -170,22 +171,14 @@ export function WhatSelect({ study, moduleId, value, onChange }: { study: StudyD
   const materials = keepMaterial && !options.materials.includes(keepMaterial) ? [...options.materials, keepMaterial] : options.materials;
   const deadlines = keepDeadline && !options.deadlines.includes(keepDeadline) ? [...options.deadlines, keepDeadline] : options.deadlines;
   return (
-    <select value={value} onChange={e => onChange(e.target.value)} className={selectClass} aria-label="On what">
-      {materials.length > 0 && (
-        <optgroup label="Materials" className="bg-zinc-900">
-          {materials.map(m => <option key={m.id} value={`material:${m.id}`}>{m.title}</option>)}
-        </optgroup>
-      )}
-      {deadlines.length > 0 && (
-        <optgroup label="Open deadlines" className="bg-zinc-900">
-          {deadlines.map(d => <option key={d.id} value={`deadline:${d.id}`}>{d.title}</option>)}
-        </optgroup>
-      )}
-      <option value="revision" className="bg-zinc-900">Revision</option>
-      <option value="practice" className="bg-zinc-900">Practice questions</option>
-      <option value="preparation" className="bg-zinc-900">Preparation</option>
-      <option value={CUSTOM} className="bg-zinc-900">Something else…</option>
-    </select>
+    <Select value={value} onChange={onChange} className={selectClass} aria-label="On what" options={[
+      { group: "Materials", options: materials.map(m => ({ value: `material:${m.id}`, label: m.title })) },
+      { group: "Open deadlines", options: deadlines.map(d => ({ value: `deadline:${d.id}`, label: d.title })) },
+      { value: "revision", label: "Revision" },
+      { value: "practice", label: "Practice questions" },
+      { value: "preparation", label: "Preparation" },
+      { value: CUSTOM, label: "Something else…" },
+    ]} />
   );
 }
 

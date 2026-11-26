@@ -7,6 +7,7 @@ import { ListingPhotoPicker, PhotoSlot } from "@/components/listing-photo-picker
 import { ListingResultPopup, ListingResult } from "@/components/listing-result-popup";
 import { SKU_CATEGORIES } from "@/lib/sku-categories";
 import { LISTING_MODELS, ListingModelId } from "@/lib/listing-models";
+import { Select } from "@/components/ui/select";
 
 export function ListingsView({ onClose }: { onClose: () => void }) {
   const [isSkuDialogOpen, setIsSkuDialogOpen] = useState(false);
@@ -116,15 +117,9 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
 
         <div className="flex flex-col gap-2 bg-white/5 border border-white/10 rounded-xl p-4">
           <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Category</label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm text-white outline-none appearance-none"
-          >
-            {SKU_CATEGORIES.map((c) => (
-              <option key={c.code} value={c.name}>{c.name}</option>
-            ))}
-          </select>
+          <Select value={category} onChange={setCategory} aria-label="Category"
+            className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm text-white outline-none"
+            options={SKU_CATEGORIES.map((c) => ({ value: c.name, label: c.name }))} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -179,15 +174,9 @@ export function ListingsView({ onClose }: { onClose: () => void }) {
 
         <div className="flex flex-col gap-2 bg-white/5 border border-white/10 rounded-xl p-4">
           <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">AI model</label>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value as ListingModelId)}
-            className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm text-white outline-none appearance-none"
-          >
-            {LISTING_MODELS.map((m) => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
+          <Select value={model} onChange={(v) => setModel(v as ListingModelId)} aria-label="AI model"
+            className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm text-white outline-none"
+            options={LISTING_MODELS.map((m) => ({ value: m.id, label: m.label }))} />
         </div>
 
         <div className="flex flex-col bg-white/5 border border-white/10 rounded-xl">

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Check, AlertTriangle } from "lucide-react";
 import { SKU_CATEGORIES } from "@/lib/sku-categories";
+import { Select } from "@/components/ui/select";
 
 interface SkuResult {
   sku: string;
@@ -76,18 +77,9 @@ export function GenerateSkuDialog({ isOpen, onClose, onGenerated }: GenerateSkuD
         <div className="px-6 pb-6 flex flex-col gap-5">
           <div className="flex flex-col gap-2">
             <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">Category</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              disabled={loading}
+            <Select value={category} onChange={setCategory} disabled={loading} aria-label="Category"
               className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 transition-colors appearance-none"
-            >
-              {SKU_CATEGORIES.map((c) => (
-                <option key={c.code} value={c.name} className="bg-zinc-900">
-                  {c.name} ({c.code})
-                </option>
-              ))}
-            </select>
+              options={SKU_CATEGORIES.map((c) => ({ value: c.name, label: `${c.name} (${c.code})` }))} />
           </div>
 
           <label className="flex items-start gap-3 cursor-pointer">

@@ -233,6 +233,25 @@
 
 /* Details: a very faint pencil after anything that can be changed (Eryk, 25 Nov) */
 .kvv { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
-.pen { width: 18px; height: 16px; flex: none; display: grid; place-items: center; border: 0; background: none; padding: 0; color: var(--dim) !important; opacity: .35; margin-right: -4px; }
+.pen { width: 18px; height: 16px; flex: none; display: grid; place-items: center; border: 0; background: none; padding: 0; color: var(--dim) !important; opacity: .35; }
 .kvr:hover .pen, .pen:focus-visible { opacity: .9; }
 .pen:hover { color: var(--fg) !important; }
+
+.est { color: var(--muted); }
+
+/* arrival check, compact (Eryk's sketch, 26 Nov) */
+.ckrow { display: grid; grid-template-columns: 56px minmax(0,1fr) auto; gap: 14px; align-items: center; height: 60px; border-bottom: 1px solid var(--line2); font-size: 14px; }
+.ckrow:last-child { border-bottom: 0; }
+.ckn { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ckn .bn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ckn .chip { flex: none; }
+.ckr { display: flex; align-items: center; gap: 10px; }
+.ckr .seg { flex-wrap: nowrap; }
+.ckb { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); background: transparent; color: var(--muted) !important; }
+.ckb:hover { color: #fff !important; border-color: rgba(255,255,255,.3); }
+.dmgi { display: inline-flex; flex: none; color: #fca5a5; }
+.jobsSm { gap: 16px; }
+.jobsSm .tick { gap: 7px; padding: 0; }
+.jobsSm .box { width: 20px; height: 20px; }
+.ckref { width: 150px; }
+.ckref .inp { padding: 7px 0; }

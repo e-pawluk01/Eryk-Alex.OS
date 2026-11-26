@@ -8,6 +8,7 @@ import { WORK_TASKS, partnerOf, openSessionOf, sessionLabel } from "@/lib/work-s
 import { SessionFormDialog } from "./session-form-dialog";
 import { openStudySessionsOf, StudySession } from "@/lib/study-sessions";
 import { PromptDialog, StudyClockOutAll } from "./study/study-clock-dialogs";
+import { Select } from "@/components/ui/select";
 
 const TASKS = WORK_TASKS;
 
@@ -110,16 +111,9 @@ export function ClockInDialog({ onSessionStarted, trigger }: ClockInDialogProps)
                 <label className="text-[9px] uppercase tracking-widest font-semibold text-white/30">
                   Select Task
                 </label>
-                <select
-                  value={task}
-                  onChange={(e) => setTask(e.target.value)}
-                  disabled={isSubmitting}
+                <Select value={task} onChange={setTask} disabled={isSubmitting} aria-label="Task"
                   className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 transition-colors appearance-none"
-                >
-                  {TASKS.map((t) => (
-                    <option key={t} value={t} className="bg-zinc-900">{t}</option>
-                  ))}
-                </select>
+                  options={TASKS.map((t) => ({ value: t, label: t }))} />
                 {task === "Other" && (
                   <input
                     type="text"
