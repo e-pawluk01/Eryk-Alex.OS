@@ -19,7 +19,8 @@ import s from "./stock.module.css";
 function infoFor(it: StockItem, batchNo: number | undefined, category: string | undefined) {
   if (["paid", "in_transit", "to_check"].includes(it.status)) return batchNo ? <BatchPill n={batchNo} /> : null;
   if (it.status === "prep") {
-    const jobs = [["Steam", Wind, it.steam_done], ["Repair", Scissors, it.repair_done], ["Measure", Ruler, it.measure_done]] as const;
+    // Only the jobs it needs (ticked at the check).
+    const jobs = ([["Steam", Wind, it.steam_done, it.needs_steam], ["Repair", Scissors, it.repair_done, it.needs_repair], ["Measure", Ruler, it.measure_done, it.needs_measure]] as const).filter((j) => j[3]);
     return (
       <span className={s.jobi}>
         {jobs.map(([k, Icon, done]) => (
