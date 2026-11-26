@@ -11,6 +11,7 @@ import { TaskDetailsPanel } from "@/components/task-details-panel";
 import { EventDetailsPanel } from "@/components/event-details-panel";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { AnalyticsView } from "@/components/analytics-view";
+import { StockView } from "@/components/stock/stock-view";
 import { ActiveSessionWidget } from "@/components/active-session-widget";
 import { NewTaskDialog } from "@/components/new-task-dialog";
 import { NewTopicDialog } from "@/components/new-topic-dialog";
@@ -57,6 +58,8 @@ export default function Home() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   
   const [showAnalytics, setShowAnalytics] = useState(false);
+  // The new Stock page (Work only). Runs alongside the sheet; only one of Analytics / Stock is open.
+  const [showStock, setShowStock] = useState(false);
   // Which Study page is open from the side tabs (null = Study home).
   const [studyPage, setStudyPage] = useState<"analytics" | "deadlines" | "materials" | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -323,7 +326,9 @@ export default function Home() {
       <StudyClock study={study} music={music} visible={currentDomain === "STUDY"} />
       <MusicPlayer music={music} />
       <LectureReminder events={events} />
-      {currentDomain === "WORK" && showAnalytics ? (
+      {currentDomain === "WORK" && showStock ? (
+        <StockView />
+      ) : currentDomain === "WORK" && showAnalytics ? (
         <AnalyticsView />
       ) : currentDomain === "STUDY" && studyPage === "analytics" ? (
         <StudyAnalyticsView study={study} />
@@ -557,8 +562,10 @@ export default function Home() {
         onAddEvent={handleAddEvent}
         onSelectTask={setSelectedTask}
         onSelectEvent={setSelectedEvent}
-        onAnalyticsToggle={() => setShowAnalytics(!showAnalytics)}
+        onAnalyticsToggle={() => { setShowAnalytics(!showAnalytics); setShowStock(false); }}
         showAnalytics={showAnalytics}
+        onStockToggle={() => { setShowStock(!showStock); setShowAnalytics(false); }}
+        showStock={showStock}
         studyPage={studyPage}
         onStudyPageToggle={page => setStudyPage(studyPage === page ? null : page)}
       />

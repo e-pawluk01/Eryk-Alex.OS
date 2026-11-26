@@ -7,11 +7,11 @@ import { addDays, format, isSameDay, startOfDay } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { TimeField } from "@/components/ui/time-field";
 import { DatePills } from "@/components/ui/date-pills";
-import { StudyDeadline, StudyMaterial } from "@/lib/types";
+import { StudyDeadline, StudyMaterial, Task } from "@/lib/types";
 import {
-  StudySession, OTHER, CUSTOM, addTaskTime, untickIfShort, firstWhat, missingText, formatDuration, notifyStudyChanged, sessionFields, whatOptions,
+  StudySession, OTHER, CUSTOM, TASK, STUDY_CHANGED_EVENT, addTaskTime, untickIfShort, firstWhat, missingText, formatDuration, minutesLeft, notifyStudyChanged, sessionFields, whatLabel, whatOptions,
 } from "@/lib/study-sessions";
-import { StudyData } from "./use-study";
+import { StudyData, useStudy } from "./use-study";
 import { ProgressFields, progressOf } from "./deadline-progress";
 import { FieldLabel, ModuleDot, OptionPill, primaryButton, StudyModal } from "./bits";
 
@@ -36,8 +36,32 @@ function Portal({ children }: { children: React.ReactNode }) {
 
 const todayIso = () => format(new Date(), "yyyy-MM-dd");
 
-/** Module pills plus "Other", then "On what": the module's dropdown, or a text box for Other. */
-export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWhat, onOtherText }: {
+/** Today's open timed Study tasks, in the order they were added. */
+export function useTodaysTimedTasks(person: string | null) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  useEffect(() => {
+    if (!person) return;
+    let alive = true;
+    const load = async () => {
+      const { data, error } = await supabase.from("tasks").select("*")
+        .eq("context", person).eq("domain", "STUDY").eq("status", "todo")
+        .eq("scheduled_date", todayIso()).not("time_limit_minutes", "is", null)
+        .order("created_at");
+      if (error) { console.error("Failed to load timed tasks:", error); return; }
+      if (alive) setTasks(data as Task[]);
+    };
+    load();
+    window.addEventListener(STUDY_CHANGED_EVENT, load);
+    return () => { alive = false; window.removeEventListener(STUDY_CHANGED_EVENT, load); };
+  }, [person]);
+  return tasks;
+}
+
+/**
+ * Module pills plus "Task" (when there are timed tasks today) and "Other",
+ * then "On what": the module's dropdown, today's tasks, or a text box for Other.
+ */
+export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWhat, onOtherText, tasks, taskId, onTask, noText }: {
   study: StudyData;
   moduleId: string;
   what: string;
@@ -45,10 +69,16 @@ export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWh
   onModule: (id: string) => void;
   onWhat: (v: string) => void;
   onOtherText: (v: string) => void;
+  tasks?: Task[];
+  taskId?: string | null;
+  onTask?: (task: Task) => void;
+  // No text box for Other / Something else (a task uses its own name).
+  noText?: boolean;
 }) {
   const pick = (id: string) => {
     onModule(id);
-    if (id !== OTHER) onWhat(firstWhat(id, study.materials, study.deadlines, todayIso()));
+    if (id === TASK) { if (tasks?.[0] && !tasks.some(t => t.id === taskId)) onTask?.(tasks[0]); }
+    else if (id !== OTHER) onWhat(firstWhat(id, study.materials, study.deadlines, todayIso()));
   };
   return (
     <>
@@ -60,13 +90,32 @@ export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWh
               <ModuleDot module={m} />{m.name}
             </OptionPill>
           ))}
+          {!!tasks?.length && <OptionPill active={moduleId === TASK} onClick={() => pick(TASK)}>Task</OptionPill>}
           <OptionPill active={moduleId === OTHER} onClick={() => pick(OTHER)}>Other</OptionPill>
         </div>
       </div>
+      {moduleId === TASK ? (
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Today</FieldLabel>
+          <div className="flex flex-col gap-1.5">
+            {(tasks ?? []).map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => onTask?.(t)}
+                className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border text-sm text-left transition-colors ${t.id === taskId ? "border-white/35 bg-white/[0.06] text-white" : "border-white/10 text-white/70 hover:text-white hover:border-white/20"}`}
+              >
+                <span className="truncate">{t.title}</span>
+                <span className="font-mono text-xs tabular-nums text-white/50">{formatDuration(minutesLeft(t) * 60)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
       <div className="flex flex-col gap-2">
         <FieldLabel>On what</FieldLabel>
         {moduleId !== OTHER && <WhatSelect study={study} moduleId={moduleId} value={what} onChange={onWhat} />}
-        {(moduleId === OTHER || what === CUSTOM) && (
+        {!noText && (moduleId === OTHER || what === CUSTOM) && (
           <input
             type="text"
             value={otherText}
@@ -77,8 +126,33 @@ export function ModuleAndWhat({ study, moduleId, what, otherText, onModule, onWh
           />
         )}
       </div>
+      )}
     </>
   );
+}
+
+/**
+ * A timed task's Module and On what: the time it's clocked for is logged there.
+ * Other (no module) logs it as Other with the task's name.
+ */
+export function TaskModuleFields({ person, moduleId, what, onChange }: {
+  person: string;
+  moduleId: string | null;
+  what: string | null;
+  onChange: (moduleId: string | null, what: string | null) => void;
+}) {
+  const study = useStudy(person);
+  const [mod, setMod] = useState(moduleId ?? OTHER);
+  const [wh, setWh] = useState(what ?? "");
+  // Picking a module sets both at once, so report after they settle.
+  useEffect(() => {
+    const m = mod === OTHER ? null : mod;
+    const w = mod === OTHER ? null : wh || null;
+    if (m !== (moduleId ?? null) || w !== (what ?? null)) onChange(m, w);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mod, wh]);
+  if (!study.modules.length) return null;
+  return <ModuleAndWhat study={study} moduleId={mod} what={wh} otherText="" onModule={setMod} onWhat={setWh} onOtherText={() => {}} noText />;
 }
 
 /** The first module (or Other when there are none) and its first "what". */
@@ -109,6 +183,7 @@ export function WhatSelect({ study, moduleId, value, onChange }: { study: StudyD
       )}
       <option value="revision" className="bg-zinc-900">Revision</option>
       <option value="practice" className="bg-zinc-900">Practice questions</option>
+      <option value="preparation" className="bg-zinc-900">Preparation</option>
       <option value={CUSTOM} className="bg-zinc-900">Something else…</option>
     </select>
   );
@@ -198,8 +273,7 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
         session.deadline_id ? supabase.from("study_deadlines").select("*").eq("id", session.deadline_id).maybeSingle() : Promise.resolve({ data: null }),
       ]);
       const m = mat.data as StudyMaterial | null;
-      const what = m?.title ?? (dl.data as { title: string } | null)?.title
-        ?? (session.kind === "revision" ? "Revision" : session.kind === "practice" ? "Practice questions" : session.kind === "other" ? session.note || "Other" : "General");
+      const what = m?.title ?? (dl.data as { title: string } | null)?.title ?? whatLabel(session, [], []);
       setLabel(`${(mod as { name: string } | null)?.name ?? "Study"} · ${what}`);
       if (m?.total) { setMaterial(m); setPage(String(m.current)); }
       const d = dl.data as StudyDeadline | null;
@@ -311,6 +385,20 @@ export function StudyClockOutDialog({ session, onClose, onSaved }: { session: St
       </StudyModal>
     </Portal>
   );
+}
+
+/**
+ * Clock out of several open sessions (the current one and any switched away
+ * from), one "Are these hours correct?" after another. Closing stops there.
+ */
+export function StudyClockOutAll({ sessions, onClose, onSaved }: { sessions: StudySession[]; onClose: () => void; onSaved: () => void }) {
+  // Kept as they were when it opened: the list refreshes as each one is saved.
+  const [queue] = useState(sessions);
+  const [index, setIndex] = useState(0);
+  const session = queue[index];
+  if (!session) return null;
+  const next = () => { if (index + 1 < queue.length) setIndex(index + 1); else onSaved(); };
+  return <StudyClockOutDialog key={session.id} session={session} onClose={onClose} onSaved={next} />;
 }
 
 /** Log study time you forgot to clock, or fix a past session (when `session` is given). */

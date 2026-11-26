@@ -8,6 +8,7 @@ import { differenceInDays, startOfDay } from "date-fns";
 import { Pin, Repeat, Users } from "lucide-react";
 import { ProgressSlider } from "./ui/progress-slider";
 import { TagChip } from "./tags/tags";
+import { TaskTimer } from "./task-timer";
 
 interface TaskItemProps {
   task: Task;
@@ -94,11 +95,8 @@ export function TaskItem({ task, onToggleStatus, onSelect, onUpdate, noTick }: T
           )}
           {/* Timed Study task: the same bar as Track Progress, filled by time clocked */}
           {task.domain === "STUDY" && !!task.time_limit_minutes && (
-            <div className="w-full h-1.5 bg-white/10 rounded-full relative mt-3 mb-1">
-              <div
-                className="absolute left-0 top-0 bottom-0 rounded-full bg-white"
-                style={{ width: `${task.status === "done" ? 100 : Math.min(100, ((task.time_spent_seconds ?? 0) / (task.time_limit_minutes * 60)) * 100)}%` }}
-              />
+            <div className="flex items-center gap-2.5 mt-2" onClick={e => e.stopPropagation()}>
+              <TaskTimer task={task} person={task.context} />
             </div>
           )}
           {task.track_progress && !(task.domain === "STUDY" && task.time_limit_minutes) && (

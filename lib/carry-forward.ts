@@ -69,12 +69,12 @@ export async function carryForwardUnsold(fromTab: string, toTab: string) {
 
   // Write directly after the last row with a real item on it. We can't trust
   // dstRows.length or `append`: a column of empty tickboxes reads "FALSE" all
-  // the way down, making the sheet look ~1000 rows long. Only a note, a SKU or
-  // a buy price marks a genuine row.
+  // the way down, making the sheet look ~1000 rows long. Only a name, a note,
+  // a SKU or a buy price marks a genuine row.
   let lastItemRow = 1; // header
   for (let i = 1; i < dstRows.length; i++) {
     const r = dstRows[i];
-    if (cell(r, dst, "notes") || cell(r, dst, "sku") || cell(r, dst, "buy")) lastItemRow = i + 1;
+    if (cell(r, dst, "name") || cell(r, dst, "notes") || cell(r, dst, "sku") || cell(r, dst, "buy")) lastItemRow = i + 1;
   }
   const firstEmptyRow = lastItemRow + 1;
 

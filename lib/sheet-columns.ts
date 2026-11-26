@@ -3,6 +3,7 @@
 // (August 2026) fall back to the old fixed layout until they are phased out.
 
 export const COLUMN_HEADERS = {
+  name: "Name",
   notes: "Notes",
   buy: "Sourced",
   sold: "Sold",
