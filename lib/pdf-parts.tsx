@@ -31,10 +31,7 @@ export const styles = StyleSheet.create({
     alignSelf: 'flex-start', marginTop: 4, fontSize: 5.75, color: '#666666', textTransform: 'uppercase', letterSpacing: 0.8,
     borderWidth: 0.75, borderColor: '#cfc9bd', borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1,
   },
-  personRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 3 },
-  personName: { fontSize: 7, color: '#666666', textTransform: 'uppercase', letterSpacing: 0.9, marginRight: 6 },
-  personValue: { fontSize: 10.5, fontWeight: 'bold', textAlign: 'right', flexShrink: 1 },
-  personSub: { fontSize: 6.75, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.75, textAlign: 'right', marginTop: 1 },
+  belowChart: { marginTop: 14 },
   below: { marginTop: 9 },
   belowTwo: { marginTop: 9, flexDirection: 'row', justifyContent: 'space-between' },
 
@@ -76,22 +73,6 @@ export const Metric = ({ label, value, sub, muted, small, badge }: {
     <Text style={[styles.cardValue, small ? { fontSize: 11.5 } : {}, muted ? { color: '#999999' } : {}]}>{value}</Text>
     {sub ? <Text style={styles.cardSub}>{sub}</Text> : null}
     {badge ? <Text style={styles.badge}>{badge}</Text> : null}
-  </View>
-);
-
-// A card with one line per person, e.g. Individual Time's Total Hours for Eryk and Alex.
-export const PeopleMetric = ({ label, rows }: { label: string; rows: { person: string; value: string; sub?: string }[] }) => (
-  <View style={styles.card}>
-    <Text style={styles.cardLabel}>{label}</Text>
-    {rows.map((r) => (
-      <View key={r.person}>
-        <View style={styles.personRow}>
-          <Text style={styles.personName}>{r.person}</Text>
-          <Text style={styles.personValue}>{r.value}</Text>
-        </View>
-        {r.sub ? <Text style={styles.personSub}>{r.sub}</Text> : null}
-      </View>
-    ))}
   </View>
 );
 

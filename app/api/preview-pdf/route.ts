@@ -56,9 +56,9 @@ export async function GET(request: Request) {
       }
 
       // Snapshots from before Individual Time: work it out from the sessions.
-      if (payload.time_breakdown && !payload.time_breakdown.people) {
+      if (payload.time_breakdown && !payload.time_breakdown.people?.[0]?.weeks) {
         const sessions = await fetchSessionsForMonth(supabase, dateObj);
-        payload = { ...payload, time_breakdown: { ...payload.time_breakdown, people: buildPeople(sessions) } };
+        payload = { ...payload, time_breakdown: { ...payload.time_breakdown, people: buildPeople(sessions, dateObj) } };
       }
     } else {
       // 2. If no snapshot exists, generate a simulated payload live

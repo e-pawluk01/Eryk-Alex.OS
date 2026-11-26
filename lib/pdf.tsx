@@ -6,7 +6,7 @@ import type { TimeBreakdown } from './time-breakdown';
 import type { ReportExtras } from './report-extras';
 import { StockCategoriesPage, CategoriesTablePage } from './pdf-extras';
 import {
-  styles, Metric, PeopleMetric, Section, ChartHead, num, fmtCurrency, fmtPercent, fmtHours, fmtMinutes, isNil, CHART_W,
+  styles, Metric, Section, ChartHead, num, fmtCurrency, fmtPercent, fmtHours, fmtMinutes, isNil, CHART_W,
 } from './pdf-parts';
 
 // Page 1 has room for about six one-line rows of "What Other was" in the busiest
@@ -26,6 +26,9 @@ const PROFIT_BANDS = [
   { label: '£40–60', test: (p: number) => p >= 40 && p < 60, color: PRINT.magenta },
   { label: '£60+', test: (p: number) => p >= 60, color: PRINT.violet },
 ];
+
+// Same person colours as the By person bar.
+const personPrint = (person: string) => (person === 'Alex' ? PRINT.orange : PRINT.blue);
 
 export interface MonthPoint { label: string; revenue: number; grossProfit: number }
 
@@ -50,6 +53,8 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
   const totalHours = num(snapshot.total_hours);
   const topTask = time?.byTask[0];
   const people = time?.people ?? [];
+  // One scale for every person's weekly chart, so they compare at a glance.
+  const personWeekMax = Math.max(0, ...people.flatMap((p) => p.weeks ?? []));
   const topTasks = (time?.byTask ?? []).slice(0, 4).map((t) => t.task);
   const weekSeries = [...topTasks, 'Other tasks']
     .map((name) => ({
@@ -111,8 +116,6 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
     <Document>
       {/* PAGE 1 — THE NUMBERS */}
       <Page size="A4" style={styles.page}>
-        {/* Page 1 runs onto a second page when it's full; that page gets the usual running header. */}
-        <View fixed render={({ subPageNumber }) => (subPageNumber > 1 ? <Running right="The Numbers, continued" /> : null)} />
         <View style={styles.header}>
           <Text style={styles.title}>Business Analytics</Text>
           <Text style={styles.subtitle}>{reportName}</Text>
@@ -153,7 +156,7 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
             </View>
             <View style={{ width: 200 }}>
               <SplitBar label="By person" format={fmtHours} columns={1}
-                items={(time?.byPerson ?? []).map((p) => ({ label: p.person, value: p.hours, color: p.person === 'Alex' ? PRINT.orange : PRINT.blue }))} />
+                items={(time?.byPerson ?? []).map((p) => ({ label: p.person, value: p.hours, color: personPrint(p.person) }))} />
             </View>
           </View>
           )}
@@ -174,26 +177,6 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
             </View>
           )}
         </Section>
-
-        {/* One row of the app's four cards, each with a line per person, so page 1 still fits. */}
-        {people.length > 0 && (
-          <Section label="Individual Time">
-            <View style={styles.grid}>
-              <PeopleMetric label="Total Hours" rows={people.map((p) => ({ person: p.person, value: fmtHours(p.hours) }))} />
-              <PeopleMetric label="Hours / Week" rows={people.map((p) => ({ person: p.person, value: fmtHours(p.hours / (daysInMonth / 7)) }))} />
-              <PeopleMetric label="Daily Average" rows={people.map((p) => ({
-                person: p.person,
-                value: p.daysWorked > 0 ? fmtMinutes((p.hours * 60) / p.daysWorked) : '—',
-                sub: `${p.daysWorked} day${p.daysWorked === 1 ? '' : 's'} worked`,
-              }))} />
-              <PeopleMetric label="Top Task" rows={people.map((p) => ({
-                person: p.person,
-                value: p.byTask[0]?.task ?? '—',
-                sub: p.byTask[0] && p.hours > 0 ? `${fmtHours(p.byTask[0].hours)} · ${Math.round((p.byTask[0].hours / p.hours) * 100)}%` : undefined,
-              }))} />
-            </View>
-          </Section>
-        )}
 
         <Section label="Unit Economics">
           <View style={styles.grid}>
@@ -217,6 +200,41 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
         </Section>
         <Footer />
       </Page>
+
+      {/* INDIVIDUAL TIME — each person's month, laid out like page 1's Joint Time */}
+      {people.length > 0 && (
+        <Page size="A4" style={styles.page}>
+          <Running right="Individual Time" />
+          {people.map((p) => {
+            const top = p.byTask[0];
+            return (
+              <Section key={p.person} label={p.person}>
+                <View style={styles.grid}>
+                  <Metric label="Total Hours" value={fmtHours(p.hours)} />
+                  <Metric label="Hours / Week" value={fmtHours(p.hours / (daysInMonth / 7))} />
+                  <Metric label="Daily Average" value={p.daysWorked > 0 ? fmtMinutes((p.hours * 60) / p.daysWorked) : '—'}
+                    muted={p.daysWorked === 0} sub={`${p.daysWorked} day${p.daysWorked === 1 ? '' : 's'} worked`} />
+                  <Metric label="Top Task" value={top ? top.task : '—'} muted={!top}
+                    sub={top && p.hours > 0 ? `${fmtHours(top.hours)} · ${Math.round((top.hours / p.hours) * 100)}% of time` : undefined} />
+                </View>
+                <View style={styles.below}>
+                  <SplitBar label="Hours by task" format={fmtHours}
+                    items={p.byTask.map((t) => ({ label: t.task, value: t.hours, color: taskPrint(t.task) }))} />
+                </View>
+                {p.weeks && (
+                  <View style={styles.belowChart}>
+                    <ChartHead title="Hours per week" />
+                    <ColumnChart width={CHART_W} height={96} axis={(v) => `${v}h`}
+                      categories={(time?.weeks ?? []).map((w) => `${w.start}–${w.end} ${monthShort}`)}
+                      series={[{ color: personPrint(p.person), values: p.weeks }]} scaleTo={personWeekMax} />
+                  </View>
+                )}
+              </Section>
+            );
+          })}
+          <Footer />
+        </Page>
+      )}
 
       {/* PAGE 2 — STOCK HEALTH AND CATEGORIES (left out if the sheet couldn't be read) */}
       {extras && (

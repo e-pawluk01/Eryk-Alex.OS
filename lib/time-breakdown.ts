@@ -20,6 +20,7 @@ export interface PersonTime {
   hours: number;
   daysWorked: number; // days with any finished session
   byTask: { task: string; hours: number }[]; // biggest first
+  weeks?: number[]; // hours in each of the month's weeks, same weeks as TimeBreakdown.weeks
 }
 
 interface SessionRow {
@@ -78,7 +79,7 @@ export function buildTimeBreakdown(sessions: SessionRow[], month: Date): TimeBre
   });
 
   return {
-    people: buildPeople(sessions),
+    people: buildPeople(sessions, month),
     byTask: sum("task").map(([task, h]) => ({ task, hours: round1(h) })),
     byPerson: sum("person").map(([person, h]) => ({ person, hours: round1(h) })),
     weeks,
@@ -88,7 +89,9 @@ export function buildTimeBreakdown(sessions: SessionRow[], month: Date): TimeBre
   };
 }
 
-export function buildPeople(sessions: SessionRow[]): PersonTime[] {
+export function buildPeople(sessions: SessionRow[], month: Date): PersonTime[] {
+  const lastDay = endOfMonth(month).getDate();
+  const weekStarts = [1, 8, 15, 22, 29].filter((start) => start <= lastDay);
   const names = [...new Set(sessions.map((s) => s.person))];
   return names
     .map((person) => {
@@ -100,6 +103,9 @@ export function buildPeople(sessions: SessionRow[]): PersonTime[] {
         hours: round1(mine.reduce((a, s) => a + (s.duration || 0), 0) / 3600),
         daysWorked: new Set(mine.map((s) => new Date(s.started_at).toDateString())).size,
         byTask: [...tasks.entries()].sort((a, b) => b[1] - a[1]).map(([task, h]) => ({ task, hours: round1(h) })),
+        weeks: weekStarts.map((start) => round1(mine
+          .filter((s) => { const day = new Date(s.started_at).getDate(); return day >= start && day <= Math.min(start + 6, lastDay); })
+          .reduce((a, s) => a + (s.duration || 0), 0) / 3600)),
       };
     })
     .sort((a, b) => rank(a.person) - rank(b.person));
