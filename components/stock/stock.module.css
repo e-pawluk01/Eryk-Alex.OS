@@ -255,3 +255,23 @@
 .jobsSm .box { width: 20px; height: 20px; }
 .ckref { width: 150px; }
 .ckref .inp { padding: 7px 0; }
+
+/* Photos (mockup v129) */
+.ctx { display: flex; gap: 10px; align-items: center; justify-content: space-between; height: 48px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; }
+.ctx p { margin: 0; font-size: 13px; color: var(--muted); }
+.ib { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 8px; border: 1px solid rgba(255,255,255,.15); background: transparent; color: var(--muted) !important; }
+.ib:hover { color: #fff !important; border-color: rgba(255,255,255,.35); }
+.ctx .ib { width: 30px; height: 30px; }
+.lrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.pgrid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+.pgrid.five { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; }
+.pimg { aspect-ratio: 3/4; border-radius: 10px; background: #171717; border: 1px solid var(--line); overflow: hidden; position: relative; padding: 0; display: block; }
+.pimg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pimg.pick { cursor: pointer; }
+.pimg.pick .box { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid rgba(255,255,255,.35); background: rgba(0,0,0,.35); display: grid; place-items: center; }
+.pimg.pick.pk { border-color: rgba(255,255,255,.6); }
+.pimg.pick.pk .box { background: #fff; border-color: #fff; }
+.pimg.pick.pk .box::after { content: ""; width: 9px; height: 5px; border-left: 2.2px solid #000; border-bottom: 2.2px solid #000; transform: rotate(-45deg) translate(1px,-1px); }
+.inbox { display: flex; flex-direction: column; gap: 26px; }
+.igroup { display: flex; flex-direction: column; gap: 12px; }
+.center { flex: 1; display: grid; place-items: center; text-align: center; }

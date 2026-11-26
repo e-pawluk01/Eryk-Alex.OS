@@ -392,3 +392,10 @@ export async function sendInvoice(itemId: string): Promise<string> {
   if (!res.ok || !out?.ok) throw new Error(out?.error || `Invoice not sent (${res.status})`);
   return out.to as string;
 }
+
+/** After Sort: these items' photos are in their folders, so they move on to Generate. */
+export async function photosDone(itemIds: string[]) {
+  if (!itemIds.length) return;
+  const { error } = await supabase.from("stock_items").update({ status: "generate" }).in("id", itemIds).eq("status", "photos");
+  if (error) throw error;
+}
