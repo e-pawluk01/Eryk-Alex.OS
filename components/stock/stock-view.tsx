@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Search, Check, Wind, Scissors, Ruler } from "lucide-react";
+import { Plus, Search, Check, Wind, Scissors, Ruler, Folder } from "lucide-react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import {
@@ -11,6 +11,8 @@ import {
 import { AddStockDialog } from "./add-stock-dialog";
 import { BatchList, BatchPanel, ShipDialog, ArriveDialog, CheckDialog, batchAction } from "./batches";
 import { ItemPanel } from "./item-panel";
+import { PhotoFolderDialog, PhotoInbox } from "./photos";
+import { photoFolder, FolderState } from "@/lib/photos";
 import { StatusChip, BatchPill, cx } from "./ui";
 import s from "./stock.module.css";
 
@@ -57,6 +59,13 @@ export function StockView() {
   const [shipping, setShipping] = useState<string | null>(null);
   const [arriving, setArriving] = useState<string | null>(null);
   const [checking, setChecking] = useState<string | null>(null);
+  // Photos: the OS Photos folder (chosen once; Arc may ask to allow it again), and the open inbox.
+  const [folderAsk, setFolderAsk] = useState<FolderState | null>(null);
+  const [inboxDir, setInboxDir] = useState<FileSystemDirectoryHandle | null>(null);
+  const openInbox = async () => {
+    const f = await photoFolder();
+    if (f.state === "ok") setInboxDir(f.dir); else setFolderAsk(f);
+  };
   // The batch's next step: Ship, Arrived or Check.
   const batchStep = (b: StockBatch) => {
     const a = batchAction(b);
@@ -122,6 +131,13 @@ export function StockView() {
         </div>
       </div>
 
+      {filter === "Photos" && !q && data && (
+        <div className={s.ctx}>
+          <p>{items.filter((it) => it.status === "photos").length} items waiting</p>
+          <button className={s.ib} onClick={openInbox} aria-label="Open photo inbox" title="Photo inbox"><Folder className="w-4 h-4" /></button>
+        </div>
+      )}
+
       {filter === "Orders" && !q && data && data.batches.length > 0 && (
         <BatchList data={data} onOpen={(b) => setOpenBatch(b.id)} onAction={batchStep} />
       )}
@@ -178,7 +194,7 @@ export function StockView() {
 
       {data && openItem && (() => {
         const it = data.items.find((x) => x.id === openItem);
-        return it ? <ItemPanel item={it} data={data} onClose={() => setOpenItem(null)} onChanged={(msg) => { if (msg) setToast(msg); refresh(); }} /> : null;
+        return it ? <ItemPanel item={it} data={data} onClose={() => setOpenItem(null)} onChanged={(msg) => { if (msg) setToast(msg); refresh(); }} onOpenInbox={openInbox} /> : null;
       })()}
 
       {data && shipping && (() => {
@@ -199,6 +215,13 @@ export function StockView() {
         return b ? <CheckDialog batch={b} data={data} onClose={() => setChecking(null)}
           onSaved={(msg) => { setChecking(null); setToast(msg); refresh(); }} /> : null;
       })()}
+
+      {folderAsk && (
+        <PhotoFolderDialog folder={folderAsk} onClose={() => setFolderAsk(null)} onReady={(dir) => { setFolderAsk(null); setInboxDir(dir); }} />
+      )}
+      {data && inboxDir && (
+        <PhotoInbox dir={inboxDir} data={data} onClose={() => setInboxDir(null)} onSorted={(msg) => { setInboxDir(null); setToast(msg); refresh(); }} />
+      )}
 
       {adding && data && (
         <AddStockDialog

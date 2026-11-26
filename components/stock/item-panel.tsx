@@ -4,7 +4,8 @@
 // Prep (job ticks + measuring form) and Photos. Tabs: Overview, Photos, Details (+ history).
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Calendar, Ship, Truck, Package, Tag, History, Camera, ChevronDown, Check, Wind, Scissors, Ruler, Pencil } from "lucide-react";
+import { X, Calendar, Ship, Truck, Package, Tag, History, Camera, ChevronDown, Check, Wind, Scissors, Ruler, Pencil, Folder } from "lucide-react";
+import { photoFolder, itemPhotos } from "@/lib/photos";
 import { StockData, StockItem, LogEntry, Needs, Job, saveNotes, itemHistory, logLine, trackingUrl, gbp, checkItems, setJobDone, updateItem, landedCosts, sendInvoice } from "@/lib/stock";
 import { StatusChip, BatchPill, FloorIcon, ModalHead, Confirmation, cx, dateLabel } from "./ui";
 import { NeedTicks } from "./batches";
@@ -12,12 +13,14 @@ import s from "./stock.module.css";
 
 type Tab = "overview" | "photos" | "details";
 
-export function ItemPanel({ item, data, onClose, onChanged }: {
+export function ItemPanel({ item, data, onClose, onChanged, onOpenInbox }: {
   item: StockItem;
   data: StockData;
   onClose: () => void;
   /** Something was saved: refresh, and show the message if there is one. */
   onChanged: (msg?: string) => void;
+  /** Opens the photo inbox (Photos items). */
+  onOpenInbox?: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [notes, setNotes] = useState(item.notes ?? "");
@@ -127,11 +130,7 @@ export function ItemPanel({ item, data, onClose, onChanged }: {
               </div>
             </>
           ) : tab === "photos" ? (
-            <div className={s.empty2}>
-              <span className={s.eic}><Camera className="w-[22px] h-[22px]" /></span>
-              <span className={s.et}>No photos yet</span>
-              <span className={s.sub}>AirDrop them to the Mac, then sort them in the photo inbox.</span>
-            </div>
+            <PhotosTab item={item} />
           ) : (
             <div className={s.kvwrap}>
               {item.source === "imported" && group("Order", [
@@ -169,6 +168,11 @@ export function ItemPanel({ item, data, onClose, onChanged }: {
         {item.status === "in_transit" && batch?.tracking && (
           <div className={s.foot}>
             <a className={cx(s.btn)} href={trackingUrl(batch.tracking)} target="_blank" rel="noreferrer">Track parcel ↗</a>
+          </div>
+        )}
+        {item.status === "photos" && onOpenInbox && (
+          <div className={s.foot} style={{ justifyContent: "flex-end" }}>
+            <button className={s.ib} onClick={onOpenInbox} aria-label="Open photo inbox" title="Photo inbox"><Folder className="w-4 h-4" /></button>
           </div>
         )}
         {item.status === "to_check" && (
@@ -401,5 +405,37 @@ function EditDialog({ item, data, field, onClose, onSaved }: {
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** The item's photos, read from its folder in OS Photos (once the folder has been allowed). */
+function PhotosTab({ item }: { item: StockItem }) {
+  const folder = item.code;
+  const [photos, setPhotos] = useState<{ name: string; url: string }[] | null>(null);
+  useEffect(() => {
+    let alive = true, urls: string[] = [];
+    photoFolder().then(async (f) => {
+      const list = f.state === "ok" ? await itemPhotos(f.dir, folder) : [];
+      urls = list.map((p) => p.url);
+      if (alive) setPhotos(list); else urls.forEach(URL.revokeObjectURL);
+    }).catch(() => alive && setPhotos([]));
+    return () => { alive = false; urls.forEach(URL.revokeObjectURL); };
+  }, [folder, item.status]);
+  if (photos === null) return null;
+  if (!photos.length) return (
+    <div className={s.empty2}>
+      <span className={s.eic}><Camera className="w-[22px] h-[22px]" /></span>
+      <span className={s.et}>No photos yet</span>
+      <span className={s.sub}>Drag them into OS Photos / Inbox, then sort them in the photo inbox.</span>
+    </div>
+  );
+  return (
+    <div className={s.ov} style={{ gap: 12 }}>
+      <div className={s.lrow}><span className={s.lbl}>Photos · {photos.length}</span><span className={s.mono}>OS Photos / {folder}</span></div>
+      <div className={s.pgrid}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {photos.map((p) => <span key={p.name} className={s.pimg} title={p.name}><img src={p.url} alt="" /></span>)}
+      </div>
+    </div>
   );
 }
