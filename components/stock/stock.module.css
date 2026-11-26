@@ -164,6 +164,15 @@
 .kvwrap { display: flex; flex-direction: column; gap: 26px; }
 .kvg { display: flex; flex-direction: column; }
 .kvg > .lbl { margin-bottom: 4px; }
+/* Location (Eryk's sketch, 26 Nov): pills like the platform pills; grey = not chosen */
+.loch { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
+.loch > .lbl { margin: 0; }
+.locp { display: flex; gap: 8px; }
+.locp .lpill { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 0; background: rgba(255,255,255,.05); color: #5a5a5a; cursor: pointer; transition: filter .15s, background .15s; }
+.lpill:hover { filter: brightness(1.35); }
+.lpill:not(.Eryk):not(.Alex):hover { background: rgba(255,255,255,.1); }
+.locp .lpill.Eryk { background: rgba(96,165,250,.2); color: #93c5fd; }
+.locp .lpill.Alex { background: rgba(244,114,182,.2); color: #f9a8d4; }
 .kvr { display: flex; justify-content: space-between; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--line2); font-size: 13px; }
 .kvr:last-child { border-bottom: 0; }
 .kvr > span:first-child { color: var(--muted); flex: none; }

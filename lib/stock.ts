@@ -66,6 +66,8 @@ export interface StockItem {
   /** {"Pit to pit": "46", ...} in inches, as typed */
   measurements: Record<string, string>;
   kept_by: "Eryk" | "Alex" | null;
+  /** Who has the piece at home (Eryk's sketch, 26 Nov). Empty until set. */
+  location: "Eryk" | "Alex" | null;
   damaged_where: "warehouse" | "arrival" | null;
   refund: number | null;
   exit_date: string | null;
@@ -103,6 +105,9 @@ export const GROUPS = [
 export type GroupKey = (typeof GROUPS)[number]["key"];
 
 /** In stock = from arrival until it leaves (not while paid or in transit). */
+/** Physically with Eryk or Alex: arrived and checked, not yet gone. Location shows only for these. */
+export const atHome = (it: StockItem) => !["paid", "in_transit", "to_check"].includes(it.status) && !EXITS.includes(it.status);
+
 export const inStock = (it: StockItem) => !["paid", "in_transit"].includes(it.status) && !EXITS.includes(it.status);
 
 // One colour per batch number, cycling (the mockup's batch pills).
@@ -120,7 +125,7 @@ export interface StockData {
 
 export async function loadStock(): Promise<StockData> {
   const [items, batches, categories, log, settings] = await Promise.all([
-    supabase.from("stock_items").select("id, code, sku, source, batch_id, name, brand, category_id, bought_on, link, notes, date_added, floor_price, paid, non_gbp_fee, purchase_fee, item_cost, current_price, status, created_at, needs_steam, steam_done, needs_repair, repair_done, needs_measure, measure_done, size, condition, measurements, kept_by, damaged_where, refund, exit_date").order("created_at", { ascending: false }),
+    supabase.from("stock_items").select("id, code, sku, source, batch_id, name, brand, category_id, bought_on, link, notes, date_added, floor_price, paid, non_gbp_fee, purchase_fee, item_cost, current_price, status, created_at, needs_steam, steam_done, needs_repair, repair_done, needs_measure, measure_done, size, condition, measurements, kept_by, location, damaged_where, refund, exit_date").order("created_at", { ascending: false }),
     supabase.from("stock_batches").select(BATCH_COLS).order("number"),
     supabase.from("stock_categories").select("id, name, sku_code, measurements, active").order("name"),
     supabase.from("stock_log").select("item_id, created_at").eq("what", "status").not("item_id", "is", null).order("created_at", { ascending: false }),
@@ -268,7 +273,7 @@ const FIELD_LABEL: Record<string, string> = {
   non_gbp_fee: "Non-GBP fee", purchase_fee: "Purchase fee", item_cost: "Item cost", floor_price: "Floor price", bought_on: "Bought on", link: "Link",
   batch_id: "Batch", needs_steam: "Needs steam", needs_repair: "Needs repair", needs_measure: "Needs measuring",
   steam_done: "Steamed", repair_done: "Repaired", measure_done: "Measured", size: "Size", condition: "Condition",
-  measurements: "Measurements", kept_by: "Kept by", refund: "Refund", customs: "Customs", other_costs: "Other costs",
+  measurements: "Measurements", kept_by: "Kept by", location: "Location", refund: "Refund", customs: "Customs", other_costs: "Other costs",
 };
 
 /** One history line in plain words, e.g. "Paid → In transit". */
@@ -373,7 +378,7 @@ export async function setJobDone(it: StockItem, job: Job, done: boolean): Promis
 
 /** Save measuring-form fields (size, condition, measurements, category, notes). */
 /** Save item fields: the measuring form, and the Details pencils (name, brand, bought on, paid and its fees...). */
-export async function updateItem(id: string, patch: Partial<Pick<StockItem, "size" | "condition" | "measurements" | "category_id" | "notes" | "name" | "brand" | "bought_on" | "paid" | "non_gbp_fee" | "purchase_fee">>) {
+export async function updateItem(id: string, patch: Partial<Pick<StockItem, "size" | "condition" | "measurements" | "category_id" | "notes" | "name" | "brand" | "bought_on" | "paid" | "non_gbp_fee" | "purchase_fee" | "location">>) {
   const { error } = await supabase.from("stock_items").update(patch).eq("id", id);
   if (error) throw error;
 }
