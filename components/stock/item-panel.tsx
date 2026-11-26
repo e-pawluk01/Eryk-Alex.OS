@@ -4,7 +4,7 @@
 // Prep (job ticks + measuring form) and Photos. Tabs: Overview, Photos, Details (+ history).
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Calendar, Ship, Truck, Package, Tag, History, Camera, ChevronDown, Check, Wind, Scissors, Ruler } from "lucide-react";
+import { X, Calendar, Ship, Truck, Package, Tag, History, Camera, ChevronDown, Check, Wind, Scissors, Ruler, Pencil } from "lucide-react";
 import { StockData, StockItem, LogEntry, Needs, Job, saveNotes, itemHistory, logLine, trackingUrl, gbp, checkItems, setJobDone, updateItem, landedCosts, sendInvoice } from "@/lib/stock";
 import { StatusChip, BatchPill, FloorIcon, ModalHead, Confirmation, cx, dateLabel } from "./ui";
 import { NeedTicks } from "./batches";
@@ -28,6 +28,7 @@ export function ItemPanel({ item, data, onClose, onChanged }: {
   const isOrder = ["paid", "in_transit", "to_check"].includes(item.status);
   const [pop, setPop] = useState<null | "ready" | "kept">(null);
   const [sent, setSent] = useState<{ cost: number; to: string } | null>(null);
+  const [editing, setEditing] = useState<EditField | null>(null);
   const [busy, setBusy] = useState(false);
 
   // To check, one item at a time (mockup ic-dam / ic-kept / ic-ready)
@@ -60,7 +61,18 @@ export function ItemPanel({ item, data, onClose, onChanged }: {
     ? <span className={s.hl}><b className={s.muted}>{item.item_cost != null ? gbp(item.item_cost) : "~" + gbp(rough)}</b></span>
     : null;
 
-  const row = (k: string, v: string | null | undefined) => (v === null || v === undefined || v === "") ? null : <div className={s.kvr}><span>{k}</span><span>{v}</span></div>;
+  // A Details row. With `edit`, a very faint pencil follows the value (Eryk, 25 Nov) and the row shows even when empty.
+  const row = (k: string, v: string | null | undefined, edit?: EditField | false) => {
+    const empty = v === null || v === undefined || v === "";
+    if (empty && !edit) return null;
+    return (
+      <div className={s.kvr}><span>{k}</span>
+        <span className={s.kvv}>{empty ? "—" : v}{edit && (
+          <button className={s.pen} onClick={() => setEditing(edit)} aria-label={`Change ${k.toLowerCase()}`} title="Change"><Pencil className="w-3 h-3" /></button>
+        )}</span>
+      </div>
+    );
+  };
   const group = (title: string, rows: (React.ReactNode | null)[]) => rows.some(Boolean) ? <div className={s.kvg}><span className={s.lbl}>{title}</span>{rows.map((r, i) => <Fragment key={i}>{r}</Fragment>)}</div> : null;
 
   const cells: [React.ReactNode, string, string][] = [
@@ -122,14 +134,17 @@ export function ItemPanel({ item, data, onClose, onChanged }: {
           ) : (
             <div className={s.kvwrap}>
               {item.source === "imported" && group("Order", [
-                row("Batch", batch ? String(batch.number) : null), row("Proxy", batch?.proxy), row("Bought on", item.bought_on),
-                row("Paid", item.paid != null ? gbp(item.paid) : null),
-                row("Non-GBP fee", item.non_gbp_fee != null ? gbp(item.non_gbp_fee) : null), row("Purchase fee", item.purchase_fee != null ? gbp(item.purchase_fee) : null),
+                row("Batch", batch ? String(batch.number) : null), row("Proxy", batch?.proxy), row("Bought on", item.bought_on, "bought_on"),
+                // What was paid can be corrected until the check sets the final cost from it.
+                row("Paid", item.paid != null ? gbp(item.paid) : null, isOrder && "paid"),
+                row("Non-GBP fee", item.non_gbp_fee != null ? gbp(item.non_gbp_fee) : null, isOrder && "non_gbp_fee"),
+                row("Purchase fee", item.purchase_fee != null ? gbp(item.purchase_fee) : null, isOrder && "purchase_fee"),
               ])}
               {group("Dates", [row("Added", item.date_added ? dateLabel(item.date_added) : null)])}
               {group("Item", [
-                row("Category", category), row("Brand", item.brand),
-                item.source === "imported" ? null : row("Sourced from", item.bought_on),
+                row("Name", item.name, "name"), row("Category", category, "category_id"), row("Brand", item.brand, "brand"),
+                item.source === "imported" ? null : row("Sourced from", item.bought_on, "bought_on"),
+                item.size ? row("Size", item.size, "size") : null,
               ])}
               <div>
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -179,6 +194,8 @@ export function ItemPanel({ item, data, onClose, onChanged }: {
           } catch (e: any) { onChanged(e?.message || "Couldn't save it."); }
           finally { setBusy(false); }
         }} />}
+      {editing && <EditDialog item={item} data={data} field={editing} onClose={() => setEditing(null)}
+        onSaved={() => { setEditing(null); onChanged("Saved"); }} />}
       {sent && <Confirmation label="Invoice sent" value={gbp(sent.cost)} line={`Emailed to ${sent.to}`} onClose={() => setSent(null)} />}
     </div>,
     document.body,
@@ -325,5 +342,64 @@ function PrepForm({ item, data, notes, setNotes, saveNotes, onChanged }: {
         <textarea className={s.inp} rows={2} placeholder="Notes" aria-label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={saveNotes} />
       </div>
     </div>
+  );
+}
+
+type EditField = "name" | "category_id" | "brand" | "bought_on" | "size" | "paid" | "non_gbp_fee" | "purchase_fee";
+const EDIT_LABEL: Record<EditField, string> = {
+  name: "Name", category_id: "Category", brand: "Brand", bought_on: "Bought on", size: "Size",
+  paid: "Paid", non_gbp_fee: "Non-GBP fee", purchase_fee: "Purchase fee",
+};
+const MONEY: EditField[] = ["paid", "non_gbp_fee", "purchase_fee"];
+
+/** Change one detail (mockup v124): the item, one field filled with its current value, Save. */
+function EditDialog({ item, data, field, onClose, onSaved }: {
+  item: StockItem; data: StockData; field: EditField; onClose: () => void; onSaved: () => void;
+}) {
+  const money = MONEY.includes(field);
+  const start = field === "category_id" ? (item.category_id ?? "") : money ? (item[field] != null ? Number(item[field]).toFixed(2) : "") : ((item[field] as string | null) ?? "");
+  const [v, setV] = useState<string>(start);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = field === "bought_on" && item.source !== "imported" ? "Sourced from" : EDIT_LABEL[field];
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
+  useEffect(() => {
+    // Esc closes only this pop-up, not the item panel behind it.
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopImmediatePropagation(); onClose(); } };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
+  const save = async () => {
+    if (saving) return;
+    let value: string | number | null = v.trim();
+    if (money) { const n = parseFloat(v.replace(/[£,\s]/g, "")); if (!Number.isFinite(n)) return setError("Type an amount, e.g. 6.98"); value = n; }
+    else if (!value) { if (field === "name") return setError("It needs a name"); value = null; }
+    setSaving(true);
+    setError(null);
+    try { await updateItem(item.id, { [field]: value } as Parameters<typeof updateItem>[1]); onSaved(); }
+    catch (e: any) { setError(e?.message || "Couldn't save it."); setSaving(false); }
+  };
+
+  return createPortal(
+    <div className={s.root}>
+      <div className={s.scrim} onClick={onClose} />
+      <div className={cx(s.modal, s.gapsm)} role="dialog" aria-modal="true" aria-label={`Change ${label.toLowerCase()}`}>
+        <ModalHead title={`Change ${label.toLowerCase()}`} onClose={onClose} />
+        <ItemHead item={item} />
+        {field === "category_id" ? (
+          <Dropdown label="Category" value={v || null} options={data.categories.filter((c) => c.active || c.id === item.category_id).map((c) => ({ v: c.id, t: c.name }))} onPick={setV} />
+        ) : (
+          <label className={s.fi}><span>{label}{money ? " £" : ""}</span>
+            <input ref={ref} className={s.inp} value={v} inputMode={money ? "decimal" : undefined} aria-label={label}
+              onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }} />
+          </label>
+        )}
+        {error && <div className={s.err}>{error}</div>}
+        <button className={s.btnw} disabled={saving} onClick={save}>Save</button>
+      </div>
+    </div>,
+    document.body,
   );
 }

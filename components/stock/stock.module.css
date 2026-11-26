@@ -230,3 +230,9 @@
 .chkl .seg { flex-wrap: nowrap; }
 .chkx { padding-left: 70px; height: 38px; display: flex; align-items: center; }
 .chkref { max-width: 200px; }
+
+/* Details: a very faint pencil after anything that can be changed (Eryk, 25 Nov) */
+.kvv { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.pen { width: 18px; height: 16px; flex: none; display: grid; place-items: center; border: 0; background: none; padding: 0; color: var(--dim) !important; opacity: .35; margin-right: -4px; }
+.kvr:hover .pen, .pen:focus-visible { opacity: .9; }
+.pen:hover { color: var(--fg) !important; }

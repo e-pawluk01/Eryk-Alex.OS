@@ -372,7 +372,8 @@ export async function setJobDone(it: StockItem, job: Job, done: boolean): Promis
 }
 
 /** Save measuring-form fields (size, condition, measurements, category, notes). */
-export async function updateItem(id: string, patch: Partial<Pick<StockItem, "size" | "condition" | "measurements" | "category_id" | "notes">>) {
+/** Save item fields: the measuring form, and the Details pencils (name, brand, bought on, paid and its fees...). */
+export async function updateItem(id: string, patch: Partial<Pick<StockItem, "size" | "condition" | "measurements" | "category_id" | "notes" | "name" | "brand" | "bought_on" | "paid" | "non_gbp_fee" | "purchase_fee">>) {
   const { error } = await supabase.from("stock_items").update(patch).eq("id", id);
   if (error) throw error;
 }
