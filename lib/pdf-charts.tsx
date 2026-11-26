@@ -5,6 +5,8 @@ import { View, Text, Svg, Path, Rect, Line, Text as SvgText, StyleSheet } from '
 export const PRINT = {
   blue: '#2a78d6', orange: '#eb6834', aqua: '#1baf7a', yellow: '#eda100',
   magenta: '#e87ba4', green: '#008300', violet: '#4a3aa7', red: '#e34948', other: '#8d8a83',
+  // "Other tasks" (the grouped rest) — kept apart from the "Other" task's grey.
+  grouped: '#d3cec4',
 };
 
 const TASK_PRINT: Record<string, string> = {

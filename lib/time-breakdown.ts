@@ -10,6 +10,16 @@ export interface TimeBreakdown {
   // What the "Other" hours were, by the note typed for them (null: none typed).
   // Missing on snapshots from before it was added.
   other?: { note: string | null; people: string[]; sessions: number; hours: number }[];
+  // Each person's month for the Individual Time section. Missing on snapshots
+  // from before it was added.
+  people?: PersonTime[];
+}
+
+export interface PersonTime {
+  person: string;
+  hours: number;
+  daysWorked: number; // days with any finished session
+  byTask: { task: string; hours: number }[]; // biggest first
 }
 
 interface SessionRow {
@@ -68,6 +78,7 @@ export function buildTimeBreakdown(sessions: SessionRow[], month: Date): TimeBre
   });
 
   return {
+    people: buildPeople(sessions),
     byTask: sum("task").map(([task, h]) => ({ task, hours: round1(h) })),
     byPerson: sum("person").map(([person, h]) => ({ person, hours: round1(h) })),
     weeks,
@@ -76,3 +87,24 @@ export function buildTimeBreakdown(sessions: SessionRow[], month: Date): TimeBre
       .map((r) => ({ note: r.note, people: [...r.people].sort(), sessions: r.sessions, hours: round1(r.hours) })),
   };
 }
+
+export function buildPeople(sessions: SessionRow[]): PersonTime[] {
+  const names = [...new Set(sessions.map((s) => s.person))];
+  return names
+    .map((person) => {
+      const mine = sessions.filter((s) => s.person === person);
+      const tasks = new Map<string, number>();
+      mine.forEach((s) => tasks.set(s.task, (tasks.get(s.task) || 0) + (s.duration || 0) / 3600));
+      return {
+        person,
+        hours: round1(mine.reduce((a, s) => a + (s.duration || 0), 0) / 3600),
+        daysWorked: new Set(mine.map((s) => new Date(s.started_at).toDateString())).size,
+        byTask: [...tasks.entries()].sort((a, b) => b[1] - a[1]).map(([task, h]) => ({ task, hours: round1(h) })),
+      };
+    })
+    .sort((a, b) => rank(a.person) - rank(b.person));
+}
+
+// Same order as the app's person switch.
+const PERSON_ORDER = ["Eryk", "Alex"];
+const rank = (person: string) => (PERSON_ORDER.includes(person) ? PERSON_ORDER.indexOf(person) : PERSON_ORDER.length);

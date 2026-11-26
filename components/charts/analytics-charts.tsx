@@ -11,7 +11,8 @@ const money = (v: number) => v.toLocaleString("en-GB", { minimumFractionDigits: 
 const moneyAxis = (v: number) => (v >= 1000 ? `£${v / 1000}k` : `£${v}`);
 const REVENUE = "#3987e5";
 const PROFIT = "#d95926";
-const OTHER = "#555553";
+// "Other tasks" (the grouped rest) must not share the "Other" task's grey.
+const OTHER = "#a8a49c";
 
 // PERFORMANCE — revenue and gross profit, closed months plus this month live.
 export function PerformanceChart({ history }: { history: { label: string; revenue: number; grossProfit: number; live?: boolean }[] }) {

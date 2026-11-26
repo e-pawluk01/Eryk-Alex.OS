@@ -6,7 +6,7 @@ import type { TimeBreakdown } from './time-breakdown';
 import type { ReportExtras } from './report-extras';
 import { StockCategoriesPage, CategoriesTablePage } from './pdf-extras';
 import {
-  styles, Metric, Section, ChartHead, num, fmtCurrency, fmtPercent, fmtHours, fmtMinutes, isNil, CHART_W,
+  styles, Metric, PeopleMetric, Section, ChartHead, num, fmtCurrency, fmtPercent, fmtHours, fmtMinutes, isNil, CHART_W,
 } from './pdf-parts';
 
 // Page 1 has room for about six one-line rows of "What Other was" in the busiest
@@ -49,11 +49,12 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
   // Time
   const totalHours = num(snapshot.total_hours);
   const topTask = time?.byTask[0];
+  const people = time?.people ?? [];
   const topTasks = (time?.byTask ?? []).slice(0, 4).map((t) => t.task);
   const weekSeries = [...topTasks, 'Other tasks']
     .map((name) => ({
       name,
-      color: name === 'Other tasks' ? PRINT.other : taskPrint(name),
+      color: name === 'Other tasks' ? PRINT.grouped : taskPrint(name),
       values: (time?.weeks ?? []).map((w) => Object.entries(w.tasks)
         .filter(([t]) => (name === 'Other tasks' ? !topTasks.includes(t) : t === name))
         .reduce((a, [, h]) => a + h, 0)),
@@ -110,6 +111,8 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
     <Document>
       {/* PAGE 1 — THE NUMBERS */}
       <Page size="A4" style={styles.page}>
+        {/* Page 1 runs onto a second page when it's full; that page gets the usual running header. */}
+        <View fixed render={({ subPageNumber }) => (subPageNumber > 1 ? <Running right="The Numbers, continued" /> : null)} />
         <View style={styles.header}>
           <Text style={styles.title}>Business Analytics</Text>
           <Text style={styles.subtitle}>{reportName}</Text>
@@ -132,7 +135,7 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
           </View>
         </Section>
 
-        <Section label="Time">
+        <Section label="Joint Time">
           <View style={styles.grid}>
             <Metric label="Total Hours" value={fmtHours(totalHours)} />
             <Metric label="Hours / Week" value={fmtHours(totalHours / (daysInMonth / 7))} />
@@ -171,6 +174,26 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
             </View>
           )}
         </Section>
+
+        {/* One row of the app's four cards, each with a line per person, so page 1 still fits. */}
+        {people.length > 0 && (
+          <Section label="Individual Time">
+            <View style={styles.grid}>
+              <PeopleMetric label="Total Hours" rows={people.map((p) => ({ person: p.person, value: fmtHours(p.hours) }))} />
+              <PeopleMetric label="Hours / Week" rows={people.map((p) => ({ person: p.person, value: fmtHours(p.hours / (daysInMonth / 7)) }))} />
+              <PeopleMetric label="Daily Average" rows={people.map((p) => ({
+                person: p.person,
+                value: p.daysWorked > 0 ? fmtMinutes((p.hours * 60) / p.daysWorked) : '—',
+                sub: `${p.daysWorked} day${p.daysWorked === 1 ? '' : 's'} worked`,
+              }))} />
+              <PeopleMetric label="Top Task" rows={people.map((p) => ({
+                person: p.person,
+                value: p.byTask[0]?.task ?? '—',
+                sub: p.byTask[0] && p.hours > 0 ? `${fmtHours(p.byTask[0].hours)} · ${Math.round((p.byTask[0].hours / p.hours) * 100)}%` : undefined,
+              }))} />
+            </View>
+          </Section>
+        )}
 
         <Section label="Unit Economics">
           <View style={styles.grid}>
@@ -213,7 +236,7 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
           ]} />
         </Section>
 
-        <Section label="Time">
+        <Section label="Joint Time">
           <ChartHead title="Hours per week, by task"
             sub={weekSeries.some((x) => x.name === 'Other tasks') ? 'Top 4 tasks shown, the rest grouped' : undefined}
             keys={weekSeries.map((x) => ({ label: x.name, color: x.color }))} />

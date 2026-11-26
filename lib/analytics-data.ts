@@ -104,3 +104,20 @@ export async function fetchRecentMonths(count: number) {
     grossProfit: Number(m.gross_profit) || 0,
   }));
 }
+
+// One person's month so far for Individual Time. Daily Average is per day they
+// actually worked (a day with any finished session), not per calendar day.
+export function personTime(sessions: WorkSession[], person: string, now: Date) {
+  const mine = sessions.filter((s) => s.person === person);
+  const seconds = (list: WorkSession[]) => list.reduce((acc, s) => acc + (s.duration || 0), 0);
+  const hours = seconds(mine) / 3600;
+  const daysWorked = new Set(mine.map((s) => format(new Date(s.started_at), "yyyy-MM-dd"))).size;
+  const today = format(now, "yyyy-MM-dd");
+  return {
+    hours,
+    hoursPerWeek: hours / (now.getDate() / 7),
+    dailyAvgMinutes: daysWorked > 0 ? (hours * 60) / daysWorked : null,
+    todayMinutes: seconds(mine.filter((s) => format(new Date(s.started_at), "yyyy-MM-dd") === today)) / 60,
+    topTask: hoursByTask(mine)[0] ?? null,
+  };
+}

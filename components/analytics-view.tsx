@@ -13,8 +13,8 @@ import { PerformanceChart, HoursByWeekChart, ProfitBandsChart, StockChart } from
 import { CategoriesSection, CategoryCard } from "./categories-section";
 import { useGlobalContext } from "./global-context";
 import { useAnalyticsData } from "./use-analytics-data";
-import { WorkSession, formatMinutes } from "@/lib/work-sessions";
-import { comparisonWindow, hoursCoverLastMonth, makeComparison, hoursByTask, Tone } from "@/lib/analytics-data";
+import { WorkSession, formatMinutes, PERSON_COLORS } from "@/lib/work-sessions";
+import { comparisonWindow, hoursCoverLastMonth, makeComparison, hoursByTask, personTime, Tone } from "@/lib/analytics-data";
 import { categoryWindow } from "@/lib/category-window";
 import { stockHealth } from "@/lib/stock-health";
 import { StockHealthSection, HealthCard } from "./stock-health-section";
@@ -40,6 +40,9 @@ export function AnalyticsView() {
   const [selectedHistorical, setSelectedHistorical] = useState<any>(null);
   const { userEmail } = useGlobalContext();
   const userContextName = userEmail === "alexandra.ap.archive@gmail.com" ? "Alex" : "Eryk";
+  // Individual Time opens on whoever is signed in.
+  const [personPick, setPersonPick] = useState<string | null>(null);
+  const person = personPick ?? userContextName;
 
   // Categories look at the last 3 months: this month plus the two before.
   const windowSales = useMemo(() => [...(data?.salesTable ?? []), ...earlierSales], [data, earlierSales]);
@@ -65,6 +68,7 @@ export function AnalyticsView() {
   const minutesPerItem = safeData.itemsSold > 0 && totalHours > 0 ? (totalHours * 60) / safeData.itemsSold : null;
   const tasks = hoursByTask(sessions);
   const topTask = tasks[0] ?? null;
+  const mine = personTime(sessions, person, now);
 
   // --- Arrows --------------------------------------------------------------
   // An arrow only shows once the data behind it covers all of last month:
@@ -122,9 +126,9 @@ export function AnalyticsView() {
             comparison={compare(profitPerHour, prevHours > 0 && prevSales ? prevSales.grossProfit / prevHours : null, "more-is-good", bothComparable)} />
         </MetricSection>
 
-        {/* TIME — where the hours go */}
+        {/* JOINT TIME — where everyone's hours go */}
         <MetricSection
-          title="Time"
+          title="Joint Time"
           loading={loading}
           chart={<HoursByWeekChart sessions={sessions} month={now} />}
           detail={
@@ -150,6 +154,33 @@ export function AnalyticsView() {
             value={topTask ? topTask.task : "—"}
             sub={topTask ? `${topTask.hours.toFixed(1)}h · ${Math.round((topTask.hours / totalHours) * 100)}% of time` : undefined}
             onClick={topTask ? () => toggle("tasks") : undefined} expanded={openCard === "tasks"} />
+        </MetricSection>
+
+        {/* INDIVIDUAL TIME — one person's hours, picked with the switch */}
+        <MetricSection
+          title="Individual Time"
+          loading={loading}
+          actions={
+            <div role="group" aria-label="Whose time" className="flex gap-0.5 p-0.5 rounded-lg border border-white/10 bg-white/[0.04]">
+              {Object.keys(PERSON_COLORS).map((name) => (
+                <button key={name} type="button" onClick={() => setPersonPick(name)} aria-pressed={person === name}
+                  className={`h-6 px-2.5 rounded-md text-[11px] font-semibold transition-colors ${
+                    person === name ? "bg-white/10 text-white" : "text-muted-foreground/50 hover:text-white"
+                  }`}>
+                  {name}
+                </button>
+              ))}
+            </div>
+          }
+        >
+          <MetricCard title="Total Hours" value={mine.hours.toFixed(1)} suffix="h" />
+          <MetricCard title="Hours / Week" value={mine.hoursPerWeek.toFixed(1)} suffix="h" />
+          <MetricCard title="Daily Average" compact
+            value={mine.dailyAvgMinutes !== null ? formatMinutes(Math.round(mine.dailyAvgMinutes)) : "—"}
+            sub={`Today ${mine.todayMinutes > 0 ? formatMinutes(Math.round(mine.todayMinutes)) : "—"}`} />
+          <MetricCard title="Top Task" compact
+            value={mine.topTask ? mine.topTask.task : "—"}
+            sub={mine.topTask ? `${mine.topTask.hours.toFixed(1)}h · ${Math.round((mine.topTask.hours / mine.hours) * 100)}% of time` : undefined} />
         </MetricSection>
 
         {/* UNIT ECONOMICS — quality of each sale */}
