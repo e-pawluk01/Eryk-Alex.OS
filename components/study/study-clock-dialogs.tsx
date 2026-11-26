@@ -163,7 +163,12 @@ export function initialChoice(study: StudyData, preferModule?: string | null) {
 
 /** The module's "what" dropdown: its materials, its open deadlines, revision. */
 export function WhatSelect({ study, moduleId, value, onChange }: { study: StudyData; moduleId: string; value: string; onChange: (v: string) => void }) {
-  const { materials, deadlines } = whatOptions(moduleId, study.materials, study.deadlines, todayIso());
+  const options = whatOptions(moduleId, study.materials, study.deadlines, todayIso());
+  // Editing a past session: keep its finished material or closed deadline in the list.
+  const keepMaterial = value.startsWith("material:") ? study.materials.find(m => `material:${m.id}` === value) : undefined;
+  const keepDeadline = value.startsWith("deadline:") ? study.deadlines.find(d => `deadline:${d.id}` === value) : undefined;
+  const materials = keepMaterial && !options.materials.includes(keepMaterial) ? [...options.materials, keepMaterial] : options.materials;
+  const deadlines = keepDeadline && !options.deadlines.includes(keepDeadline) ? [...options.deadlines, keepDeadline] : options.deadlines;
   return (
     <select value={value} onChange={e => onChange(e.target.value)} className={selectClass} aria-label="On what">
       {materials.length > 0 && (
@@ -396,26 +401,34 @@ export function StudyClockOutAll({ sessions, onClose, onSaved }: { sessions: Stu
   return <StudyClockOutDialog key={session.id} session={session} onClose={onClose} onSaved={next} />;
 }
 
-/** Log study time you forgot to clock. */
-export function StudyMissedDialog({ study, initialModule, initialWhat, initialOther, onClose }: {
+/** Log study time you forgot to clock, or fix a past session (when `session` is given). */
+export function StudyMissedDialog({ study, session, initialModule, initialWhat, initialOther, onClose }: {
   study: StudyData;
+  session?: StudySession;
   initialModule: string;
   initialWhat: string;
   initialOther: string;
   onClose: () => void;
 }) {
-  const [day, setDay] = useState(startOfDay(new Date()));
-  const [start, setStart] = useState("10:00");
-  const [end, setEnd] = useState("12:00");
+  const origStart = session ? new Date(session.started_at) : null;
+  const origEnd = session?.ended_at ? new Date(session.ended_at) : null;
+  const [day, setDay] = useState(startOfDay(origStart ?? new Date()));
+  const [start, setStart] = useState(origStart ? hhmm(origStart) : "10:00");
+  const [end, setEnd] = useState(origEnd ? hhmm(origEnd) : "12:00");
   const [moduleId, setModuleId] = useState(initialModule);
   const [what, setWhat] = useState(initialWhat);
   const [otherText, setOtherText] = useState(initialOther);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const startDate = atTime(day, start);
-  const endDate = atTime(end < start ? addDays(day, 1) : day, end);
+  // An untouched time keeps its exact seconds.
+  const startDate = origStart && isSameDay(day, origStart) && start === hhmm(origStart) ? origStart : atTime(day, start);
+  const endDay = end < start ? addDays(day, 1) : day;
+  const endDate = origEnd && isSameDay(endDay, origEnd) && end === hhmm(origEnd) ? origEnd : atTime(endDay, end);
   const seconds = Math.round((endDate.getTime() - startDate.getTime()) / 1000);
+  // Time paused stays taken off, but never more than the session now lasts.
+  const paused = Math.min(session?.paused_seconds ?? 0, Math.max(0, seconds));
   const inFuture = endDate.getTime() > Date.now() && isSameDay(day, new Date());
   const missingOther = missingText(moduleId, what, otherText);
 
@@ -423,12 +436,24 @@ export function StudyMissedDialog({ study, initialModule, initialWhat, initialOt
     e.preventDefault();
     if (seconds <= 0 || inFuture || missingOther || saving) return;
     setSaving(true);
-    const { error: err } = await supabase.from("study_sessions").insert({
-      person: study.person,
+    const fields = {
       ...sessionFields(moduleId, what, otherText),
       started_at: startDate.toISOString(),
       ended_at: endDate.toISOString(),
-    });
+    };
+    const { error: err } = session
+      ? await supabase.from("study_sessions").update({ ...fields, paused_seconds: paused }).eq("id", session.id)
+      : await supabase.from("study_sessions").insert({ person: study.person, ...fields });
+    if (err) { setSaving(false); setError(err.message); return; }
+    notifyStudyChanged();
+    onClose();
+  };
+
+  const handleDelete = async () => {
+    if (!session || saving) return;
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    setSaving(true);
+    const { error: err } = await supabase.from("study_sessions").delete().eq("id", session.id);
     if (err) { setSaving(false); setError(err.message); return; }
     notifyStudyChanged();
     onClose();
@@ -436,11 +461,12 @@ export function StudyMissedDialog({ study, initialModule, initialWhat, initialOt
 
   return (
     <Portal>
-      <StudyModal title="Add Missed Session" onClose={onClose}>
+      <StudyModal title={session ? "Edit Session" : "Add Missed Session"} onClose={onClose}>
         <form onSubmit={handleSave} className="flex flex-col gap-5">
           <div className="flex flex-col gap-3">
-            <p className="text-[15px] font-medium text-white">Log time you forgot to clock</p>
-            <div className="text-3xl font-semibold text-white tabular-nums tracking-tight">{formatDuration(Math.max(0, seconds))}</div>
+            <p className="text-[15px] font-medium text-white">{session ? "Fix this session" : "Log time you forgot to clock"}</p>
+            <div className="text-3xl font-semibold text-white tabular-nums tracking-tight">{formatDuration(Math.max(0, seconds - paused))}</div>
+            {paused > 0 && <p className="text-xs text-white/40">{formatDuration(paused)} paused, not counted</p>}
           </div>
           <div className="flex flex-col gap-2"><FieldLabel>Date</FieldLabel><DatePills value={day} onChange={setDay} /></div>
           <div className="grid grid-cols-2 gap-3">
@@ -451,7 +477,19 @@ export function StudyMissedDialog({ study, initialModule, initialWhat, initialOt
           {(seconds <= 0 || inFuture || error) && (
             <p className="text-xs text-red-400/80">{error ?? (inFuture ? "That session hasn't finished yet." : "The end has to be after the start.")}</p>
           )}
-          <button type="submit" disabled={seconds <= 0 || inFuture || missingOther || saving} className={primaryButton}>Save session</button>
+          <div className="flex flex-col gap-2">
+            <button type="submit" disabled={seconds <= 0 || inFuture || missingOther || saving} className={primaryButton}>Save session</button>
+            {session && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={saving}
+                className="w-full py-2.5 border border-red-400/25 text-red-400/80 font-bold uppercase tracking-widest text-[10px] rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-40"
+              >
+                {confirmDelete ? "Tap again to delete" : "Delete session"}
+              </button>
+            )}
+          </div>
         </form>
       </StudyModal>
     </Portal>

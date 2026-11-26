@@ -26,9 +26,11 @@ interface MetricCardProps {
   expanded?: boolean;
   // Small pill under the card's text, e.g. "Early read".
   badge?: string;
+  // Thin stacked bar under the value, e.g. a module's mix of work types.
+  bar?: { value: number; color: string }[];
 }
 
-export function MetricCard({ title, value, prefix, suffix, className, sub, compact, onClick, expanded, badge }: MetricCardProps) {
+export function MetricCard({ title, value, prefix, suffix, className, sub, compact, onClick, expanded, badge, bar }: MetricCardProps) {
   const Tag = onClick ? "button" : "div";
   return (
     <Tag
@@ -51,14 +53,22 @@ export function MetricCard({ title, value, prefix, suffix, className, sub, compa
           )}
         />
       )}
-      <div className="flex items-baseline gap-1 mt-1 min-w-0">
+      {/* w-full: inside a <button> the lines don't always stretch, so long text would run past the edge. */}
+      <div className="flex items-baseline gap-1 mt-1 min-w-0 w-full">
         {prefix && <span className="text-sm text-muted-foreground/50 font-medium">{prefix}</span>}
         <span className={cn("font-semibold tracking-tight text-white truncate", compact ? "text-xl" : "text-2xl")}>{value}</span>
         {suffix && <span className="text-sm text-muted-foreground/50 font-medium">{suffix}</span>}
       </div>
       
+      {bar && bar.some((b) => b.value > 0) && (
+        <div className="w-full flex gap-0.5 h-1 mt-2.5">
+          {bar.filter((b) => b.value > 0).map((b, i) => (
+            <i key={i} className="block h-full min-w-[3px] first:rounded-l last:rounded-r" style={{ flex: b.value, background: b.color }} />
+          ))}
+        </div>
+      )}
       {sub && (
-        <div className="mt-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50 truncate">{sub}</div>
+        <div className="w-full mt-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50 truncate">{sub}</div>
       )}
       {badge && <EarlyBadge label={badge} className="self-start mt-1.5" />}
     </Tag>

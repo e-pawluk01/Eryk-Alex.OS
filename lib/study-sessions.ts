@@ -177,6 +177,16 @@ export function sessionFields(moduleId: string, what: string, otherText: string)
   return { module_id: moduleId, kind: "revision", material_id: null, deadline_id: null, note: null };
 }
 
+/** The form's choices for a saved session: the reverse of sessionFields. */
+export function choiceOf(s: Pick<StudySession, "module_id" | "kind" | "material_id" | "deadline_id" | "note">) {
+  if (!s.module_id) return { moduleId: OTHER, what: "", otherText: s.note ?? "" };
+  if (s.kind === "material" && s.material_id) return { moduleId: s.module_id, what: `material:${s.material_id}`, otherText: "" };
+  if (s.kind === "deadline" && s.deadline_id) return { moduleId: s.module_id, what: `deadline:${s.deadline_id}`, otherText: "" };
+  if (s.kind === "practice") return { moduleId: s.module_id, what: "practice", otherText: "" };
+  if (s.kind === "other") return { moduleId: s.module_id, what: CUSTOM, otherText: s.note ?? "" };
+  return { moduleId: s.module_id, what: "revision", otherText: "" };
+}
+
 /** True when the choice needs a typed description and none was given. */
 export function missingText(moduleId: string, what: string, otherText: string) {
   return (moduleId === OTHER || what === CUSTOM) && !otherText.trim();
