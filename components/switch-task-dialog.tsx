@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { WORK_TASKS, WorkSession, sessionLabel, switchSession, taskColor, workedSeconds } from "@/lib/work-sessions";
+import { Select } from "@/components/ui/select";
 
 interface SwitchTaskDialogProps {
   current: WorkSession;
@@ -108,17 +109,9 @@ export function SwitchTaskDialog({ current, parked, formatTime, onClose }: Switc
 
           <div className="flex flex-col gap-2">
             <label htmlFor="switch-task" className={fieldLabel}>Switch To</label>
-            <select
-              id="switch-task"
-              value={task}
-              onChange={(e) => setTask(e.target.value)}
-              disabled={busy}
+            <Select id="switch-task" value={task} onChange={setTask} disabled={busy} aria-label="Task"
               className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 transition-colors appearance-none"
-            >
-              {choices.map((t) => (
-                <option key={t} value={t} className="bg-zinc-900">{t}</option>
-              ))}
-            </select>
+              options={choices.map((t) => ({ value: t, label: t }))} />
             {task === "Other" && (
               <input
                 type="text"

@@ -15,6 +15,7 @@ import { StudyData } from "./use-study";
 import { MusicData } from "./use-music";
 import { FieldLabel, primaryButton, StudyModal } from "./bits";
 import { ModuleAndWhat, PromptDialog, StudyClockOutAll, StudyClockOutDialog, StudyMissedDialog, initialChoice, useTodaysTimedTasks } from "./study-clock-dialogs";
+import { Select } from "@/components/ui/select";
 
 const formatTime = (total: number) => {
   const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
@@ -380,15 +381,9 @@ function StartStudyDialog({ study, music, initialModule, tasks, onClose, onBegin
         </div>
         <div className="flex flex-col gap-2">
           <FieldLabel>Music · optional</FieldLabel>
-          <select
-            value={trackId}
-            onChange={e => setTrackId(e.target.value)}
-            aria-label="Music"
+          <Select value={trackId} onChange={setTrackId} aria-label="Music"
             className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/90 outline-none focus:border-white/30 transition-colors appearance-none"
-          >
-            <option value="" className="bg-zinc-900">{music.tracks.length ? "None" : "None (add tracks from the music button)"}</option>
-            {music.tracks.map(t => <option key={t.id} value={t.id} className="bg-zinc-900">{t.title}</option>)}
-          </select>
+            options={[{ value: "", label: music.tracks.length ? "None" : "None (add tracks from the music button)" }, ...music.tracks.map(t => ({ value: t.id, label: t.title }))]} />
         </div>
         <div className="flex flex-col gap-2 pt-2">
           <button type="submit" disabled={starting || missing} className={primaryButton}>{starting ? "Starting..." : "Begin Session"}</button>

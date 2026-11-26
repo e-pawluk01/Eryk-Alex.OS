@@ -151,7 +151,8 @@ export function StockView() {
               <span className={s.st}><StatusChip status={it.status} /></span>
               <span className={s.info}>{infoFor(it, batch?.number, data.categories.find((c) => c.id === it.category_id)?.name)}</span>
               <span className={s.since} title={`${since} days in ${STATUS_LABEL[it.status]}`}>{since}d</span>
-              <span className={s.pr}>{price ?? <span className={s.dash}>—</span>}</span>
+              {/* an order's "~£" price is an estimate: grey, like the panel's headline (Eryk, 26 Nov) */}
+              <span className={s.pr}>{price == null ? <span className={s.dash}>—</span> : price.startsWith("~") ? <span className={s.est}>{price}</span> : price}</span>
               <span className={s.plat}><span className={s.dash}>—</span></span>
             </div>
           );

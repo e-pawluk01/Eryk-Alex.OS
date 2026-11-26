@@ -67,9 +67,10 @@ export function ItemPanel({ item, data, onClose, onChanged }: {
     if (empty && !edit) return null;
     return (
       <div className={s.kvr}><span>{k}</span>
-        <span className={s.kvv}>{empty ? "—" : v}{edit && (
+        {/* pencil on the left of the value, so values line up with the other rows (Eryk, 26 Nov) */}
+        <span className={s.kvv}>{edit && (
           <button className={s.pen} onClick={() => setEditing(edit)} aria-label={`Change ${k.toLowerCase()}`} title="Change"><Pencil className="w-3 h-3" /></button>
-        )}</span>
+        )}{empty ? "—" : v}</span>
       </div>
     );
   };
@@ -209,7 +210,7 @@ function ItemHead({ item }: { item: StockItem }) {
 
 /** Ready (mockup 'ready'): what it needs, then Save. */
 function ReadyDialog({ item, busy, onClose, onSave }: { item: StockItem; busy: boolean; onClose: () => void; onSave: (n: Needs) => void }) {
-  const [n, setN] = useState<Needs>({ steam: item.needs_steam, repair: item.needs_repair, measure: item.needs_measure });
+  const [n, setN] = useState<Needs>({ steam: item.needs_steam, repair: item.needs_repair, measure: true }); // Measure ticked by default (Eryk, 26 Nov)
   return createPortal(
     <div className={s.root}>
       <div className={s.scrim} onClick={onClose} />
@@ -387,7 +388,6 @@ function EditDialog({ item, data, field, onClose, onSaved }: {
       <div className={s.scrim} onClick={onClose} />
       <div className={cx(s.modal, s.gapsm)} role="dialog" aria-modal="true" aria-label={`Change ${label.toLowerCase()}`}>
         <ModalHead title={`Change ${label.toLowerCase()}`} onClose={onClose} />
-        <ItemHead item={item} />
         {field === "category_id" ? (
           <Dropdown label="Category" value={v || null} options={data.categories.filter((c) => c.active || c.id === item.category_id).map((c) => ({ v: c.id, t: c.name }))} onPick={setV} />
         ) : (

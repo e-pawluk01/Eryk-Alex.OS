@@ -3,7 +3,7 @@
 // Batches on the Orders filter, the batch panel, and the Ship pop-up (mockup: batches(), batchSlide(), modal 'ship').
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Calendar, Ship, Package, Wind, Scissors, Ruler } from "lucide-react";
+import { X, Calendar, Ship, Package, PackageX, Undo2, Wind, Scissors, Ruler } from "lucide-react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { StockBatch, StockData, StockItem, batchTotals, batchSince, trackingUrl, shipBatch, arriveBatch, checkItems, CheckOutcome, Needs, gbp, sendInvoice } from "@/lib/stock";
 import { BatchPill, BatchChip, StatusChip, ModalHead, cx, dateLabel } from "./ui";
@@ -236,7 +236,7 @@ export function ArriveDialog({ batch, onClose, onArrived }: {
   );
 }
 
-type Draft = { out?: "ready" | "kept" | "damaged"; needs: Needs; by: "Eryk" | "Alex"; refund: string };
+type Draft = { out?: "ready" | "kept" | "damaged"; needs: Needs; by: "Eryk" | "Alex" | null; refund: string };
 const NEED_TICKS = [
   { key: "steam", label: "Steam", Icon: Wind },
   { key: "repair", label: "Repair", Icon: Scissors },
@@ -244,9 +244,9 @@ const NEED_TICKS = [
 ] as const;
 
 /** The three icon ticks (Steam · Repair · Measure), as in Add stock. */
-export function NeedTicks({ value, onChange }: { value: Needs; onChange: (n: Needs) => void }) {
+export function NeedTicks({ value, onChange, small }: { value: Needs; onChange: (n: Needs) => void; small?: boolean }) {
   return (
-    <div className={s.jobs}>
+    <div className={cx(s.jobs, small && s.jobsSm)}>
       {NEED_TICKS.map(({ key, label, Icon }) => (
         <button key={key} type="button" className={s.tick} aria-pressed={value[key]} aria-label={label} title={label}
           onClick={() => onChange({ ...value, [key]: !value[key] })}>
@@ -266,13 +266,15 @@ export function CheckDialog({ batch, data, onClose, onSaved }: {
 }) {
   const its: StockItem[] = data.items.filter((i) => i.batch_id === batch.id && i.status === "to_check")
     .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
-  const blank: Draft = { needs: { steam: false, repair: false, measure: false }, by: "Alex", refund: "" };
+  // Measure is ticked by default; who kept it has to be picked (Eryk, 26 Nov).
+  const blank: Draft = { needs: { steam: false, repair: false, measure: true }, by: null, refund: "" };
   const [d, setD] = useState<Record<string, Draft>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const get = (id: string) => d[id] ?? blank;
   const put = (id: string, patch: Partial<Draft>) => setD((p) => ({ ...p, [id]: { ...(p[id] ?? blank), ...patch } }));
-  const done = its.filter((i) => get(i.id).out).length;
+  // Checked = an outcome, and for Kept also who kept it.
+  const done = its.filter((i) => { const x = get(i.id); return x.out && (x.out !== "kept" || x.by); }).length;
   useEscape(onClose);
 
   const save = async () => {
@@ -282,7 +284,7 @@ export function CheckDialog({ batch, data, onClose, onSaved }: {
     try {
       const outcomes = new Map<string, CheckOutcome>(its.map((i) => {
         const x = get(i.id);
-        return [i.id, x.out === "ready" ? { out: "ready", needs: x.needs } : x.out === "kept" ? { out: "kept", by: x.by } : { out: "damaged", refund: money(x.refund) }];
+        return [i.id, x.out === "ready" ? { out: "ready", needs: x.needs } : x.out === "kept" ? { out: "kept", by: x.by! } : { out: "damaged", refund: money(x.refund) }];
       }));
       await checkItems(batch, data, outcomes);
       // Kept items: email each one's invoice (a PDF) to whoever kept it.
@@ -299,38 +301,56 @@ export function CheckDialog({ batch, data, onClose, onSaved }: {
   return createPortal(
     <div className={s.root}>
       <div className={s.scrim} onClick={onClose} />
-      {/* Reworked 25 Nov (mockup v122): wide, one fixed size, one line per item with its outcome on the right, and a
-          second line under the name that's always there, so picking an outcome never moves anything. */}
+      {/* Compact (Eryk's sketch, 26 Nov; mockup v127): one fixed-height row per item. Before choosing: Ready | Kept and a
+          small Damaged icon. After: a pill of the choice by the name, its follow-up on the right, and a back button.
+          One fixed size and fixed rows, so nothing moves. */}
       <div className={cx(s.modal, s.gapsm, s.wide, s.chkm)} role="dialog" aria-modal="true" aria-label={`Batch ${batch.number} arrival check`}>
         <ModalHead title={`Batch ${batch.number} · arrival check`} onClose={onClose} />
         <div className={s.chkhead}>
-          <span className={s.sub}>{done} of {its.length} checked</span>
+          <span className={s.chip} style={{ "--c": "#8a8f98" } as React.CSSProperties}>{done} of {its.length} checked</span>
           <button className={cx(s.btn, s.sm)} onClick={() => setD((p) => Object.fromEntries(its.map((i) => [i.id, { ...(p[i.id] ?? blank), out: p[i.id]?.out ?? "ready" }])))}>All ready</button>
         </div>
         <div className={cx(s.chklist, s.fill)}>
           {its.map((i) => {
             const x = get(i.id);
             return (
-              <div key={i.id} className={s.chk2}>
-                <div className={s.chkl}>
-                  <span className={s.mono}>{i.code}</span><span className={s.bn}>{i.name}</span>
-                  <div className={s.seg} role="group" aria-label={`Outcome for ${i.name}`}>
-                    {(["ready", "kept", "damaged"] as const).map((o) => (
-                      <button key={o} className={x.out === o ? s.on : undefined} onClick={() => put(i.id, { out: o })}>{o[0].toUpperCase() + o.slice(1)}</button>
-                    ))}
-                  </div>
-                </div>
-                <div className={s.chkx}>
-                  {x.out === "ready" && <NeedTicks value={x.needs} onChange={(n) => put(i.id, { needs: n })} />}
-                  {x.out === "kept" && (
-                    <div className={s.seg} role="group" aria-label="Kept by">
-                      {(["Eryk", "Alex"] as const).map((w) => <button key={w} className={x.by === w ? s.on : undefined} onClick={() => put(i.id, { by: w })}>{w}</button>)}
-                    </div>
+              <div key={i.id} className={s.ckrow}>
+                <span className={s.mono}>{i.code}</span>
+                <span className={s.ckn}>
+                  <span className={s.bn}>{i.name}</span>
+                  {x.out === "ready" && <span className={s.chip} style={{ "--c": "#8a8f98" } as React.CSSProperties}>Ready</span>}
+                  {x.out === "kept" && <StatusChip status="kept" />}
+                  {x.out === "damaged" && <span className={s.dmgi} title="Damaged" aria-label="Damaged"><PackageX className="w-4 h-4" /></span>}
+                </span>
+                <span className={s.ckr}>
+                  {!x.out ? (
+                    <>
+                      <div className={s.seg} role="group" aria-label={`Outcome for ${i.name}`}>
+                        <button onClick={() => put(i.id, { out: "ready" })}>Ready</button>
+                        <button onClick={() => put(i.id, { out: "kept" })}>Kept</button>
+                      </div>
+                      <button className={s.ckb} onClick={() => put(i.id, { out: "damaged" })} aria-label="Damaged" title="Damaged"><PackageX className="w-4 h-4" /></button>
+                    </>
+                  ) : (
+                    <>
+                      {x.out === "ready" && <NeedTicks value={x.needs} onChange={(n) => put(i.id, { needs: n })} small />}
+                      {x.out === "kept" && (
+                        // Same tick boxes as Steam / Repair / Measure; one of the two.
+                        <div className={cx(s.jobs, s.jobsSm)} role="radiogroup" aria-label="Kept by">
+                          {(["Eryk", "Alex"] as const).map((w) => (
+                            <button key={w} type="button" role="radio" aria-checked={x.by === w} aria-pressed={x.by === w} className={s.tick} onClick={() => put(i.id, { by: w })}>
+                              {w}<span className={s.box} />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {x.out === "damaged" && (
+                        <label className={cx(s.fi, s.ckref)}><span>Refund £</span><input className={s.inp} inputMode="decimal" value={x.refund} onChange={(e) => put(i.id, { refund: e.target.value })} aria-label="Refund" /></label>
+                      )}
+                      <button className={s.ckb} onClick={() => put(i.id, { out: undefined })} aria-label="Back" title="Back"><Undo2 className="w-[15px] h-[15px]" /></button>
+                    </>
                   )}
-                  {x.out === "damaged" && (
-                    <label className={cx(s.fi, s.chkref)}><span>Refund £</span><input className={s.inp} inputMode="decimal" value={x.refund} onChange={(e) => put(i.id, { refund: e.target.value })} aria-label="Refund" /></label>
-                  )}
-                </div>
+                </span>
               </div>
             );
           })}
