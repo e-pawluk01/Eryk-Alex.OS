@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { getMonthlyAnalytics } from '@/lib/sheets';
 import { generateMonthlyReportBuffer } from '@/lib/pdf';
-import { fetchSessionsForMonth, buildTimeBreakdown } from '@/lib/time-breakdown';
+import { fetchSessionsForMonth, buildTimeBreakdown, buildPeople } from '@/lib/time-breakdown';
 import { fetchReportHistory } from '@/lib/report-history';
 import { buildReportExtras } from '@/lib/report-extras';
 
@@ -53,6 +53,12 @@ export async function GET(request: Request) {
             expected_profit: inv.data.expectedProfit,
           };
         }
+      }
+
+      // Snapshots from before Individual Time: work it out from the sessions.
+      if (payload.time_breakdown && !payload.time_breakdown.people?.[0]?.weeks) {
+        const sessions = await fetchSessionsForMonth(supabase, dateObj);
+        payload = { ...payload, time_breakdown: { ...payload.time_breakdown, people: buildPeople(sessions, dateObj) } };
       }
     } else {
       // 2. If no snapshot exists, generate a simulated payload live

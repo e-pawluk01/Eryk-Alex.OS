@@ -5,6 +5,8 @@ import { View, Text, Svg, Path, Rect, Line, Text as SvgText, StyleSheet } from '
 export const PRINT = {
   blue: '#2a78d6', orange: '#eb6834', aqua: '#1baf7a', yellow: '#eda100',
   magenta: '#e87ba4', green: '#008300', violet: '#4a3aa7', red: '#e34948', other: '#8d8a83',
+  // "Other tasks" (the grouped rest) — kept apart from the "Other" task's grey.
+  grouped: '#d3cec4',
 };
 
 const TASK_PRINT: Record<string, string> = {
@@ -86,15 +88,16 @@ const topBar = (x: number, y: number, w: number, h: number, r = 2.5) => {
 export interface PdfSeries { color: string | string[]; values: number[] }
 
 // Vertical bars, side by side or stacked — page 2's column charts.
-export function ColumnChart({ width, height, categories, series, stacked, axis }: {
-  width: number; height: number; categories: string[]; series: PdfSeries[]; stacked?: boolean; axis: (v: number) => string;
+// scaleTo: draw to at least this value, so charts meant to be compared share one scale.
+export function ColumnChart({ width, height, categories, series, stacked, axis, scaleTo = 0 }: {
+  width: number; height: number; categories: string[]; series: PdfSeries[]; stacked?: boolean; axis: (v: number) => string; scaleTo?: number;
 }) {
   const pad = { t: 6, r: 4, b: 17, l: 32 };
   const plotW = width - pad.l - pad.r;
   const plotH = height - pad.t - pad.b;
   const tops = categories.map((_, c) =>
     stacked ? series.reduce((a, x) => a + x.values[c], 0) : Math.max(...series.map((x) => x.values[c])));
-  const { max, ticks } = niceScale(Math.max(0, ...tops));
+  const { max, ticks } = niceScale(Math.max(scaleTo, ...tops));
   const y = (v: number) => pad.t + plotH - (v / max) * plotH;
   const slot = plotW / categories.length;
   const barW = stacked ? Math.min(30, slot * 0.42) : Math.min(15, (slot * 0.56) / series.length);

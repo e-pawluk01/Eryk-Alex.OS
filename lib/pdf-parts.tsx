@@ -31,6 +31,7 @@ export const styles = StyleSheet.create({
     alignSelf: 'flex-start', marginTop: 4, fontSize: 5.75, color: '#666666', textTransform: 'uppercase', letterSpacing: 0.8,
     borderWidth: 0.75, borderColor: '#cfc9bd', borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1,
   },
+  belowChart: { marginTop: 14 },
   below: { marginTop: 9 },
   belowTwo: { marginTop: 9, flexDirection: 'row', justifyContent: 'space-between' },
 

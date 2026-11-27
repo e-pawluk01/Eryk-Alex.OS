@@ -27,6 +27,9 @@ const PROFIT_BANDS = [
   { label: '£60+', test: (p: number) => p >= 60, color: PRINT.violet },
 ];
 
+// Same person colours as the By person bar.
+const personPrint = (person: string) => (person === 'Alex' ? PRINT.orange : PRINT.blue);
+
 export interface MonthPoint { label: string; revenue: number; grossProfit: number }
 
 const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; history: MonthPoint[]; extras: ReportExtras | null }) => {
@@ -49,11 +52,14 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
   // Time
   const totalHours = num(snapshot.total_hours);
   const topTask = time?.byTask[0];
+  const people = time?.people ?? [];
+  // One scale for every person's weekly chart, so they compare at a glance.
+  const personWeekMax = Math.max(0, ...people.flatMap((p) => p.weeks ?? []));
   const topTasks = (time?.byTask ?? []).slice(0, 4).map((t) => t.task);
   const weekSeries = [...topTasks, 'Other tasks']
     .map((name) => ({
       name,
-      color: name === 'Other tasks' ? PRINT.other : taskPrint(name),
+      color: name === 'Other tasks' ? PRINT.grouped : taskPrint(name),
       values: (time?.weeks ?? []).map((w) => Object.entries(w.tasks)
         .filter(([t]) => (name === 'Other tasks' ? !topTasks.includes(t) : t === name))
         .reduce((a, [, h]) => a + h, 0)),
@@ -132,7 +138,7 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
           </View>
         </Section>
 
-        <Section label="Time">
+        <Section label="Joint Time">
           <View style={styles.grid}>
             <Metric label="Total Hours" value={fmtHours(totalHours)} />
             <Metric label="Hours / Week" value={fmtHours(totalHours / (daysInMonth / 7))} />
@@ -150,7 +156,7 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
             </View>
             <View style={{ width: 200 }}>
               <SplitBar label="By person" format={fmtHours} columns={1}
-                items={(time?.byPerson ?? []).map((p) => ({ label: p.person, value: p.hours, color: p.person === 'Alex' ? PRINT.orange : PRINT.blue }))} />
+                items={(time?.byPerson ?? []).map((p) => ({ label: p.person, value: p.hours, color: personPrint(p.person) }))} />
             </View>
           </View>
           )}
@@ -195,6 +201,41 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
         <Footer />
       </Page>
 
+      {/* INDIVIDUAL TIME — each person's month, laid out like page 1's Joint Time */}
+      {people.length > 0 && (
+        <Page size="A4" style={styles.page}>
+          <Running right="Individual Time" />
+          {people.map((p) => {
+            const top = p.byTask[0];
+            return (
+              <Section key={p.person} label={p.person}>
+                <View style={styles.grid}>
+                  <Metric label="Total Hours" value={fmtHours(p.hours)} />
+                  <Metric label="Hours / Week" value={fmtHours(p.hours / (daysInMonth / 7))} />
+                  <Metric label="Daily Average" value={p.daysWorked > 0 ? fmtMinutes((p.hours * 60) / p.daysWorked) : '—'}
+                    muted={p.daysWorked === 0} sub={`${p.daysWorked} day${p.daysWorked === 1 ? '' : 's'} worked`} />
+                  <Metric label="Top Task" value={top ? top.task : '—'} muted={!top}
+                    sub={top && p.hours > 0 ? `${fmtHours(top.hours)} · ${Math.round((top.hours / p.hours) * 100)}% of time` : undefined} />
+                </View>
+                <View style={styles.below}>
+                  <SplitBar label="Hours by task" format={fmtHours}
+                    items={p.byTask.map((t) => ({ label: t.task, value: t.hours, color: taskPrint(t.task) }))} />
+                </View>
+                {p.weeks && (
+                  <View style={styles.belowChart}>
+                    <ChartHead title="Hours per week" />
+                    <ColumnChart width={CHART_W} height={96} axis={(v) => `${v}h`}
+                      categories={(time?.weeks ?? []).map((w) => `${w.start}–${w.end} ${monthShort}`)}
+                      series={[{ color: personPrint(p.person), values: p.weeks }]} scaleTo={personWeekMax} />
+                  </View>
+                )}
+              </Section>
+            );
+          })}
+          <Footer />
+        </Page>
+      )}
+
       {/* PAGE 2 — STOCK HEALTH AND CATEGORIES (left out if the sheet couldn't be read) */}
       {extras && (
         <StockCategoriesPage extras={extras} monthLabel={String(snapshot.month_label ?? '')}
@@ -213,7 +254,7 @@ const MonthlyReportPDF = ({ snapshot, history, extras }: { snapshot: any; histor
           ]} />
         </Section>
 
-        <Section label="Time">
+        <Section label="Joint Time">
           <ChartHead title="Hours per week, by task"
             sub={weekSeries.some((x) => x.name === 'Other tasks') ? 'Top 4 tasks shown, the rest grouped' : undefined}
             keys={weekSeries.map((x) => ({ label: x.name, color: x.color }))} />

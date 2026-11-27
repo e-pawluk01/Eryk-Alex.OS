@@ -14,6 +14,8 @@ interface MetricSectionProps {
   chart?: React.ReactNode;
   // Colour key shown above the cards when they share colours (e.g. work types).
   legend?: { label: string; color: string }[];
+  // Extra controls in the heading, left of the grid/chart icons (e.g. a person switch).
+  actions?: React.ReactNode;
 }
 
 const storageKey = (title: string) => `analytics-view:${title}`;
@@ -21,7 +23,7 @@ const storageKey = (title: string) => `analytics-view:${title}`;
 // Shared wrapper for a titled block of MetricCards on the analytics dashboard.
 // Matches the existing heading + 2x4 grid pattern; first section sits flush,
 // the rest are separated by mt-8.
-export function MetricSection({ title, loading, children, detail, chart, legend }: MetricSectionProps) {
+export function MetricSection({ title, loading, children, detail, chart, legend, actions }: MetricSectionProps) {
   const [showChart, setShowChart] = useState(false);
 
   // Each section remembers numbers vs chart on this device.
@@ -44,18 +46,21 @@ export function MetricSection({ title, loading, children, detail, chart, legend 
     <div className="flex flex-col gap-4 mt-8 first:mt-0">
       <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
         <h2 className="text-sm uppercase tracking-[0.2em] text-muted-foreground">{title}</h2>
-        {chart && (
-          <div role="group" aria-label={`${title} view`} className="flex gap-0.5 p-0.5 rounded-lg border border-white/10 bg-white/[0.04]">
-            <button type="button" onClick={() => choose(false)} aria-pressed={!showChart}
-              aria-label={`Show ${title} as numbers`} title="Numbers" className={iconButton(!showChart)}>
-              <LayoutGrid className="w-3.5 h-3.5" />
-            </button>
-            <button type="button" onClick={() => choose(true)} aria-pressed={showChart}
-              aria-label={`Show ${title} as a chart`} title="Chart" className={iconButton(showChart)}>
-              <ChartColumn className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {actions}
+          {chart && (
+            <div role="group" aria-label={`${title} view`} className="flex gap-0.5 p-0.5 rounded-lg border border-white/10 bg-white/[0.04]">
+              <button type="button" onClick={() => choose(false)} aria-pressed={!showChart}
+                aria-label={`Show ${title} as numbers`} title="Numbers" className={iconButton(!showChart)}>
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button type="button" onClick={() => choose(true)} aria-pressed={showChart}
+                aria-label={`Show ${title} as a chart`} title="Chart" className={iconButton(showChart)}>
+                <ChartColumn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       {chart && showChart ? (
         chart
