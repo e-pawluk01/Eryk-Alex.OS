@@ -6,7 +6,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Calendar, Ship, Truck, Package, Tag, History, Camera, ChevronDown, Check, Wind, Scissors, Ruler, Pencil, Folder } from "lucide-react";
 import { photoFolder, itemPhotos } from "@/lib/photos";
-import { StockData, StockItem, LogEntry, Needs, Job, saveNotes, itemHistory, logLine, trackingUrl, gbp, checkItems, setJobDone, updateItem, landedCosts, sendInvoice } from "@/lib/stock";
+import { StockData, StockItem, LogEntry, Needs, Job, saveNotes, itemHistory, logLine, trackingUrl, gbp, atHome, checkItems, setJobDone, updateItem, landedCosts, sendInvoice } from "@/lib/stock";
 import { StatusChip, BatchPill, FloorIcon, ModalHead, Confirmation, cx, dateLabel } from "./ui";
 import { NeedTicks } from "./batches";
 import s from "./stock.module.css";
@@ -133,6 +133,7 @@ export function ItemPanel({ item, data, onClose, onChanged, onOpenInbox }: {
             <PhotosTab item={item} />
           ) : (
             <div className={s.kvwrap}>
+              {atHome(item) && <Location item={item} onChanged={onChanged} />}
               {item.source === "imported" && group("Order", [
                 row("Batch", batch ? String(batch.number) : null), row("Proxy", batch?.proxy), row("Bought on", item.bought_on, "bought_on"),
                 // What was paid can be corrected until the check sets the final cost from it.
@@ -435,6 +436,31 @@ function PhotosTab({ item }: { item: StockItem }) {
       <div className={s.pgrid}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {photos.map((p) => <span key={p.name} className={s.pimg} title={p.name}><img src={p.url} alt="" /></span>)}
+      </div>
+    </div>
+  );
+}
+
+/** Location (Eryk's sketch, 26 Nov): who has the piece. Blue Eryk, pink Alex; the other is grey, like a platform it isn't listed on. One tap changes it. */
+function Location({ item, onChanged }: { item: StockItem; onChanged: (msg?: string) => void }) {
+  const [at, setAt] = useState(item.location);
+  useEffect(() => setAt(item.location), [item.location]);
+  const pick = async (w: "Eryk" | "Alex") => {
+    if (w === at) return;
+    const was = at;
+    setAt(w);
+    try { await updateItem(item.id, { location: w }); onChanged(); }
+    catch { setAt(was); onChanged("Couldn't change the location"); }
+  };
+  return (
+    <div className={s.kvg}>
+      <div className={s.loch}>
+        <span className={s.lbl}>Location</span>
+        <span className={s.locp} role="radiogroup" aria-label="Location">
+          {(["Eryk", "Alex"] as const).map((w) => (
+            <button key={w} role="radio" aria-checked={at === w} className={cx(s.lpill, at === w && s[w])} onClick={() => pick(w)}>{w}</button>
+          ))}
+        </span>
       </div>
     </div>
   );
